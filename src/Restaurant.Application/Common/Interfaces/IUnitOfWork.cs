@@ -1,7 +1,9 @@
 namespace Restaurant.Application.Common.Interfaces;
 
-public interface IUnitOfWork : IAsyncDisposable
+public interface IUnitOfWork
 {
-    IRepository<T> Repository<T>() where T : class;
+    IRepository<TEntity> Repository<TEntity>()
+        where TEntity : class;
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

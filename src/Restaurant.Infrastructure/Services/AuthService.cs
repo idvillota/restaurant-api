@@ -4,31 +4,35 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Auth;
 using Restaurant.Domain.Entities;
 using Restaurant.Infrastructure.Authorization;
-using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
 
 public sealed class AuthService : IAuthService
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
 
-    public AuthService(ApplicationDbContext db, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService)
+    public AuthService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService)
     {
-        _db = db;
+        _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
     }
 
     public async Task<AuthResponseDto> RegisterTenantAsync(RegisterTenantDto dto, CancellationToken cancellationToken = default)
     {
+        var users = _unitOfWork.Repository<User>();
+        var tenants = _unitOfWork.Repository<Tenant>();
+        var rolesRepo = _unitOfWork.Repository<Role>();
+        var tenantUsers = _unitOfWork.Repository<TenantUser>();
+
         var normalizedEmail = NormalizeEmail(dto.AdminEmail);
-        if (await _db.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken))
+        if (await users.Query().AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken))
             throw new InvalidOperationException("Email is already registered.");
 
         var slugBase = Slugify(dto.TenantName);
-        var slug = await EnsureUniqueSlugAsync(slugBase, cancellationToken);
+        var slug = await EnsureUniqueSlugAsync(tenants, slugBase, cancellationToken);
 
         var tenant = new Tenant
         {
@@ -69,12 +73,11 @@ public sealed class AuthService : IAuthService
             RoleId = ownerRole.Id,
         });
 
-        await _db.Tenants.AddAsync(tenant, cancellationToken);
-        await _db.Users.AddAsync(user, cancellationToken);
-        foreach (var role in roles)
-            await _db.Roles.AddAsync(role, cancellationToken);
-        await _db.TenantUsers.AddAsync(tenantUser, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        await tenants.AddAsync(tenant, cancellationToken);
+        await users.AddAsync(user, cancellationToken);
+        await rolesRepo.AddRangeAsync(roles, cancellationToken);
+        await tenantUsers.AddAsync(tenantUser, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var token = _jwtTokenService.CreateAccessToken(user.Id, tenant.Id, user.Email, new[] { SystemRoles.Owner });
         return new AuthResponseDto
@@ -90,12 +93,15 @@ public sealed class AuthService : IAuthService
 
     public async Task<AuthResponseDto> LoginAsync(LoginDto dto, CancellationToken cancellationToken = default)
     {
+        var users = _unitOfWork.Repository<User>();
+        var tenantUsersRepo = _unitOfWork.Repository<TenantUser>();
+
         var normalizedEmail = NormalizeEmail(dto.Email);
-        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
+        var user = await users.Query().AsNoTracking().FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
         if (user is null || !_passwordHasher.Verify(dto.Password, user.PasswordHash))
             throw new UnauthorizedAccessException("Invalid credentials.");
 
-        var memberships = await _db.TenantUsers
+        var memberships = await tenantUsersRepo.Query()
             .AsNoTracking()
             .Include(tu => tu.Tenant)
             .Include(tu => tu.TenantUserRoles).ThenInclude(tur => tur.Role)
@@ -147,11 +153,14 @@ public sealed class AuthService : IAuthService
         };
     }
 
-    private async Task<string> EnsureUniqueSlugAsync(string baseSlug, CancellationToken cancellationToken)
+    private static async Task<string> EnsureUniqueSlugAsync(
+        IRepository<Tenant> tenants,
+        string baseSlug,
+        CancellationToken cancellationToken)
     {
         var slug = baseSlug;
         var i = 0;
-        while (await _db.Tenants.AnyAsync(t => t.Slug == slug, cancellationToken))
+        while (await tenants.Query().AnyAsync(t => t.Slug == slug, cancellationToken))
         {
             i++;
             slug = $"{baseSlug}-{i}";

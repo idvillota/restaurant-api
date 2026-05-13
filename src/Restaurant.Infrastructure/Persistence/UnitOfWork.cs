@@ -9,20 +9,19 @@ public sealed class UnitOfWork : IUnitOfWork
 
     public UnitOfWork(ApplicationDbContext db) => _db = db;
 
-    public IRepository<T> Repository<T>() where T : class
+    public IRepository<TEntity> Repository<TEntity>()
+        where TEntity : class
     {
-        var type = typeof(T);
+        var type = typeof(TEntity);
         if (!_repositories.TryGetValue(type, out var repo))
         {
-            repo = new GenericRepository<T>(_db);
+            repo = new Repository<TEntity>(_db);
             _repositories[type] = repo;
         }
 
-        return (IRepository<T>)repo;
+        return (IRepository<TEntity>)repo;
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);
-
-    public async ValueTask DisposeAsync() => await _db.DisposeAsync();
 }

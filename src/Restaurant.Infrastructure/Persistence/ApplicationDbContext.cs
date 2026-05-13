@@ -173,55 +173,55 @@ public sealed class ApplicationDbContext : DbContext
     private void ApplyTenantFilters(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantUser>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Role>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<TenantUserRole>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Employee>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductType>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Product>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Ingredient>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductIngredient>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Provider>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<DiningTable>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Customer>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Reservation>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ReservationTable>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrder>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrderLine>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Invoice>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Payment>().HasQueryFilter(e =>
-            !_currentTenant.TenantId.HasValue || e.TenantId == _currentTenant.TenantId.Value);
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

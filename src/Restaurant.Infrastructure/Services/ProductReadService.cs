@@ -2,24 +2,24 @@ using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Catalog;
-using Restaurant.Infrastructure.Persistence;
+using Restaurant.Domain.Entities;
 
 namespace Restaurant.Infrastructure.Services;
 
 public sealed class ProductReadService : IProductReadService
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IRepository<Product> _products;
     private readonly IMapper _mapper;
 
-    public ProductReadService(ApplicationDbContext db, IMapper mapper)
+    public ProductReadService(IRepository<Product> products, IMapper mapper)
     {
-        _db = db;
+        _products = products;
         _mapper = mapper;
     }
 
     public async Task<IReadOnlyList<ProductListItemDto>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await _db.Products
+        var rows = await _products.Query()
             .AsNoTracking()
             .Include(p => p.ProductType)
             .Where(p => p.IsActive)

@@ -24,9 +24,12 @@ public static class DependencyInjection
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(connectionString));
 
+        services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IProductReadService, ProductReadService>();
+        services.AddScoped<IIngredientService, IngredientService>();
 
         return services;
     }
