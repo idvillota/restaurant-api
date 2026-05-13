@@ -1,43 +1,42 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Restaurant.Application.Common.Interfaces;
-using Restaurant.Application.Features.Catalog;
-using Restaurant.Application.Features.Catalog.Products;
+using Restaurant.Application.Features.Catalog.ProductTypes;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
-public sealed class ProductsController : ControllerBase
+public sealed class ProductTypesController : ControllerBase
 {
-    private readonly IProductService _products;
+    private readonly IProductTypeService _service;
 
-    public ProductsController(IProductService products) => _products = products;
+    public ProductTypesController(IProductTypeService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ProductListItemDto>>> List(
+    public async Task<ActionResult<IReadOnlyList<ProductTypeDto>>> List(
         [FromQuery] bool includeInactive = false,
         CancellationToken cancellationToken = default) =>
-        Ok(await _products.ListAsync(includeInactive, cancellationToken));
+        Ok(await _service.ListAsync(includeInactive, cancellationToken));
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ProductListItemDto>> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<ProductTypeDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var item = await _products.GetByIdAsync(id, cancellationToken);
+        var item = await _service.GetByIdAsync(id, cancellationToken);
         return item is null ? NotFound() : Ok(item);
     }
 
     [HttpPost]
-    public async Task<ActionResult<ProductListItemDto>> Create(
-        [FromBody] CreateProductDto dto,
+    public async Task<ActionResult<ProductTypeDto>> Create(
+        [FromBody] CreateProductTypeDto dto,
         CancellationToken cancellationToken = default)
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
         try
         {
-            var created = await _products.CreateAsync(dto, cancellationToken);
+            var created = await _service.CreateAsync(dto, cancellationToken);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
         catch (InvalidOperationException ex)
@@ -47,16 +46,16 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<ProductListItemDto>> Update(
+    public async Task<ActionResult<ProductTypeDto>> Update(
         Guid id,
-        [FromBody] UpdateProductDto dto,
+        [FromBody] UpdateProductTypeDto dto,
         CancellationToken cancellationToken = default)
     {
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
         try
         {
-            var updated = await _products.UpdateAsync(id, dto, cancellationToken);
+            var updated = await _service.UpdateAsync(id, dto, cancellationToken);
             return updated is null ? NotFound() : Ok(updated);
         }
         catch (InvalidOperationException ex)
@@ -68,7 +67,14 @@ public sealed class ProductsController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> SoftDelete(Guid id, CancellationToken cancellationToken = default)
     {
-        var ok = await _products.SoftDeleteAsync(id, cancellationToken);
-        return ok ? NoContent() : NotFound();
+        try
+        {
+            var ok = await _service.SoftDeleteAsync(id, cancellationToken);
+            return ok ? NoContent() : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 }

@@ -29,6 +29,12 @@ public sealed class TenantDbFixture : IDisposable
         {
             cfg.AddProfile<IngredientMappingProfile>();
             cfg.AddProfile<ProductMappingProfile>();
+            cfg.AddProfile<ProductTypeMappingProfile>();
+            cfg.AddProfile<ProviderMappingProfile>();
+            cfg.AddProfile<EmployeeMappingProfile>();
+            cfg.AddProfile<DiningTableMappingProfile>();
+            cfg.AddProfile<CustomerMappingProfile>();
+            cfg.AddProfile<ReservationMappingProfile>();
         }).CreateMapper();
     }
 
@@ -61,6 +67,12 @@ public sealed class NoTenantDbFixture : IDisposable
         {
             cfg.AddProfile<IngredientMappingProfile>();
             cfg.AddProfile<ProductMappingProfile>();
+            cfg.AddProfile<ProductTypeMappingProfile>();
+            cfg.AddProfile<ProviderMappingProfile>();
+            cfg.AddProfile<EmployeeMappingProfile>();
+            cfg.AddProfile<DiningTableMappingProfile>();
+            cfg.AddProfile<CustomerMappingProfile>();
+            cfg.AddProfile<ReservationMappingProfile>();
         }).CreateMapper();
     }
 

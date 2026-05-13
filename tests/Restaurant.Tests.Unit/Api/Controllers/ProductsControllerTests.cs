@@ -11,7 +11,7 @@ public sealed class ProductsControllerTests
     [Fact]
     public async Task List_returns_ok_with_items()
     {
-        var mock = new Mock<IProductReadService>();
+        var mock = new Mock<IProductService>();
         var items = new List<ProductListItemDto>
         {
             new()
@@ -22,14 +22,15 @@ public sealed class ProductsControllerTests
                 UnitPrice = 1m,
                 ProductTypeId = Guid.NewGuid(),
                 ProductTypeName = "Type",
+                IsActive = true,
             },
         };
-        mock.Setup(s => s.ListAsync(default)).ReturnsAsync(items);
+        mock.Setup(s => s.ListAsync(false, It.IsAny<CancellationToken>())).ReturnsAsync(items);
         var controller = new ProductsController(mock.Object);
 
-        var result = await controller.List(CancellationToken.None);
+        var result = await controller.List(false, CancellationToken.None);
 
-        var ok = Assert.IsType<OkObjectResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
         var body = Assert.IsAssignableFrom<IReadOnlyList<ProductListItemDto>>(ok.Value);
         Assert.Single(body!);
     }

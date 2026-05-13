@@ -9,4 +9,5 @@ public class Customer : EntityBase, ITenantScoped
     public string? Email { get; set; }
     public string? Phone { get; set; }
     public string? TaxId { get; set; }
+    public bool IsActive { get; set; } = true;
 }

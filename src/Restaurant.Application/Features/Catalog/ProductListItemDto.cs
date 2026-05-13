@@ -8,4 +8,5 @@ public sealed class ProductListItemDto
     public decimal UnitPrice { get; set; }
     public Guid ProductTypeId { get; set; }
     public string ProductTypeName { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
 }
