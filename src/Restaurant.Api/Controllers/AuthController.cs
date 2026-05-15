@@ -10,8 +10,13 @@ namespace Restaurant.Api.Controllers;
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService) => _authService = authService;
+    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    {
+        _authService = authService;
+        _logger = logger;
+    }
 
     [AllowAnonymous]
     [HttpPost("register")]
@@ -32,17 +37,21 @@ public sealed class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginDto dto, CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Login attempt for email: {Email}", dto.Email);
         try
         {
             var result = await _authService.LoginAsync(dto, cancellationToken);
+            _logger.LogInformation("Login successful for email: {Email}", dto.Email);
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)
         {
+            _logger.LogWarning("Login failed for email: {Email} - {Message}", dto.Email, ex.Message);
             return Unauthorized(new { message = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
+            _logger.LogWarning("Login error for email: {Email} - {Message}", dto.Email, ex.Message);
             return BadRequest(new { message = ex.Message });
         }
     }

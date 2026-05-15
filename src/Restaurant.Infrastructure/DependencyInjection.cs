@@ -18,16 +18,17 @@ public static class DependencyInjection
         services.AddScoped<ICurrentTenantContext, CurrentTenantContext>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
-        var connectionString = configuration.GetConnectionString("Default")
-            ?? throw new InvalidOperationException("Connection string 'ConnectionStrings:Default' is not configured.");
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("Connection string 'ConnectionStrings:DefaultConnection' is not configured.");
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(connectionString));
+            options.UseNpgsql(connectionString));
 
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductTypeService, ProductTypeService>();
         services.AddScoped<IProviderService, ProviderService>();

@@ -21,12 +21,12 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<App
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString = configuration.GetConnectionString("Default")
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException(
-                $"Connection string 'Default' not found. Expected appsettings under: {apiProjectRoot}");
+                $"Connection string 'DefaultConnection' not found. Expected appsettings under: {apiProjectRoot}");
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseSqlServer(connectionString)
+            .UseNpgsql(connectionString)
             .Options;
 
         ICurrentTenantContext tenant = new CurrentTenantContext();
