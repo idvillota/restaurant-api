@@ -18,6 +18,7 @@ public sealed class ProductsControllerTests
             {
                 Id = Guid.NewGuid(),
                 Name = "Item",
+                Description = "Test description",
                 Sku = null,
                 UnitPrice = 1m,
                 ProductTypeId = Guid.NewGuid(),

@@ -59,6 +59,7 @@ public sealed class ProductService : IProductService
             Id = Guid.NewGuid(),
             ProductTypeId = dto.ProductTypeId,
             Name = name,
+            Description = NormalizeDescription(dto.Description),
             Sku = sku,
             UnitPrice = dto.UnitPrice,
             IsActive = true,
@@ -89,6 +90,7 @@ public sealed class ProductService : IProductService
 
         entity.ProductTypeId = dto.ProductTypeId;
         entity.Name = name;
+        entity.Description = NormalizeDescription(dto.Description);
         entity.Sku = sku;
         entity.UnitPrice = dto.UnitPrice;
         entity.IsActive = dto.IsActive;
@@ -113,4 +115,7 @@ public sealed class ProductService : IProductService
 
     private static string? NormalizeSku(string? sku) =>
         string.IsNullOrWhiteSpace(sku) ? null : sku.Trim();
+
+    private static string? NormalizeDescription(string? description) =>
+        string.IsNullOrWhiteSpace(description) ? null : description.Trim();
 }

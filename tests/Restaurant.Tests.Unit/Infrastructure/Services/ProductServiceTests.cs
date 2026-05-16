@@ -74,4 +74,37 @@ public sealed class ProductServiceTests
             sut.CreateAsync(
                 new CreateProductDto { ProductTypeId = typeId, Name = "X", UnitPrice = 1m }));
     }
+
+    [Fact]
+    public async Task CreateAsync_persists_description_and_returns_it_in_list()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        fx.Db.ProductTypes.Add(
+            new ProductType
+            {
+                Id = typeId,
+                TenantId = fx.TenantId,
+                Name = "Food",
+                SortOrder = 0,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new ProductService(fx.Repository<Product>(), fx.Repository<ProductType>(), fx.UnitOfWork, fx.Mapper);
+        var created = await sut.CreateAsync(
+            new CreateProductDto
+            {
+                ProductTypeId = typeId,
+                Name = "House salad",
+                Description = "  Fresh greens  ",
+                UnitPrice = 8.5m,
+            });
+
+        Assert.Equal("Fresh greens", created.Description);
+
+        var list = await sut.ListAsync();
+        Assert.Single(list);
+        Assert.Equal("Fresh greens", list[0].Description);
+    }
 }

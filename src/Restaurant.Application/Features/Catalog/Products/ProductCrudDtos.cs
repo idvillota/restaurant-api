@@ -11,6 +11,8 @@ public sealed class CreateProductDto
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
+    public string? Description { get; set; }
+
     [MaxLength(80)]
     public string? Sku { get; set; }
 
@@ -26,6 +28,8 @@ public sealed class UpdateProductDto
     [Required]
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
 
     [MaxLength(80)]
     public string? Sku { get; set; }
