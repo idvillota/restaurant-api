@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog;
 using Restaurant.Application.Features.Catalog.Products;
 
@@ -16,10 +17,10 @@ public sealed class ProductsController : ControllerBase
     public ProductsController(IProductService products) => _products = products;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ProductListItemDto>>> List(
-        [FromQuery] bool includeInactive = false,
+    public async Task<ActionResult<PagedResult<ProductListItemDto>>> List(
+        [FromQuery] ListQuery query,
         CancellationToken cancellationToken = default) =>
-        Ok(await _products.ListAsync(includeInactive, cancellationToken));
+        Ok(await _products.ListAsync(query, cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProductListItemDto>> GetById(Guid id, CancellationToken cancellationToken = default)

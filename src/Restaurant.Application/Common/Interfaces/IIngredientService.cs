@@ -1,10 +1,11 @@
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog.Ingredients;
 
 namespace Restaurant.Application.Common.Interfaces;
 
 public interface IIngredientService
 {
-    Task<IReadOnlyList<IngredientDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
+    Task<PagedResult<IngredientDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default);
 
     Task<IngredientDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 

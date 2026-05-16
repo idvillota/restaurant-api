@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Operations.DiningTables;
 
 namespace Restaurant.Api.Controllers;
@@ -15,10 +16,10 @@ public sealed class DiningTablesController : ControllerBase
     public DiningTablesController(IDiningTableService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<DiningTableDto>>> List(
-        [FromQuery] bool includeInactive = false,
+    public async Task<ActionResult<PagedResult<DiningTableDto>>> List(
+        [FromQuery] ListQuery query,
         CancellationToken cancellationToken = default) =>
-        Ok(await _service.ListAsync(includeInactive, cancellationToken));
+        Ok(await _service.ListAsync(query, cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DiningTableDto>> GetById(Guid id, CancellationToken cancellationToken = default)

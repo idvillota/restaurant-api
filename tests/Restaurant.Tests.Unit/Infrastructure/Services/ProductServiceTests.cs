@@ -1,3 +1,4 @@
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog.Products;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
@@ -53,12 +54,12 @@ public sealed class ProductServiceTests
         await fx.Db.SaveChangesAsync();
 
         var sut = CreateSut(fx);
-        var list = await sut.ListAsync();
+        var list = await sut.ListAsync(new ListQuery { Page = 1, PageSize = 100 });
 
-        Assert.Single(list);
-        Assert.Equal("Apple pie", list[0].Name);
-        Assert.Equal("Food", list[0].ProductTypeName);
-        Assert.True(list[0].IsActive);
+        Assert.Single(list.Items);
+        Assert.Equal("Apple pie", list.Items[0].Name);
+        Assert.Equal("Food", list.Items[0].ProductTypeName);
+        Assert.True(list.Items[0].IsActive);
     }
 
     [Fact]
@@ -112,9 +113,9 @@ public sealed class ProductServiceTests
 
         Assert.Equal("Fresh greens", created.Description);
 
-        var list = await sut.ListAsync();
-        Assert.Single(list);
-        Assert.Equal("Fresh greens", list[0].Description);
+        var list = await sut.ListAsync(new ListQuery { Page = 1, PageSize = 100 });
+        Assert.Single(list.Items);
+        Assert.Equal("Fresh greens", list.Items[0].Description);
     }
 
     [Fact]
@@ -186,7 +187,54 @@ public sealed class ProductServiceTests
         Assert.NotNull(loaded);
         Assert.Equal(1.75m, loaded!.CostPrice);
 
-        var list = await sut.ListAsync();
-        Assert.Equal(1.75m, list.Single(p => p.Id == productId).CostPrice);
+        var list = await sut.ListAsync(new ListQuery { Page = 1, PageSize = 100, IncludeInactive = true });
+        Assert.Equal(1.75m, list.Items.Single(p => p.Id == productId).CostPrice);
+    }
+
+    [Fact]
+    public async Task SetRecipeAsync_throws_when_quantity_is_zero()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var ingredientId = Guid.NewGuid();
+
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+        fx.Db.IngredientCategories.Add(
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", SortOrder = 0, IsActive = true });
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Cake",
+                UnitPrice = 20m,
+                IsActive = true,
+            });
+        fx.Db.Ingredients.Add(
+            new Ingredient
+            {
+                Id = ingredientId,
+                TenantId = fx.TenantId,
+                IngredientCategoryId = categoryId,
+                Name = "Flour",
+                Unit = IngredientUnit.Kilogram,
+                UnitCost = 2m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.SetRecipeAsync(
+                productId,
+                new SetProductRecipeDto
+                {
+                    Lines = [new SetProductRecipeLineDto { IngredientId = ingredientId, Quantity = 0m }],
+                }));
     }
 }

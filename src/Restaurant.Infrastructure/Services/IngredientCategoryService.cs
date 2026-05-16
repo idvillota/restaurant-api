@@ -1,8 +1,10 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog.IngredientCategories;
 using Restaurant.Domain.Entities;
+using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -25,14 +27,13 @@ public sealed class IngredientCategoryService : IIngredientCategoryService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyList<IngredientCategoryDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
-    {
-        var query = _categories.Query().AsNoTracking().OrderBy(c => c.SortOrder).ThenBy(c => c.Name);
-        var list = includeInactive
-            ? await query.ToListAsync(cancellationToken)
-            : await query.Where(c => c.IsActive).ToListAsync(cancellationToken);
-        return _mapper.Map<IReadOnlyList<IngredientCategoryDto>>(list);
-    }
+    public Task<PagedResult<IngredientCategoryDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync(
+            _categories.Query().AsNoTracking(),
+            query,
+            q => PagedEntityQueries.ShapeIngredientCategories(q, query),
+            entities => Task.FromResult<IReadOnlyList<IngredientCategoryDto>>(_mapper.Map<IReadOnlyList<IngredientCategoryDto>>(entities.ToList())),
+            cancellationToken);
 
     public async Task<IngredientCategoryDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {

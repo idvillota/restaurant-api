@@ -1,8 +1,10 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Operations.DiningTables;
 using Restaurant.Domain.Entities;
+using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -19,14 +21,13 @@ public sealed class DiningTableService : IDiningTableService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyList<DiningTableDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
-    {
-        var query = _tables.Query().AsNoTracking().OrderBy(t => t.Zone).ThenBy(t => t.Code);
-        var list = includeInactive
-            ? await query.ToListAsync(cancellationToken)
-            : await query.Where(t => t.IsActive).ToListAsync(cancellationToken);
-        return _mapper.Map<IReadOnlyList<DiningTableDto>>(list);
-    }
+    public Task<PagedResult<DiningTableDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync(
+            _tables.Query().AsNoTracking(),
+            query,
+            q => PagedEntityQueries.ShapeDiningTables(q, query),
+            entities => Task.FromResult<IReadOnlyList<DiningTableDto>>(_mapper.Map<IReadOnlyList<DiningTableDto>>(entities.ToList())),
+            cancellationToken);
 
     public async Task<DiningTableDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {

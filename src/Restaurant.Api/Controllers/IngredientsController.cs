@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog.Ingredients;
 
 namespace Restaurant.Api.Controllers;
@@ -15,13 +16,10 @@ public sealed class IngredientsController : ControllerBase
     public IngredientsController(IIngredientService ingredients) => _ingredients = ingredients;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<IngredientDto>>> List(
-        [FromQuery] bool includeInactive = false,
-        CancellationToken cancellationToken = default)
-    {
-        var items = await _ingredients.ListAsync(includeInactive, cancellationToken);
-        return Ok(items);
-    }
+    public async Task<ActionResult<PagedResult<IngredientDto>>> List(
+        [FromQuery] ListQuery query,
+        CancellationToken cancellationToken = default) =>
+        Ok(await _ingredients.ListAsync(query, cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<IngredientDto>> GetById(Guid id, CancellationToken cancellationToken = default)

@@ -1,8 +1,10 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Organization.Employees;
 using Restaurant.Domain.Entities;
+using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -19,14 +21,13 @@ public sealed class EmployeeService : IEmployeeService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyList<EmployeeDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
-    {
-        var query = _employees.Query().AsNoTracking().OrderBy(e => e.FullName);
-        var list = includeInactive
-            ? await query.ToListAsync(cancellationToken)
-            : await query.Where(e => e.IsActive).ToListAsync(cancellationToken);
-        return _mapper.Map<IReadOnlyList<EmployeeDto>>(list);
-    }
+    public Task<PagedResult<EmployeeDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync(
+            _employees.Query().AsNoTracking(),
+            query,
+            q => PagedEntityQueries.ShapeEmployees(q, query),
+            entities => Task.FromResult<IReadOnlyList<EmployeeDto>>(_mapper.Map<IReadOnlyList<EmployeeDto>>(entities.ToList())),
+            cancellationToken);
 
     public async Task<EmployeeDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {

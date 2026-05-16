@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog.Ingredients;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
@@ -126,10 +127,10 @@ public sealed class IngredientServiceTests
                 Unit = IngredientUnit.Unit,
             });
 
-        var list = await sut.ListAsync(includeInactive: false);
+        var list = await sut.ListAsync(new ListQuery { Page = 1, PageSize = 100 });
 
-        Assert.Single(list);
-        Assert.Equal("B", list[0].Name);
+        Assert.Single(list.Items);
+        Assert.Equal("B", list.Items[0].Name);
     }
 
     [Fact]
@@ -154,9 +155,9 @@ public sealed class IngredientServiceTests
                 Unit = IngredientUnit.Unit,
             });
 
-        var list = await sut.ListAsync(includeInactive: true);
+        var list = await sut.ListAsync(new ListQuery { Page = 1, PageSize = 100, IncludeInactive = true });
 
-        Assert.Equal(2, list.Count);
+        Assert.Equal(2, list.TotalCount);
     }
 
     [Fact]

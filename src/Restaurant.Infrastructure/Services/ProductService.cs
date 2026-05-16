@@ -1,9 +1,11 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog;
 using Restaurant.Application.Features.Catalog.Products;
 using Restaurant.Domain.Entities;
+using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -32,14 +34,21 @@ public sealed class ProductService : IProductService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyList<ProductListItemDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
-    {
-        var query = _products.Query().AsNoTracking().Include(p => p.ProductType).OrderBy(p => p.Name);
-        var list = includeInactive
-            ? await query.ToListAsync(cancellationToken)
-            : await query.Where(p => p.IsActive).ToListAsync(cancellationToken);
-        return await MapProductsAsync(list, cancellationToken);
-    }
+    public Task<PagedResult<ProductListItemDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync<Product, ProductListItemDto>(
+            _products.Query().AsNoTracking(),
+            query,
+            q => PagedEntityQueries.ShapeProducts(q, query),
+            async entities =>
+            {
+                var products = entities.ToList();
+                var costs = await GetCostPricesByProductIdsAsync(products.Select(p => p.Id).ToList(), cancellationToken);
+                IReadOnlyList<ProductListItemDto> items = products
+                    .Select(p => MapProduct(p, costs.GetValueOrDefault(p.Id)))
+                    .ToList();
+                return items;
+            },
+            cancellationToken);
 
     public async Task<ProductListItemDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -263,14 +272,6 @@ public sealed class ProductService : IProductService
         var dto = _mapper.Map<ProductListItemDto>(product);
         dto.CostPrice = costPrice;
         return dto;
-    }
-
-    private async Task<IReadOnlyList<ProductListItemDto>> MapProductsAsync(
-        List<Product> products,
-        CancellationToken cancellationToken)
-    {
-        var costs = await GetCostPricesByProductIdsAsync(products.Select(p => p.Id).ToList(), cancellationToken);
-        return products.Select(p => MapProduct(p, costs.GetValueOrDefault(p.Id))).ToList();
     }
 
     private static string? NormalizeSku(string? sku) =>

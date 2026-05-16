@@ -1,8 +1,10 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Reservations;
 using Restaurant.Domain.Entities;
+using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -25,14 +27,13 @@ public sealed class ReservationService : IReservationService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyList<ReservationDto>> ListAsync(CancellationToken cancellationToken = default)
-    {
-        var list = await _reservations.Query()
-            .AsNoTracking()
-            .OrderByDescending(r => r.StartAtUtc)
-            .ToListAsync(cancellationToken);
-        return _mapper.Map<IReadOnlyList<ReservationDto>>(list);
-    }
+    public Task<PagedResult<ReservationDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync(
+            _reservations.Query().AsNoTracking(),
+            query,
+            q => PagedEntityQueries.ShapeReservations(q, query),
+            entities => Task.FromResult<IReadOnlyList<ReservationDto>>(_mapper.Map<IReadOnlyList<ReservationDto>>(entities.ToList())),
+            cancellationToken);
 
     public async Task<ReservationDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {

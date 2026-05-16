@@ -1,8 +1,10 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Procurement.Providers;
 using Restaurant.Domain.Entities;
+using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -19,14 +21,13 @@ public sealed class ProviderService : IProviderService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyList<ProviderDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
-    {
-        var query = _providers.Query().AsNoTracking().OrderBy(p => p.Name);
-        var list = includeInactive
-            ? await query.ToListAsync(cancellationToken)
-            : await query.Where(p => p.IsActive).ToListAsync(cancellationToken);
-        return _mapper.Map<IReadOnlyList<ProviderDto>>(list);
-    }
+    public Task<PagedResult<ProviderDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync(
+            _providers.Query().AsNoTracking(),
+            query,
+            q => PagedEntityQueries.ShapeProviders(q, query),
+            entities => Task.FromResult<IReadOnlyList<ProviderDto>>(_mapper.Map<IReadOnlyList<ProviderDto>>(entities.ToList())),
+            cancellationToken);
 
     public async Task<ProviderDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {

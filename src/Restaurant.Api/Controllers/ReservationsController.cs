@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Reservations;
 
 namespace Restaurant.Api.Controllers;
@@ -15,8 +16,10 @@ public sealed class ReservationsController : ControllerBase
     public ReservationsController(IReservationService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ReservationDto>>> List(CancellationToken cancellationToken = default) =>
-        Ok(await _service.ListAsync(cancellationToken));
+    public async Task<ActionResult<PagedResult<ReservationDto>>> List(
+        [FromQuery] ListQuery query,
+        CancellationToken cancellationToken = default) =>
+        Ok(await _service.ListAsync(query, cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ReservationDto>> GetById(Guid id, CancellationToken cancellationToken = default)

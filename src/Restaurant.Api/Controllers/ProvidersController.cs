@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Procurement.Providers;
 
 namespace Restaurant.Api.Controllers;
@@ -15,10 +16,10 @@ public sealed class ProvidersController : ControllerBase
     public ProvidersController(IProviderService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ProviderDto>>> List(
-        [FromQuery] bool includeInactive = false,
+    public async Task<ActionResult<PagedResult<ProviderDto>>> List(
+        [FromQuery] ListQuery query,
         CancellationToken cancellationToken = default) =>
-        Ok(await _service.ListAsync(includeInactive, cancellationToken));
+        Ok(await _service.ListAsync(query, cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProviderDto>> GetById(Guid id, CancellationToken cancellationToken = default)

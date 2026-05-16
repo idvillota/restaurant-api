@@ -1,8 +1,10 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog.ProductTypes;
 using Restaurant.Domain.Entities;
+using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -25,14 +27,13 @@ public sealed class ProductTypeService : IProductTypeService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyList<ProductTypeDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
-    {
-        var query = _productTypes.Query().AsNoTracking().OrderBy(t => t.SortOrder).ThenBy(t => t.Name);
-        var list = includeInactive
-            ? await query.ToListAsync(cancellationToken)
-            : await query.Where(t => t.IsActive).ToListAsync(cancellationToken);
-        return _mapper.Map<IReadOnlyList<ProductTypeDto>>(list);
-    }
+    public Task<PagedResult<ProductTypeDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
+        ListQueryHelpers.ToPagedResultAsync(
+            _productTypes.Query().AsNoTracking(),
+            query,
+            q => PagedEntityQueries.ShapeProductTypes(q, query),
+            entities => Task.FromResult<IReadOnlyList<ProductTypeDto>>(_mapper.Map<IReadOnlyList<ProductTypeDto>>(entities.ToList())),
+            cancellationToken);
 
     public async Task<ProductTypeDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
