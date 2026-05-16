@@ -21,6 +21,7 @@ public sealed class ProductsControllerTests
                 Description = "Test description",
                 Sku = null,
                 UnitPrice = 1m,
+                CostPrice = 0m,
                 ProductTypeId = Guid.NewGuid(),
                 ProductTypeName = "Type",
                 IsActive = true,

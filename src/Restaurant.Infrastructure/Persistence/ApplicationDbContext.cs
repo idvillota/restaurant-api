@@ -105,6 +105,7 @@ public sealed class ApplicationDbContext : DbContext
                 .HasForeignKey(x => x.IngredientCategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.UnitCost).HasPrecision(18, 4);
             e.Property(x => x.StockQuantity).HasPrecision(18, 4);
             e.Property(x => x.ReorderLevel).HasPrecision(18, 4);
         });

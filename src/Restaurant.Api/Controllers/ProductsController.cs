@@ -71,4 +71,30 @@ public sealed class ProductsController : ControllerBase
         var ok = await _products.SoftDeleteAsync(id, cancellationToken);
         return ok ? NoContent() : NotFound();
     }
+
+    [HttpGet("{id:guid}/recipe")]
+    public async Task<ActionResult<ProductRecipeDto>> GetRecipe(Guid id, CancellationToken cancellationToken = default)
+    {
+        var recipe = await _products.GetRecipeAsync(id, cancellationToken);
+        return recipe is null ? NotFound() : Ok(recipe);
+    }
+
+    [HttpPut("{id:guid}/recipe")]
+    public async Task<ActionResult<ProductRecipeDto>> SetRecipe(
+        Guid id,
+        [FromBody] SetProductRecipeDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+        try
+        {
+            var recipe = await _products.SetRecipeAsync(id, dto, cancellationToken);
+            return recipe is null ? NotFound() : Ok(recipe);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 }

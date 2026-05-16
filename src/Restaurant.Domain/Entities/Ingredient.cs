@@ -9,6 +9,7 @@ public class Ingredient : EntityBase, ITenantScoped
     public Guid IngredientCategoryId { get; set; }
     public string Name { get; set; } = string.Empty;
     public IngredientUnit Unit { get; set; }
+    public decimal? UnitCost { get; set; }
     public decimal? StockQuantity { get; set; }
     public decimal? ReorderLevel { get; set; }
     public bool IsActive { get; set; } = true;

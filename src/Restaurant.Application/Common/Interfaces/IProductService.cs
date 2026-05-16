@@ -10,4 +10,6 @@ public interface IProductService
     Task<ProductListItemDto> CreateAsync(CreateProductDto dto, CancellationToken cancellationToken = default);
     Task<ProductListItemDto?> UpdateAsync(Guid id, UpdateProductDto dto, CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ProductRecipeDto?> GetRecipeAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<ProductRecipeDto?> SetRecipeAsync(Guid productId, SetProductRecipeDto dto, CancellationToken cancellationToken = default);
 }

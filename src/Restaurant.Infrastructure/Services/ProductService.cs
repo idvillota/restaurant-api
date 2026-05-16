@@ -11,17 +11,23 @@ public sealed class ProductService : IProductService
 {
     private readonly IRepository<Product> _products;
     private readonly IRepository<ProductType> _productTypes;
+    private readonly IRepository<ProductIngredient> _productIngredients;
+    private readonly IRepository<Ingredient> _ingredients;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
 
     public ProductService(
         IRepository<Product> products,
         IRepository<ProductType> productTypes,
+        IRepository<ProductIngredient> productIngredients,
+        IRepository<Ingredient> ingredients,
         IUnitOfWork unitOfWork,
         IMapper mapper)
     {
         _products = products;
         _productTypes = productTypes;
+        _productIngredients = productIngredients;
+        _ingredients = ingredients;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
     }
@@ -32,13 +38,17 @@ public sealed class ProductService : IProductService
         var list = includeInactive
             ? await query.ToListAsync(cancellationToken)
             : await query.Where(p => p.IsActive).ToListAsync(cancellationToken);
-        return _mapper.Map<IReadOnlyList<ProductListItemDto>>(list);
+        return await MapProductsAsync(list, cancellationToken);
     }
 
     public async Task<ProductListItemDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _products.Query().AsNoTracking().Include(p => p.ProductType).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-        return entity is null ? null : _mapper.Map<ProductListItemDto>(entity);
+        if (entity is null)
+            return null;
+
+        var costPrice = await GetCostPriceAsync(id, cancellationToken);
+        return MapProduct(entity, costPrice);
     }
 
     public async Task<ProductListItemDto> CreateAsync(CreateProductDto dto, CancellationToken cancellationToken = default)
@@ -68,7 +78,7 @@ public sealed class ProductService : IProductService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         entity = await _products.Query().AsNoTracking().Include(p => p.ProductType).FirstAsync(p => p.Id == entity.Id, cancellationToken);
-        return _mapper.Map<ProductListItemDto>(entity);
+        return MapProduct(entity, 0m);
     }
 
     public async Task<ProductListItemDto?> UpdateAsync(Guid id, UpdateProductDto dto, CancellationToken cancellationToken = default)
@@ -98,7 +108,8 @@ public sealed class ProductService : IProductService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         entity = await _products.Query().AsNoTracking().Include(p => p.ProductType).FirstAsync(p => p.Id == id, cancellationToken);
-        return _mapper.Map<ProductListItemDto>(entity);
+        var costPrice = await GetCostPriceAsync(id, cancellationToken);
+        return MapProduct(entity, costPrice);
     }
 
     public async Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -111,6 +122,155 @@ public sealed class ProductService : IProductService
         _products.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<ProductRecipeDto?> GetRecipeAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        var product = await _products.Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+        if (product is null)
+            return null;
+
+        var lines = await _productIngredients.Query()
+            .AsNoTracking()
+            .Where(pi => pi.ProductId == productId)
+            .Include(pi => pi.Ingredient)
+            .ThenInclude(i => i.IngredientCategory)
+            .OrderBy(pi => pi.Ingredient.Name)
+            .ToListAsync(cancellationToken);
+
+        return BuildRecipeDto(product, lines);
+    }
+
+    public async Task<ProductRecipeDto?> SetRecipeAsync(Guid productId, SetProductRecipeDto dto, CancellationToken cancellationToken = default)
+    {
+        var product = await _products.GetByIdAsync(productId, cancellationToken);
+        if (product is null)
+            return null;
+
+        var items = dto.Lines ?? [];
+        var ingredientIds = items.Select(i => i.IngredientId).ToList();
+        if (ingredientIds.Distinct().Count() != ingredientIds.Count)
+            throw new InvalidOperationException("Duplicate ingredients are not allowed.");
+
+        if (items.Any(i => i.Quantity <= 0))
+            throw new InvalidOperationException("Each ingredient quantity must be greater than zero.");
+
+        if (ingredientIds.Count > 0)
+        {
+            var activeCount = await _ingredients.Query()
+                .CountAsync(i => ingredientIds.Contains(i.Id) && i.IsActive, cancellationToken);
+            if (activeCount != ingredientIds.Count)
+                throw new InvalidOperationException("One or more ingredients were not found or are inactive.");
+        }
+
+        var existing = await _productIngredients.Query()
+            .Where(pi => pi.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        var incoming = items.ToDictionary(i => i.IngredientId, i => i.Quantity);
+
+        foreach (var row in existing)
+        {
+            if (!incoming.TryGetValue(row.IngredientId, out var quantity))
+            {
+                _productIngredients.Remove(row);
+                continue;
+            }
+
+            row.Quantity = quantity;
+            _productIngredients.Update(row);
+            incoming.Remove(row.IngredientId);
+        }
+
+        foreach (var (ingredientId, quantity) in incoming)
+        {
+            await _productIngredients.AddAsync(
+                new ProductIngredient
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = productId,
+                    IngredientId = ingredientId,
+                    Quantity = quantity,
+                },
+                cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await GetRecipeAsync(productId, cancellationToken);
+    }
+
+    private static ProductRecipeDto BuildRecipeDto(Product product, List<ProductIngredient> lines)
+    {
+        var lineDtos = lines.Select(MapLine).ToList();
+        return new ProductRecipeDto
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            UnitPrice = product.UnitPrice,
+            CostPrice = lineDtos.Sum(l => l.LineCost),
+            Lines = lineDtos,
+        };
+    }
+
+    private static ProductRecipeLineDto MapLine(ProductIngredient pi)
+    {
+        var ingredient = pi.Ingredient;
+        var lineCost = ComputeLineCost(pi.Quantity, ingredient.UnitCost);
+        return new ProductRecipeLineDto
+        {
+            Id = pi.Id,
+            IngredientId = pi.IngredientId,
+            IngredientName = ingredient.Name,
+            IngredientCategoryId = ingredient.IngredientCategoryId,
+            IngredientCategoryName = ingredient.IngredientCategory.Name,
+            Unit = ingredient.Unit,
+            UnitCost = ingredient.UnitCost,
+            Quantity = pi.Quantity,
+            LineCost = lineCost,
+        };
+    }
+
+    internal static decimal ComputeLineCost(decimal quantity, decimal? unitCost) =>
+        quantity * (unitCost ?? 0m);
+
+    private async Task<decimal> GetCostPriceAsync(Guid productId, CancellationToken cancellationToken)
+    {
+        var costs = await GetCostPricesByProductIdsAsync([productId], cancellationToken);
+        return costs.GetValueOrDefault(productId);
+    }
+
+    private async Task<Dictionary<Guid, decimal>> GetCostPricesByProductIdsAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken)
+    {
+        if (productIds.Count == 0)
+            return new Dictionary<Guid, decimal>();
+
+        return await _productIngredients.Query()
+            .AsNoTracking()
+            .Where(pi => productIds.Contains(pi.ProductId))
+            .GroupBy(pi => pi.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                CostPrice = g.Sum(pi => pi.Quantity * (pi.Ingredient.UnitCost ?? 0m)),
+            })
+            .ToDictionaryAsync(x => x.ProductId, x => x.CostPrice, cancellationToken);
+    }
+
+    private ProductListItemDto MapProduct(Product product, decimal costPrice)
+    {
+        var dto = _mapper.Map<ProductListItemDto>(product);
+        dto.CostPrice = costPrice;
+        return dto;
+    }
+
+    private async Task<IReadOnlyList<ProductListItemDto>> MapProductsAsync(
+        List<Product> products,
+        CancellationToken cancellationToken)
+    {
+        var costs = await GetCostPricesByProductIdsAsync(products.Select(p => p.Id).ToList(), cancellationToken);
+        return products.Select(p => MapProduct(p, costs.GetValueOrDefault(p.Id))).ToList();
     }
 
     private static string? NormalizeSku(string? sku) =>

@@ -9,6 +9,7 @@ public sealed class ProductMappingProfile : Profile
     public ProductMappingProfile()
     {
         CreateMap<Product, ProductListItemDto>()
-            .ForMember(d => d.ProductTypeName, o => o.MapFrom(s => s.ProductType.Name));
+            .ForMember(d => d.ProductTypeName, o => o.MapFrom(s => s.ProductType.Name))
+            .ForMember(d => d.CostPrice, o => o.Ignore());
     }
 }

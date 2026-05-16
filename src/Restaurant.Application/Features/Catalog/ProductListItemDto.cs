@@ -7,6 +7,7 @@ public sealed class ProductListItemDto
     public string? Description { get; set; }
     public string? Sku { get; set; }
     public decimal UnitPrice { get; set; }
+    public decimal CostPrice { get; set; }
     public Guid ProductTypeId { get; set; }
     public string ProductTypeName { get; set; } = string.Empty;
     public bool IsActive { get; set; }

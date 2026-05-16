@@ -10,6 +10,7 @@ public sealed class IngredientDto
     public string IngredientCategoryName { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public IngredientUnit Unit { get; set; }
+    public decimal? UnitCost { get; set; }
     public decimal? StockQuantity { get; set; }
     public decimal? ReorderLevel { get; set; }
     public bool IsActive { get; set; }
@@ -26,6 +27,9 @@ public sealed class CreateIngredientDto
 
     [Required]
     public IngredientUnit? Unit { get; set; }
+
+    [Range(0, double.MaxValue)]
+    public decimal? UnitCost { get; set; }
 
     [Range(0, double.MaxValue)]
     public decimal? StockQuantity { get; set; }
@@ -45,6 +49,9 @@ public sealed class UpdateIngredientDto
 
     [Required]
     public IngredientUnit? Unit { get; set; }
+
+    [Range(0, double.MaxValue)]
+    public decimal? UnitCost { get; set; }
 
     [Range(0, double.MaxValue)]
     public decimal? StockQuantity { get; set; }
