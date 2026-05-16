@@ -9,19 +9,25 @@ namespace Restaurant.Infrastructure.Services;
 public sealed class IngredientService : IIngredientService
 {
     private readonly IRepository<Ingredient> _ingredients;
+    private readonly IRepository<IngredientCategory> _categories;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
 
-    public IngredientService(IRepository<Ingredient> ingredients, IUnitOfWork unitOfWork, IMapper mapper)
+    public IngredientService(
+        IRepository<Ingredient> ingredients,
+        IRepository<IngredientCategory> categories,
+        IUnitOfWork unitOfWork,
+        IMapper mapper)
     {
         _ingredients = ingredients;
+        _categories = categories;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
     }
 
     public async Task<IReadOnlyList<IngredientDto>> ListAsync(bool includeInactive = false, CancellationToken cancellationToken = default)
     {
-        var query = _ingredients.Query().AsNoTracking().OrderBy(i => i.Name);
+        var query = _ingredients.Query().AsNoTracking().Include(i => i.IngredientCategory).OrderBy(i => i.Name);
         var list = includeInactive
             ? await query.ToListAsync(cancellationToken)
             : await query.Where(i => i.IsActive).ToListAsync(cancellationToken);
@@ -31,12 +37,17 @@ public sealed class IngredientService : IIngredientService
 
     public async Task<IngredientDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var entity = await _ingredients.Query().AsNoTracking().FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
+        var entity = await _ingredients.Query()
+            .AsNoTracking()
+            .Include(i => i.IngredientCategory)
+            .FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
         return entity is null ? null : _mapper.Map<IngredientDto>(entity);
     }
 
     public async Task<IngredientDto> CreateAsync(CreateIngredientDto dto, CancellationToken cancellationToken = default)
     {
+        await EnsureCategoryExistsAsync(dto.IngredientCategoryId, cancellationToken);
+
         var name = dto.Name.Trim();
         var exists = await _ingredients.Query().AnyAsync(
             i => i.IsActive && i.Name == name,
@@ -47,6 +58,7 @@ public sealed class IngredientService : IIngredientService
         var entity = new Ingredient
         {
             Id = Guid.NewGuid(),
+            IngredientCategoryId = dto.IngredientCategoryId,
             Name = name,
             Unit = dto.Unit!.Value,
             StockQuantity = dto.StockQuantity,
@@ -57,6 +69,11 @@ public sealed class IngredientService : IIngredientService
         await _ingredients.AddAsync(entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        entity = await _ingredients.Query()
+            .AsNoTracking()
+            .Include(i => i.IngredientCategory)
+            .FirstAsync(i => i.Id == entity.Id, cancellationToken);
+
         return _mapper.Map<IngredientDto>(entity);
     }
 
@@ -66,6 +83,8 @@ public sealed class IngredientService : IIngredientService
         if (entity is null)
             return null;
 
+        await EnsureCategoryExistsAsync(dto.IngredientCategoryId, cancellationToken);
+
         var name = dto.Name.Trim();
         var duplicate = await _ingredients.Query().AnyAsync(
             i => i.Id != id && i.IsActive && i.Name == name,
@@ -73,6 +92,7 @@ public sealed class IngredientService : IIngredientService
         if (duplicate)
             throw new InvalidOperationException("Another active ingredient already uses this name.");
 
+        entity.IngredientCategoryId = dto.IngredientCategoryId;
         entity.Name = name;
         entity.Unit = dto.Unit!.Value;
         entity.StockQuantity = dto.StockQuantity;
@@ -81,6 +101,11 @@ public sealed class IngredientService : IIngredientService
 
         _ingredients.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        entity = await _ingredients.Query()
+            .AsNoTracking()
+            .Include(i => i.IngredientCategory)
+            .FirstAsync(i => i.Id == id, cancellationToken);
 
         return _mapper.Map<IngredientDto>(entity);
     }
@@ -95,5 +120,12 @@ public sealed class IngredientService : IIngredientService
         _ingredients.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private async Task EnsureCategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken)
+    {
+        var ok = await _categories.Query().AnyAsync(c => c.Id == categoryId && c.IsActive, cancellationToken);
+        if (!ok)
+            throw new InvalidOperationException("Ingredient category was not found or is inactive.");
     }
 }

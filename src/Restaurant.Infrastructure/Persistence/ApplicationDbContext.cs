@@ -22,6 +22,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
+    public DbSet<IngredientCategory> IngredientCategories => Set<IngredientCategory>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<ProductIngredient> ProductIngredients => Set<ProductIngredient>();
@@ -84,6 +85,11 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Name).HasMaxLength(200);
         });
 
+        modelBuilder.Entity<IngredientCategory>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+        });
+
         modelBuilder.Entity<Product>(e =>
         {
             e.HasOne(x => x.ProductType).WithMany(x => x.Products).HasForeignKey(x => x.ProductTypeId);
@@ -94,6 +100,10 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Ingredient>(e =>
         {
+            e.HasOne(x => x.IngredientCategory)
+                .WithMany(x => x.Ingredients)
+                .HasForeignKey(x => x.IngredientCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.StockQuantity).HasPrecision(18, 4);
             e.Property(x => x.ReorderLevel).HasPrecision(18, 4);
@@ -188,6 +198,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Product>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<IngredientCategory>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Ingredient>().HasQueryFilter(e =>

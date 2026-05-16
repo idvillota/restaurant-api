@@ -10,17 +10,34 @@ namespace Restaurant.Tests.Unit.Infrastructure.Services;
 public sealed class IngredientServiceTests
 {
     private static IngredientService CreateSut(TenantDbFixture fx) =>
-        new(fx.Repository<Ingredient>(), fx.UnitOfWork, fx.Mapper);
+        new(fx.Repository<Ingredient>(), fx.Repository<IngredientCategory>(), fx.UnitOfWork, fx.Mapper);
+
+    private static async Task<Guid> SeedCategoryAsync(TenantDbFixture fx)
+    {
+        var cat = new IngredientCategory
+        {
+            Id = Guid.NewGuid(),
+            TenantId = fx.TenantId,
+            Name = "General",
+            SortOrder = 0,
+            IsActive = true,
+        };
+        await fx.Db.IngredientCategories.AddAsync(cat);
+        await fx.Db.SaveChangesAsync();
+        return cat.Id;
+    }
 
     [Fact]
     public async Task CreateAsync_persists_ingredient_with_tenant_id()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
 
         var dto = await sut.CreateAsync(
             new CreateIngredientDto
             {
+                IngredientCategoryId = catId,
                 Name = "  Flour  ",
                 Unit = IngredientUnit.Kilogram,
                 StockQuantity = 10m,
@@ -29,6 +46,7 @@ public sealed class IngredientServiceTests
 
         Assert.False(string.IsNullOrEmpty(dto.Name));
         Assert.Equal("Flour", dto.Name);
+        Assert.Equal(catId, dto.IngredientCategoryId);
         var stored = await fx.Db.Ingredients.AsNoTracking().SingleAsync();
         Assert.Equal(fx.TenantId, stored.TenantId);
         Assert.Equal(IngredientUnit.Kilogram, stored.Unit);
@@ -38,26 +56,49 @@ public sealed class IngredientServiceTests
     public async Task CreateAsync_throws_when_active_duplicate_name()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
         await sut.CreateAsync(
-            new CreateIngredientDto { Name = "Salt", Unit = IngredientUnit.Gram },
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "Salt",
+                Unit = IngredientUnit.Gram,
+            },
             CancellationToken.None);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            sut.CreateAsync(new CreateIngredientDto { Name = "Salt", Unit = IngredientUnit.Gram }));
+            sut.CreateAsync(
+                new CreateIngredientDto
+                {
+                    IngredientCategoryId = catId,
+                    Name = "Salt",
+                    Unit = IngredientUnit.Gram,
+                }));
     }
 
     [Fact]
     public async Task CreateAsync_allows_same_name_when_previous_is_inactive()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
         var first = await sut.CreateAsync(
-            new CreateIngredientDto { Name = "Pepper", Unit = IngredientUnit.Gram });
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "Pepper",
+                Unit = IngredientUnit.Gram,
+            });
         await sut.SoftDeleteAsync(first.Id);
 
         var second = await sut.CreateAsync(
-            new CreateIngredientDto { Name = "Pepper", Unit = IngredientUnit.Gram });
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "Pepper",
+                Unit = IngredientUnit.Gram,
+            });
 
         Assert.NotEqual(first.Id, second.Id);
         Assert.True(second.IsActive);
@@ -67,10 +108,23 @@ public sealed class IngredientServiceTests
     public async Task ListAsync_excludes_inactive_by_default()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
-        var a = await sut.CreateAsync(new CreateIngredientDto { Name = "A", Unit = IngredientUnit.Unit });
+        var a = await sut.CreateAsync(
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "A",
+                Unit = IngredientUnit.Unit,
+            });
         await sut.SoftDeleteAsync(a.Id);
-        await sut.CreateAsync(new CreateIngredientDto { Name = "B", Unit = IngredientUnit.Unit });
+        await sut.CreateAsync(
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "B",
+                Unit = IngredientUnit.Unit,
+            });
 
         var list = await sut.ListAsync(includeInactive: false);
 
@@ -82,10 +136,23 @@ public sealed class IngredientServiceTests
     public async Task ListAsync_includeInactive_returns_all()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
-        var a = await sut.CreateAsync(new CreateIngredientDto { Name = "X", Unit = IngredientUnit.Unit });
+        var a = await sut.CreateAsync(
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "X",
+                Unit = IngredientUnit.Unit,
+            });
         await sut.SoftDeleteAsync(a.Id);
-        await sut.CreateAsync(new CreateIngredientDto { Name = "Y", Unit = IngredientUnit.Unit });
+        await sut.CreateAsync(
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "Y",
+                Unit = IngredientUnit.Unit,
+            });
 
         var list = await sut.ListAsync(includeInactive: true);
 
@@ -107,12 +174,14 @@ public sealed class IngredientServiceTests
     public async Task UpdateAsync_returns_null_when_missing()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
 
         var result = await sut.UpdateAsync(
             Guid.NewGuid(),
             new UpdateIngredientDto
             {
+                IngredientCategoryId = catId,
                 Name = "N",
                 Unit = IngredientUnit.Unit,
                 IsActive = true,
@@ -125,14 +194,21 @@ public sealed class IngredientServiceTests
     public async Task UpdateAsync_updates_fields()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
         var created = await sut.CreateAsync(
-            new CreateIngredientDto { Name = "Sugar", Unit = IngredientUnit.Gram });
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "Sugar",
+                Unit = IngredientUnit.Gram,
+            });
 
         var updated = await sut.UpdateAsync(
             created.Id,
             new UpdateIngredientDto
             {
+                IngredientCategoryId = catId,
                 Name = "Brown sugar",
                 Unit = IngredientUnit.Kilogram,
                 StockQuantity = 5m,
@@ -150,9 +226,15 @@ public sealed class IngredientServiceTests
     public async Task SoftDeleteAsync_returns_false_when_already_inactive()
     {
         using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
         var sut = CreateSut(fx);
         var created = await sut.CreateAsync(
-            new CreateIngredientDto { Name = "Herb", Unit = IngredientUnit.Unit });
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "Herb",
+                Unit = IngredientUnit.Unit,
+            });
         await sut.SoftDeleteAsync(created.Id);
 
         var second = await sut.SoftDeleteAsync(created.Id);

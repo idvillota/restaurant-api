@@ -22,10 +22,20 @@ public sealed class IngredientMappingProfileTests
     public void Maps_ingredient_to_dto()
     {
         var mapper = CreateMapper();
+        var catId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
         var entity = new Ingredient
         {
             Id = Guid.NewGuid(),
-            TenantId = Guid.NewGuid(),
+            TenantId = tenantId,
+            IngredientCategoryId = catId,
+            IngredientCategory = new IngredientCategory
+            {
+                Id = catId,
+                TenantId = tenantId,
+                Name = "Dry goods",
+                IsActive = true,
+            },
             Name = "Olive oil",
             Unit = IngredientUnit.Liter,
             StockQuantity = 2.5m,
@@ -36,6 +46,8 @@ public sealed class IngredientMappingProfileTests
         var dto = mapper.Map<IngredientDto>(entity);
 
         Assert.Equal(entity.Id, dto.Id);
+        Assert.Equal(catId, dto.IngredientCategoryId);
+        Assert.Equal("Dry goods", dto.IngredientCategoryName);
         Assert.Equal(entity.Name, dto.Name);
         Assert.Equal(entity.Unit, dto.Unit);
         Assert.Equal(entity.StockQuantity, dto.StockQuantity);

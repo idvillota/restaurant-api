@@ -8,6 +8,7 @@ public sealed class IngredientMappingProfile : Profile
 {
     public IngredientMappingProfile()
     {
-        CreateMap<Ingredient, IngredientDto>();
+        CreateMap<Ingredient, IngredientDto>()
+            .ForMember(d => d.IngredientCategoryName, o => o.MapFrom(s => s.IngredientCategory.Name));
     }
 }

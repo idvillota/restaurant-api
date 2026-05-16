@@ -29,9 +29,12 @@ public sealed class IngredientsControllerTests
     public async Task GetById_returns_ok_with_dto()
     {
         var id = Guid.NewGuid();
+        var cat = Guid.NewGuid();
         var dto = new IngredientDto
         {
             Id = id,
+            IngredientCategoryId = cat,
+            IngredientCategoryName = "General",
             Name = "Tomato",
             Unit = IngredientUnit.Unit,
             IsActive = true,
@@ -48,16 +51,25 @@ public sealed class IngredientsControllerTests
     [Fact]
     public async Task Create_returns_created_at_route()
     {
+        var cat = Guid.NewGuid();
         var created = new IngredientDto
         {
             Id = Guid.NewGuid(),
+            IngredientCategoryId = cat,
+            IngredientCategoryName = "Herbs",
             Name = "Basil",
             Unit = IngredientUnit.Gram,
             IsActive = true,
         };
         _service.Setup(s => s.CreateAsync(It.IsAny<CreateIngredientDto>(), default)).ReturnsAsync(created);
 
-        var result = await _controller.Create(new CreateIngredientDto { Name = "Basil", Unit = IngredientUnit.Gram });
+        var result = await _controller.Create(
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = cat,
+                Name = "Basil",
+                Unit = IngredientUnit.Gram,
+            });
 
         var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
         Assert.Equal(nameof(IngredientsController.GetById), createdResult.ActionName);
@@ -70,7 +82,13 @@ public sealed class IngredientsControllerTests
         _service.Setup(s => s.CreateAsync(It.IsAny<CreateIngredientDto>(), default))
             .ThrowsAsync(new InvalidOperationException("duplicate"));
 
-        var result = await _controller.Create(new CreateIngredientDto { Name = "X", Unit = IngredientUnit.Unit });
+        var result = await _controller.Create(
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = Guid.NewGuid(),
+                Name = "X",
+                Unit = IngredientUnit.Unit,
+            });
 
         Assert.IsType<ConflictObjectResult>(result.Result);
     }

@@ -28,6 +28,7 @@ public sealed class TenantDbFixture : IDisposable
         Mapper = new MapperConfiguration(cfg =>
         {
             cfg.AddProfile<IngredientMappingProfile>();
+            cfg.AddProfile<IngredientCategoryMappingProfile>();
             cfg.AddProfile<ProductMappingProfile>();
             cfg.AddProfile<ProductTypeMappingProfile>();
             cfg.AddProfile<ProviderMappingProfile>();
@@ -66,6 +67,7 @@ public sealed class NoTenantDbFixture : IDisposable
         Mapper = new MapperConfiguration(cfg =>
         {
             cfg.AddProfile<IngredientMappingProfile>();
+            cfg.AddProfile<IngredientCategoryMappingProfile>();
             cfg.AddProfile<ProductMappingProfile>();
             cfg.AddProfile<ProductTypeMappingProfile>();
             cfg.AddProfile<ProviderMappingProfile>();

@@ -6,6 +6,8 @@ namespace Restaurant.Application.Features.Catalog.Ingredients;
 public sealed class IngredientDto
 {
     public Guid Id { get; set; }
+    public Guid IngredientCategoryId { get; set; }
+    public string IngredientCategoryName { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public IngredientUnit Unit { get; set; }
     public decimal? StockQuantity { get; set; }
@@ -15,6 +17,9 @@ public sealed class IngredientDto
 
 public sealed class CreateIngredientDto
 {
+    [Required]
+    public Guid IngredientCategoryId { get; set; }
+
     [Required]
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
@@ -31,6 +36,9 @@ public sealed class CreateIngredientDto
 
 public sealed class UpdateIngredientDto
 {
+    [Required]
+    public Guid IngredientCategoryId { get; set; }
+
     [Required]
     [MaxLength(200)]
     public string Name { get; set; } = string.Empty;
