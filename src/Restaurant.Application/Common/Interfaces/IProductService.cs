@@ -13,4 +13,6 @@ public interface IProductService
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ProductRecipeDto?> GetRecipeAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<ProductRecipeDto?> SetRecipeAsync(Guid productId, SetProductRecipeDto dto, CancellationToken cancellationToken = default);
+    Task<ProductListItemDto?> SetImageAsync(Guid productId, Stream content, string fileName, CancellationToken cancellationToken = default);
+    Task<ProductListItemDto?> RemoveImageAsync(Guid productId, CancellationToken cancellationToken = default);
 }

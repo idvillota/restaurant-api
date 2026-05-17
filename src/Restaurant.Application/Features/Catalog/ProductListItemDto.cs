@@ -13,5 +13,7 @@ public sealed class ProductListItemDto
     public decimal CostPrice { get; set; }
     public Guid ProductTypeId { get; set; }
     public string ProductTypeName { get; set; } = string.Empty;
+    public string? ImagePath { get; set; }
+    public string? ImageUrl { get; set; }
     public bool IsActive { get; set; }
 }

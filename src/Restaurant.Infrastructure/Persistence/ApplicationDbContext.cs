@@ -96,6 +96,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Sku).HasMaxLength(80);
+            e.Property(x => x.ImagePath).HasMaxLength(260);
         });
 
         modelBuilder.Entity<Ingredient>(e =>

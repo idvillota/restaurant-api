@@ -5,7 +5,9 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Identity;
 using Restaurant.Infrastructure.Persistence;
+using Restaurant.Application.Common.Options;
 using Restaurant.Infrastructure.Services;
+using Restaurant.Infrastructure.Storage;
 
 namespace Restaurant.Infrastructure;
 
@@ -29,6 +31,8 @@ public static class DependencyInjection
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
+        services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
+        services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductTypeService, ProductTypeService>();
         services.AddScoped<IProviderService, ProviderService>();

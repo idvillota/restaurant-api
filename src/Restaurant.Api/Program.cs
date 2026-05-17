@@ -1,10 +1,12 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Restaurant.Api.Middleware;
 using Restaurant.Application;
+using Restaurant.Application.Common.Options;
 using Restaurant.Infrastructure;
 using Restaurant.Infrastructure.Identity;
 using Restaurant.Infrastructure.Persistence;
@@ -101,6 +103,19 @@ if (!app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
+
+var productImageOptions = app.Configuration.GetSection(ProductImageOptions.SectionName).Get<ProductImageOptions>()
+    ?? new ProductImageOptions();
+var productImageRoot = Path.IsPathRooted(productImageOptions.RootPath)
+    ? productImageOptions.RootPath
+    : Path.Combine(app.Environment.ContentRootPath, productImageOptions.RootPath);
+Directory.CreateDirectory(productImageRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(productImageRoot),
+    RequestPath = productImageOptions.PublicBasePath.TrimEnd('/'),
+});
+
 app.UseAuthorization();
 app.MapControllers();
 app.Run();

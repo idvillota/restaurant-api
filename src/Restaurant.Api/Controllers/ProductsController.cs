@@ -80,6 +80,35 @@ public sealed class ProductsController : ControllerBase
         return recipe is null ? NotFound() : Ok(recipe);
     }
 
+    [HttpPut("{id:guid}/image")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    public async Task<ActionResult<ProductListItemDto>> SetImage(
+        Guid id,
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        if (file.Length == 0)
+            return BadRequest(new { message = "Image file is required." });
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            var updated = await _products.SetImageAsync(id, stream, file.FileName, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{id:guid}/image")]
+    public async Task<ActionResult<ProductListItemDto>> RemoveImage(Guid id, CancellationToken cancellationToken = default)
+    {
+        var updated = await _products.RemoveImageAsync(id, cancellationToken);
+        return updated is null ? NotFound() : Ok(updated);
+    }
+
     [HttpPut("{id:guid}/recipe")]
     public async Task<ActionResult<ProductRecipeDto>> SetRecipe(
         Guid id,

@@ -17,6 +17,7 @@ public sealed class ProductService : IProductService
     private readonly IRepository<ProductIngredient> _productIngredients;
     private readonly IRepository<Ingredient> _ingredients;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IProductImageStorage _productImages;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
 
@@ -26,6 +27,7 @@ public sealed class ProductService : IProductService
         IRepository<ProductIngredient> productIngredients,
         IRepository<Ingredient> ingredients,
         ICurrentTenantContext tenantContext,
+        IProductImageStorage productImages,
         IUnitOfWork unitOfWork,
         IMapper mapper)
     {
@@ -34,6 +36,7 @@ public sealed class ProductService : IProductService
         _productIngredients = productIngredients;
         _ingredients = ingredients;
         _tenantContext = tenantContext;
+        _productImages = productImages;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
     }
@@ -168,6 +171,48 @@ public sealed class ProductService : IProductService
             .ToListAsync(cancellationToken);
 
         return BuildRecipeDto(product, lines);
+    }
+
+    public async Task<ProductListItemDto?> SetImageAsync(
+        Guid productId,
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _products.GetByIdAsync(productId, cancellationToken);
+        if (entity is null)
+            return null;
+
+        var tenantId = ResolveTenantId();
+        var previousPath = entity.ImagePath;
+
+        var relativePath = await _productImages.SaveAsync(tenantId, productId, content, fileName, cancellationToken);
+        entity.ImagePath = relativePath;
+        _products.Update(entity);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (!string.Equals(previousPath, relativePath, StringComparison.OrdinalIgnoreCase))
+            await _productImages.DeleteIfExistsAsync(previousPath, cancellationToken);
+
+        return await GetByIdAsync(productId, cancellationToken);
+    }
+
+    public async Task<ProductListItemDto?> RemoveImageAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        var entity = await _products.GetByIdAsync(productId, cancellationToken);
+        if (entity is null)
+            return null;
+
+        var previousPath = entity.ImagePath;
+        if (string.IsNullOrWhiteSpace(previousPath))
+            return await GetByIdAsync(productId, cancellationToken);
+
+        entity.ImagePath = null;
+        _products.Update(entity);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _productImages.DeleteIfExistsAsync(previousPath, cancellationToken);
+
+        return await GetByIdAsync(productId, cancellationToken);
     }
 
     public async Task<ProductRecipeDto?> SetRecipeAsync(Guid productId, SetProductRecipeDto dto, CancellationToken cancellationToken = default)
@@ -366,6 +411,7 @@ public sealed class ProductService : IProductService
     {
         var dto = _mapper.Map<ProductListItemDto>(product);
         dto.CostPrice = costPrice;
+        dto.ImageUrl = _productImages.GetPublicUrl(product.ImagePath);
         return dto;
     }
 

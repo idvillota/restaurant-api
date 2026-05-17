@@ -9,15 +9,19 @@ namespace Restaurant.Tests.Unit.Infrastructure.Services;
 
 public sealed class ProductServiceTests
 {
-    private static ProductService CreateSut(TenantDbFixture fx) =>
-        new(
+    private static ProductService CreateSut(TenantDbFixture fx, FakeProductImageStorage? images = null)
+    {
+        images ??= new FakeProductImageStorage();
+        return new ProductService(
             fx.Repository<Product>(),
             fx.Repository<ProductType>(),
             fx.Repository<ProductIngredient>(),
             fx.Repository<Ingredient>(),
             fx.TenantContext,
+            images,
             fx.UnitOfWork,
             fx.Mapper);
+    }
 
     [Fact]
     public async Task ListAsync_returns_active_products_ordered_by_name()
@@ -504,5 +508,108 @@ public sealed class ProductServiceTests
                 {
                     Lines = [new SetProductRecipeLineDto { IngredientId = ingredientId, Quantity = 0m }],
                 }));
+    }
+
+    [Fact]
+    public async Task SetImageAsync_saves_path_and_returns_image_url()
+    {
+        using var fx = new TenantDbFixture();
+        var images = new FakeProductImageStorage();
+        var typeId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Burger",
+                UnitPrice = 12m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx, images);
+        await using var stream = new MemoryStream([0xFF, 0xD8, 0xFF, 0xD9]);
+        var updated = await sut.SetImageAsync(productId, stream, "burger.jpg");
+
+        Assert.NotNull(updated);
+        Assert.NotNull(updated!.ImagePath);
+        Assert.Contains(productId.ToString("N"), updated.ImagePath, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(updated.ImageUrl);
+        Assert.True(images.FileExists(updated.ImagePath));
+    }
+
+    [Fact]
+    public async Task SetImageAsync_replaces_previous_image_file()
+    {
+        using var fx = new TenantDbFixture();
+        var images = new FakeProductImageStorage();
+        var typeId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Burger",
+                UnitPrice = 12m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx, images);
+        await using var first = new MemoryStream([1, 2, 3]);
+        var firstResult = await sut.SetImageAsync(productId, first, "a.jpg");
+        var firstPath = firstResult!.ImagePath!;
+
+        await using var second = new MemoryStream([4, 5, 6]);
+        var secondResult = await sut.SetImageAsync(productId, second, "b.png");
+
+        Assert.NotEqual(firstPath, secondResult!.ImagePath);
+        Assert.False(images.FileExists(firstPath));
+        Assert.True(images.FileExists(secondResult.ImagePath));
+    }
+
+    [Fact]
+    public async Task RemoveImageAsync_clears_path_and_deletes_file()
+    {
+        using var fx = new TenantDbFixture();
+        var images = new FakeProductImageStorage();
+        var typeId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Burger",
+                UnitPrice = 12m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx, images);
+        await using var stream = new MemoryStream([9, 9, 9]);
+        var withImage = await sut.SetImageAsync(productId, stream, "burger.jpg");
+        var path = withImage!.ImagePath!;
+
+        var removed = await sut.RemoveImageAsync(productId);
+
+        Assert.NotNull(removed);
+        Assert.Null(removed!.ImagePath);
+        Assert.Null(removed.ImageUrl);
+        Assert.False(images.FileExists(path));
     }
 }
