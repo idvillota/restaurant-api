@@ -2,6 +2,7 @@ using AutoMapper;
 using Restaurant.Application.Features.Catalog;
 using Restaurant.Application.Mapping;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Tests.Unit.Application.Mapping;
 
@@ -29,12 +30,14 @@ public sealed class ProductMappingProfileTests
             Description = "Sparkling cola drink",
             Sku = "BEV-001",
             UnitPrice = 3.50m,
+            CompositionType = EProductType.Resale,
             IsActive = true,
         };
 
         var dto = mapper.Map<ProductListItemDto>(product);
 
         Assert.Equal(product.Id, dto.Id);
+        Assert.Equal(EProductType.Resale, dto.CompositionType);
         Assert.Equal("Cola", dto.Name);
         Assert.Equal("Sparkling cola drink", dto.Description);
         Assert.Equal("BEV-001", dto.Sku);

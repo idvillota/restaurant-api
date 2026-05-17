@@ -4,6 +4,7 @@ using Restaurant.Api.Controllers;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Tests.Unit.Api.Controllers;
 
@@ -27,6 +28,7 @@ public sealed class ProductsControllerTests
                     CostPrice = 0m,
                     ProductTypeId = Guid.NewGuid(),
                     ProductTypeName = "Type",
+                    CompositionType = EProductType.Prepared,
                     IsActive = true,
                 },
             ],

@@ -6,6 +6,7 @@ namespace Restaurant.Application.Features.Catalog.Products;
 public sealed class ProductRecipeDto
 {
     public Guid ProductId { get; set; }
+    public EProductType CompositionType { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public decimal UnitPrice { get; set; }
     public decimal CostPrice { get; set; }

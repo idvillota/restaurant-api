@@ -1,4 +1,5 @@
 using Restaurant.Domain.Common;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Domain.Entities;
 
@@ -6,6 +7,7 @@ public class Product : EntityBase, ITenantScoped
 {
     public Guid TenantId { get; set; }
     public Guid ProductTypeId { get; set; }
+    public EProductType CompositionType { get; set; } = EProductType.Prepared;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Sku { get; set; }

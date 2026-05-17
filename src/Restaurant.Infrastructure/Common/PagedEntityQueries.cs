@@ -126,6 +126,10 @@ internal static class PagedEntityQueries
             ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
             query = query.Where(p => p.IsActive == isActive);
 
+        if (q.FilterValue("compositionType") is { } kindRaw &&
+            Enum.TryParse<EProductType>(kindRaw, ignoreCase: true, out var compositionType))
+            query = query.Where(p => p.CompositionType == compositionType);
+
         return ApplyProductSort(query, q);
     }
 
@@ -363,6 +367,9 @@ internal static class PagedEntityQueries
             "producttypename" => desc
                 ? query.OrderByDescending(p => p.ProductType.Name).ThenBy(p => p.Name)
                 : query.OrderBy(p => p.ProductType.Name).ThenBy(p => p.Name),
+            "compositiontype" => desc
+                ? query.OrderByDescending(p => p.CompositionType).ThenBy(p => p.Name)
+                : query.OrderBy(p => p.CompositionType).ThenBy(p => p.Name),
             "isactive" => desc ? query.OrderByDescending(p => p.IsActive) : query.OrderBy(p => p.IsActive),
             _ => desc ? query.OrderByDescending(p => p.Name) : query.OrderBy(p => p.Name),
         };
