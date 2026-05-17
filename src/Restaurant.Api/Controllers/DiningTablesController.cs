@@ -65,6 +65,23 @@ public sealed class DiningTablesController : ControllerBase
         }
     }
 
+    [HttpPatch("{id:guid}/status")]
+    public async Task<ActionResult<DiningTableDto>> SetStatus(
+        Guid id,
+        [FromBody] SetDiningTableStatusDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await _service.SetStatusAsync(id, dto.Status, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> SoftDelete(Guid id, CancellationToken cancellationToken = default)
     {

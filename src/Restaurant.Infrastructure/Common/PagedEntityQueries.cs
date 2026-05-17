@@ -236,6 +236,10 @@ internal static class PagedEntityQueries
             ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
             query = query.Where(t => t.IsActive == isActive);
 
+        if (q.FilterValue("status") is { } statusRaw &&
+            Enum.TryParse<ETableStatus>(statusRaw, ignoreCase: true, out var tableStatus))
+            query = query.Where(t => t.Status == tableStatus);
+
         return ApplyDiningTableSort(query, q);
     }
 
@@ -420,6 +424,7 @@ internal static class PagedEntityQueries
             "code" => desc ? query.OrderByDescending(t => t.Code) : query.OrderBy(t => t.Code),
             "zone" => desc ? query.OrderByDescending(t => t.Zone) : query.OrderBy(t => t.Zone),
             "capacity" => desc ? query.OrderByDescending(t => t.Capacity) : query.OrderBy(t => t.Capacity),
+            "status" => desc ? query.OrderByDescending(t => t.Status) : query.OrderBy(t => t.Status),
             "isactive" => desc ? query.OrderByDescending(t => t.IsActive) : query.OrderBy(t => t.IsActive),
             _ => desc ? query.OrderByDescending(t => t.Code) : query.OrderBy(t => t.Code),
         };

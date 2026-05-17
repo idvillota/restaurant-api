@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Application.Features.Operations.DiningTables;
 
@@ -8,7 +9,13 @@ public sealed class DiningTableDto
     public string Code { get; set; } = string.Empty;
     public int Capacity { get; set; }
     public string? Zone { get; set; }
+    public ETableStatus Status { get; set; }
     public bool IsActive { get; set; }
+}
+
+public sealed class SetDiningTableStatusDto
+{
+    public ETableStatus Status { get; set; }
 }
 
 public sealed class CreateDiningTableDto

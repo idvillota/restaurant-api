@@ -36,5 +36,7 @@ public sealed class CustomerMappingProfile : Profile
 
 public sealed class ReservationMappingProfile : Profile
 {
-    public ReservationMappingProfile() => CreateMap<Reservation, ReservationDto>();
+    public ReservationMappingProfile() =>
+        CreateMap<Reservation, ReservationDto>()
+            .ForMember(d => d.DiningTableIds, opt => opt.Ignore());
 }

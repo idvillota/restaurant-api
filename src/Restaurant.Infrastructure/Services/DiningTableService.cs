@@ -1,9 +1,11 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Operations.DiningTables;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
@@ -68,6 +70,22 @@ public sealed class DiningTableService : IDiningTableService
         entity.Capacity = dto.Capacity;
         entity.Zone = dto.Zone?.Trim();
         entity.IsActive = dto.IsActive;
+        _tables.Update(entity);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return _mapper.Map<DiningTableDto>(entity);
+    }
+
+    public async Task<DiningTableDto?> SetStatusAsync(
+        Guid id,
+        ETableStatus status,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await _tables.GetByIdAsync(id, cancellationToken);
+        if (entity is null || !entity.IsActive)
+            return null;
+
+        TableStatusTransitions.EnsureCanTransition(entity.Status, status);
+        entity.Status = status;
         _tables.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return _mapper.Map<DiningTableDto>(entity);

@@ -1,9 +1,11 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Reservations;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Common;
 
 namespace Restaurant.Infrastructure.Services;
@@ -12,33 +14,57 @@ public sealed class ReservationService : IReservationService
 {
     private readonly IRepository<Reservation> _reservations;
     private readonly IRepository<Customer> _customers;
+    private readonly IRepository<DiningTable> _tables;
+    private readonly IRepository<ReservationTable> _reservationTables;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
 
     public ReservationService(
         IRepository<Reservation> reservations,
         IRepository<Customer> customers,
+        IRepository<DiningTable> tables,
+        IRepository<ReservationTable> reservationTables,
         IUnitOfWork unitOfWork,
         IMapper mapper)
     {
         _reservations = reservations;
         _customers = customers;
+        _tables = tables;
+        _reservationTables = reservationTables;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
     }
 
     public Task<PagedResult<ReservationDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
-        ListQueryHelpers.ToPagedResultAsync(
+        ListQueryHelpers.ToPagedResultAsync<Reservation, ReservationDto>(
             _reservations.Query().AsNoTracking(),
             query,
             q => PagedEntityQueries.ShapeReservations(q, query),
-            entities => Task.FromResult<IReadOnlyList<ReservationDto>>(_mapper.Map<IReadOnlyList<ReservationDto>>(entities.ToList())),
+            async entities =>
+            {
+                var list = entities.ToList();
+                var ids = list.Select(r => r.Id).ToList();
+                var tableIdsByReservation = await LoadTableIdsByReservationAsync(ids, cancellationToken);
+                IReadOnlyList<ReservationDto> dtos = list
+                    .Select(r =>
+                        ToDto(
+                            r,
+                            tableIdsByReservation.TryGetValue(r.Id, out var tableIds)
+                                ? tableIds
+                                : Array.Empty<Guid>()))
+                    .ToList();
+                return dtos;
+            },
             cancellationToken);
 
     public async Task<ReservationDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _reservations.Query().AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
-        return entity is null ? null : _mapper.Map<ReservationDto>(entity);
+        if (entity is null)
+            return null;
+
+        var tableIds = await LoadTableIdsForReservationAsync(id, cancellationToken);
+        return ToDto(entity, tableIds);
     }
 
     public async Task<ReservationDto> CreateAsync(CreateReservationDto dto, CancellationToken cancellationToken = default)
@@ -61,7 +87,15 @@ public sealed class ReservationService : IReservationService
         };
         await _reservations.AddAsync(entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return _mapper.Map<ReservationDto>(entity);
+
+        if (dto.DiningTableIds is { Count: > 0 })
+        {
+            await SyncReservationTablesAsync(entity, dto.DiningTableIds, cancellationToken);
+            await ApplyTableStatusesForReservationAsync(entity, previousStatus: null, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
+        return await MapDtoAsync(entity.Id, cancellationToken);
     }
 
     public async Task<ReservationDto?> UpdateAsync(Guid id, UpdateReservationDto dto, CancellationToken cancellationToken = default)
@@ -73,6 +107,7 @@ public sealed class ReservationService : IReservationService
         await ValidateCustomerAsync(dto.CustomerId, cancellationToken);
         ValidateWindow(dto.StartAtUtc!.Value, dto.EndAtUtc!.Value);
 
+        var previousStatus = entity.Status;
         entity.CustomerId = dto.CustomerId;
         entity.ContactName = dto.ContactName.Trim();
         entity.ContactEmail = dto.ContactEmail?.Trim();
@@ -83,8 +118,13 @@ public sealed class ReservationService : IReservationService
         entity.Status = dto.Status;
         entity.Notes = dto.Notes?.Trim();
         _reservations.Update(entity);
+
+        if (dto.DiningTableIds is not null)
+            await SyncReservationTablesAsync(entity, dto.DiningTableIds, cancellationToken);
+
+        await ApplyTableStatusesForReservationAsync(entity, previousStatus, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return _mapper.Map<ReservationDto>(entity);
+        return await MapDtoAsync(entity.Id, cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -93,9 +133,166 @@ public sealed class ReservationService : IReservationService
         if (entity is null)
             return false;
 
+        await ReleaseLinkedTablesAsync(id, cancellationToken);
+        var links = await _reservationTables.Query().Where(rt => rt.ReservationId == id).ToListAsync(cancellationToken);
+        foreach (var link in links)
+            _reservationTables.Remove(link);
+
         _reservations.Remove(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private async Task<ReservationDto> MapDtoAsync(Guid reservationId, CancellationToken cancellationToken)
+    {
+        var entity = await _reservations.Query().AsNoTracking().FirstAsync(r => r.Id == reservationId, cancellationToken);
+        var tableIds = await LoadTableIdsForReservationAsync(reservationId, cancellationToken);
+        return ToDto(entity, tableIds);
+    }
+
+    private ReservationDto ToDto(Reservation entity, IReadOnlyList<Guid> tableIds)
+    {
+        var dto = _mapper.Map<ReservationDto>(entity);
+        dto.DiningTableIds = tableIds.ToList();
+        return dto;
+    }
+
+    private async Task<IReadOnlyList<Guid>> LoadTableIdsForReservationAsync(
+        Guid reservationId,
+        CancellationToken cancellationToken) =>
+        await _reservationTables.Query()
+            .AsNoTracking()
+            .Where(rt => rt.ReservationId == reservationId)
+            .Select(rt => rt.DiningTableId)
+            .ToListAsync(cancellationToken);
+
+    private async Task<Dictionary<Guid, IReadOnlyList<Guid>>> LoadTableIdsByReservationAsync(
+        IReadOnlyList<Guid> reservationIds,
+        CancellationToken cancellationToken)
+    {
+        if (reservationIds.Count == 0)
+            return new Dictionary<Guid, IReadOnlyList<Guid>>();
+
+        var rows = await _reservationTables.Query()
+            .AsNoTracking()
+            .Where(rt => reservationIds.Contains(rt.ReservationId))
+            .Select(rt => new { rt.ReservationId, rt.DiningTableId })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(x => x.ReservationId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<Guid>)g.Select(x => x.DiningTableId).ToList());
+    }
+
+    private async Task SyncReservationTablesAsync(
+        Reservation reservation,
+        IReadOnlyList<Guid> tableIds,
+        CancellationToken cancellationToken)
+    {
+        var distinct = tableIds.Distinct().ToList();
+        var existing = await _reservationTables.Query()
+            .Where(rt => rt.ReservationId == reservation.Id)
+            .ToListAsync(cancellationToken);
+        var existingIds = existing.Select(e => e.DiningTableId).ToHashSet();
+
+        foreach (var link in existing.Where(e => !distinct.Contains(e.DiningTableId)))
+        {
+            await SetTableAvailableIfLinkedAsync(link.DiningTableId, cancellationToken);
+            _reservationTables.Remove(link);
+        }
+
+        foreach (var tableId in distinct.Where(id => !existingIds.Contains(id)))
+        {
+            var table = await _tables.GetByIdAsync(tableId, cancellationToken);
+            if (table is null || !table.IsActive)
+                throw new InvalidOperationException("Table was not found or is inactive.");
+            if (table.Status == ETableStatus.Busy)
+                throw new InvalidOperationException($"Table \"{table.Code}\" is busy and cannot be reserved.");
+            if (table.Status == ETableStatus.Reserved)
+                throw new InvalidOperationException($"Table \"{table.Code}\" is already reserved.");
+
+            var target = ResolveTargetTableStatus(reservation.Status, previousStatus: null);
+            TableStatusTransitions.EnsureCanTransition(table.Status, target);
+            table.Status = target;
+            _tables.Update(table);
+
+            await _reservationTables.AddAsync(
+                new ReservationTable
+                {
+                    Id = Guid.NewGuid(),
+                    ReservationId = reservation.Id,
+                    DiningTableId = tableId,
+                },
+                cancellationToken);
+        }
+    }
+
+    private async Task ApplyTableStatusesForReservationAsync(
+        Reservation reservation,
+        ReservationStatus? previousStatus,
+        CancellationToken cancellationToken)
+    {
+        var links = await _reservationTables.Query()
+            .Where(rt => rt.ReservationId == reservation.Id)
+            .Select(rt => rt.DiningTableId)
+            .ToListAsync(cancellationToken);
+        if (links.Count == 0)
+            return;
+
+        var target = ResolveTargetTableStatus(reservation.Status, previousStatus);
+        foreach (var tableId in links)
+        {
+            var table = await _tables.GetByIdAsync(tableId, cancellationToken);
+            if (table is null)
+                continue;
+
+            if (table.Status == target)
+                continue;
+
+            TableStatusTransitions.EnsureCanTransition(table.Status, target);
+            table.Status = target;
+            _tables.Update(table);
+        }
+    }
+
+    private async Task ReleaseLinkedTablesAsync(Guid reservationId, CancellationToken cancellationToken)
+    {
+        var tableIds = await _reservationTables.Query()
+            .Where(rt => rt.ReservationId == reservationId)
+            .Select(rt => rt.DiningTableId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var tableId in tableIds)
+            await SetTableAvailableIfLinkedAsync(tableId, cancellationToken);
+    }
+
+    private async Task SetTableAvailableIfLinkedAsync(Guid tableId, CancellationToken cancellationToken)
+    {
+        var table = await _tables.GetByIdAsync(tableId, cancellationToken);
+        if (table is null || table.Status == ETableStatus.Available)
+            return;
+
+        TableStatusTransitions.EnsureCanTransition(table.Status, ETableStatus.Available);
+        table.Status = ETableStatus.Available;
+        _tables.Update(table);
+    }
+
+    private static ETableStatus ResolveTargetTableStatus(ReservationStatus status, ReservationStatus? previousStatus)
+    {
+        if (status == ReservationStatus.Seated)
+            return ETableStatus.Busy;
+
+        if (TableStatusTransitions.IsTerminalReservationRelease(status))
+            return ETableStatus.Available;
+
+        if (status is ReservationStatus.Pending or ReservationStatus.Confirmed)
+        {
+            if (previousStatus == ReservationStatus.Seated)
+                return ETableStatus.Available;
+            return ETableStatus.Reserved;
+        }
+
+        return ETableStatus.Available;
     }
 
     private async Task ValidateCustomerAsync(Guid? customerId, CancellationToken cancellationToken)

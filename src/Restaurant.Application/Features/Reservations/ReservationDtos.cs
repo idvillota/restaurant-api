@@ -15,6 +15,7 @@ public sealed class ReservationDto
     public DateTime EndAtUtc { get; set; }
     public ReservationStatus Status { get; set; }
     public string? Notes { get; set; }
+    public List<Guid> DiningTableIds { get; set; } = [];
 }
 
 public sealed class CreateReservationDto
@@ -45,6 +46,8 @@ public sealed class CreateReservationDto
 
     [MaxLength(2000)]
     public string? Notes { get; set; }
+
+    public List<Guid>? DiningTableIds { get; set; }
 }
 
 public sealed class UpdateReservationDto
@@ -75,4 +78,6 @@ public sealed class UpdateReservationDto
 
     [MaxLength(2000)]
     public string? Notes { get; set; }
+
+    public List<Guid>? DiningTableIds { get; set; }
 }
