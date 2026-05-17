@@ -173,6 +173,8 @@ internal static class PagedEntityQueries
         {
             query = query.Where(p =>
                 p.Name.ToLower().Contains(search) ||
+                (p.ContactName != null && p.ContactName.ToLower().Contains(search)) ||
+                (p.Address != null && p.Address.ToLower().Contains(search)) ||
                 (p.Email != null && p.Email.ToLower().Contains(search)) ||
                 (p.Phone != null && p.Phone.ToLower().Contains(search)) ||
                 (p.TaxId != null && p.TaxId.ToLower().Contains(search)) ||
@@ -317,6 +319,14 @@ internal static class PagedEntityQueries
         if (q.FilterValue("name") is { } nameFilter)
             query = query.Where(p => p.Name.ToLower().Contains(nameFilter.ToLowerInvariant()));
 
+        if (q.FilterValue("contactName") is { } contactFilter)
+            query = query.Where(p =>
+                p.ContactName != null && p.ContactName.ToLower().Contains(contactFilter.ToLowerInvariant()));
+
+        if (q.FilterValue("address") is { } addressFilter)
+            query = query.Where(p =>
+                p.Address != null && p.Address.ToLower().Contains(addressFilter.ToLowerInvariant()));
+
         if (q.FilterValue("email") is { } emailFilter)
             query = query.Where(p => p.Email != null && p.Email.ToLower().Contains(emailFilter.ToLowerInvariant()));
 
@@ -396,6 +406,10 @@ internal static class PagedEntityQueries
         var desc = q.IsDescending;
         return (q.SortBy?.ToLowerInvariant() ?? "name") switch
         {
+            "contactname" => desc
+                ? query.OrderByDescending(p => p.ContactName)
+                : query.OrderBy(p => p.ContactName),
+            "address" => desc ? query.OrderByDescending(p => p.Address) : query.OrderBy(p => p.Address),
             "email" => desc ? query.OrderByDescending(p => p.Email) : query.OrderBy(p => p.Email),
             "phone" => desc ? query.OrderByDescending(p => p.Phone) : query.OrderBy(p => p.Phone),
             "taxid" => desc ? query.OrderByDescending(p => p.TaxId) : query.OrderBy(p => p.TaxId),

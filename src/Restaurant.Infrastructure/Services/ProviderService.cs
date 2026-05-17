@@ -45,6 +45,8 @@ public sealed class ProviderService : IProviderService
         {
             Id = Guid.NewGuid(),
             Name = name,
+            ContactName = dto.ContactName?.Trim(),
+            Address = dto.Address?.Trim(),
             TaxId = dto.TaxId?.Trim(),
             Email = dto.Email?.Trim(),
             Phone = dto.Phone?.Trim(),
@@ -67,6 +69,8 @@ public sealed class ProviderService : IProviderService
             throw new InvalidOperationException("Another active provider already uses this name.");
 
         entity.Name = name;
+        entity.ContactName = dto.ContactName?.Trim();
+        entity.Address = dto.Address?.Trim();
         entity.TaxId = dto.TaxId?.Trim();
         entity.Email = dto.Email?.Trim();
         entity.Phone = dto.Phone?.Trim();

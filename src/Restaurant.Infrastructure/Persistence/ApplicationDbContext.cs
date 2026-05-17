@@ -122,6 +122,8 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<Provider>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.ContactName).HasMaxLength(200);
+            e.Property(x => x.Address).HasMaxLength(500);
         });
 
         modelBuilder.Entity<DiningTable>(e =>
