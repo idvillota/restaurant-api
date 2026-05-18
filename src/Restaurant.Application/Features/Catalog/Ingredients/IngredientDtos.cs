@@ -29,12 +29,6 @@ public sealed class CreateIngredientDto
     public IngredientUnit? Unit { get; set; }
 
     [Range(0, double.MaxValue)]
-    public decimal? UnitCost { get; set; }
-
-    [Range(0, double.MaxValue)]
-    public decimal? StockQuantity { get; set; }
-
-    [Range(0, double.MaxValue)]
     public decimal? ReorderLevel { get; set; }
 }
 
@@ -49,12 +43,6 @@ public sealed class UpdateIngredientDto
 
     [Required]
     public IngredientUnit? Unit { get; set; }
-
-    [Range(0, double.MaxValue)]
-    public decimal? UnitCost { get; set; }
-
-    [Range(0, double.MaxValue)]
-    public decimal? StockQuantity { get; set; }
 
     [Range(0, double.MaxValue)]
     public decimal? ReorderLevel { get; set; }

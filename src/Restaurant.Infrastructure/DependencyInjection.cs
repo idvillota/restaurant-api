@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IIngredientCategoryService, IngredientCategoryService>();
         services.AddScoped<IIngredientService, IngredientService>();
+        services.AddScoped<IPurchaseService, PurchaseService>();
 
         return services;
     }

@@ -185,6 +185,26 @@ internal static class PagedEntityQueries
         return ApplyProviderSort(query, q);
     }
 
+    public static IQueryable<Purchase> ShapePurchases(IQueryable<Purchase> query, ListQuery q)
+    {
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(p =>
+                p.BillNumber.ToLower().Contains(search) ||
+                p.Provider.Name.ToLower().Contains(search) ||
+                (p.Notes != null && p.Notes.ToLower().Contains(search)));
+        }
+
+        if (q.FilterValue("billNumber") is { } billFilter)
+            query = query.Where(p => p.BillNumber.ToLower().Contains(billFilter.ToLowerInvariant()));
+
+        if (q.FilterValue("providerName") is { } providerFilter)
+            query = query.Where(p => p.Provider.Name.ToLower().Contains(providerFilter.ToLowerInvariant()));
+
+        return ApplyPurchaseSort(query, q);
+    }
+
     public static IQueryable<Employee> ShapeEmployees(IQueryable<Employee> query, ListQuery q)
     {
         if (!q.IncludeInactive)
@@ -454,6 +474,22 @@ internal static class PagedEntityQueries
             "taxid" => desc ? query.OrderByDescending(c => c.TaxId) : query.OrderBy(c => c.TaxId),
             "isactive" => desc ? query.OrderByDescending(c => c.IsActive) : query.OrderBy(c => c.IsActive),
             _ => desc ? query.OrderByDescending(c => c.Name) : query.OrderBy(c => c.Name),
+        };
+    }
+
+    private static IQueryable<Purchase> ApplyPurchaseSort(IQueryable<Purchase> query, ListQuery q)
+    {
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "purchasedatutc") switch
+        {
+            "billnumber" => desc ? query.OrderByDescending(p => p.BillNumber) : query.OrderBy(p => p.BillNumber),
+            "providername" => desc
+                ? query.OrderByDescending(p => p.Provider.Name)
+                : query.OrderBy(p => p.Provider.Name),
+            "subtotal" => desc ? query.OrderByDescending(p => p.Subtotal) : query.OrderBy(p => p.Subtotal),
+            "taxamount" => desc ? query.OrderByDescending(p => p.TaxAmount) : query.OrderBy(p => p.TaxAmount),
+            "total" => desc ? query.OrderByDescending(p => p.Total) : query.OrderBy(p => p.Total),
+            _ => desc ? query.OrderByDescending(p => p.PurchasedAtUtc) : query.OrderBy(p => p.PurchasedAtUtc),
         };
     }
 

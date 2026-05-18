@@ -12,6 +12,7 @@ public sealed class CrudEntityMappingProfilesTests
         {
             c.AddProfile<ProductTypeMappingProfile>();
             c.AddProfile<ProviderMappingProfile>();
+            c.AddProfile<PurchaseMappingProfile>();
             c.AddProfile<EmployeeMappingProfile>();
             c.AddProfile<DiningTableMappingProfile>();
             c.AddProfile<CustomerMappingProfile>();

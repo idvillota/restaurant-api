@@ -27,6 +27,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<ProductIngredient> ProductIngredients => Set<ProductIngredient>();
     public DbSet<Provider> Providers => Set<Provider>();
+    public DbSet<Purchase> Purchases => Set<Purchase>();
+    public DbSet<PurchaseLine> PurchaseLines => Set<PurchaseLine>();
     public DbSet<DiningTable> DiningTables => Set<DiningTable>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
@@ -126,6 +128,27 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Address).HasMaxLength(500);
         });
 
+        modelBuilder.Entity<Purchase>(e =>
+        {
+            e.HasOne(x => x.Provider).WithMany().HasForeignKey(x => x.ProviderId);
+            e.Property(x => x.BillNumber).HasMaxLength(80);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.Subtotal).HasPrecision(18, 2);
+            e.Property(x => x.TaxAmount).HasPrecision(18, 2);
+            e.Property(x => x.Total).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.TenantId, x.BillNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<PurchaseLine>(e =>
+        {
+            e.HasOne(x => x.Purchase).WithMany(x => x.Lines).HasForeignKey(x => x.PurchaseId);
+            e.HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId);
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+            e.Property(x => x.UnitPrice).HasPrecision(18, 4);
+            e.Property(x => x.LineTotal).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.PurchaseId, x.IngredientId }).IsUnique();
+        });
+
         modelBuilder.Entity<DiningTable>(e =>
         {
             e.Property(x => x.Code).HasMaxLength(40);
@@ -214,6 +237,12 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Provider>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Purchase>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<PurchaseLine>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<DiningTable>().HasQueryFilter(e =>

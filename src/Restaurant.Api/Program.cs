@@ -6,10 +6,12 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Restaurant.Api.Middleware;
 using Restaurant.Application;
+using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Infrastructure;
 using Restaurant.Infrastructure.Identity;
 using Restaurant.Infrastructure.Persistence;
+using Restaurant.Infrastructure.Persistence.Seeding;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +85,21 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
+
+    if (app.Environment.IsDevelopment())
+    {
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ICurrentTenantContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        var productImages = scope.ServiceProvider.GetRequiredService<IProductImageStorage>();
+        await DevelopmentDataSeeder.SeedAsync(
+            db,
+            passwordHasher,
+            logger,
+            tenantContext,
+            app.Environment,
+            productImages);
+    }
 }
 
 if (app.Environment.IsDevelopment())

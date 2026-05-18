@@ -41,7 +41,6 @@ public sealed class IngredientServiceTests
                 IngredientCategoryId = catId,
                 Name = "  Flour  ",
                 Unit = IngredientUnit.Kilogram,
-                StockQuantity = 10m,
                 ReorderLevel = 2m,
             });
 
@@ -212,7 +211,6 @@ public sealed class IngredientServiceTests
                 IngredientCategoryId = catId,
                 Name = "Brown sugar",
                 Unit = IngredientUnit.Kilogram,
-                StockQuantity = 5m,
                 ReorderLevel = 1m,
                 IsActive = true,
             });
@@ -220,7 +218,10 @@ public sealed class IngredientServiceTests
         Assert.NotNull(updated);
         Assert.Equal("Brown sugar", updated!.Name);
         Assert.Equal(IngredientUnit.Kilogram, updated.Unit);
-        Assert.Equal(5m, updated.StockQuantity);
+        Assert.Equal(1m, updated.ReorderLevel);
+
+        var stored = await fx.Db.Ingredients.AsNoTracking().SingleAsync(i => i.Id == created.Id);
+        Assert.Null(stored.StockQuantity);
     }
 
     [Fact]

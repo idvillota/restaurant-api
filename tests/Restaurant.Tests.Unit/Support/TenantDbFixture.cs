@@ -32,6 +32,7 @@ public sealed class TenantDbFixture : IDisposable
             cfg.AddProfile<ProductMappingProfile>();
             cfg.AddProfile<ProductTypeMappingProfile>();
             cfg.AddProfile<ProviderMappingProfile>();
+            cfg.AddProfile<PurchaseMappingProfile>();
             cfg.AddProfile<EmployeeMappingProfile>();
             cfg.AddProfile<DiningTableMappingProfile>();
             cfg.AddProfile<CustomerMappingProfile>();
@@ -71,6 +72,7 @@ public sealed class NoTenantDbFixture : IDisposable
             cfg.AddProfile<ProductMappingProfile>();
             cfg.AddProfile<ProductTypeMappingProfile>();
             cfg.AddProfile<ProviderMappingProfile>();
+            cfg.AddProfile<PurchaseMappingProfile>();
             cfg.AddProfile<EmployeeMappingProfile>();
             cfg.AddProfile<DiningTableMappingProfile>();
             cfg.AddProfile<CustomerMappingProfile>();

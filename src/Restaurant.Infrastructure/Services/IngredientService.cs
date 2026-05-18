@@ -61,8 +61,8 @@ public sealed class IngredientService : IIngredientService
             IngredientCategoryId = dto.IngredientCategoryId,
             Name = name,
             Unit = dto.Unit!.Value,
-            UnitCost = dto.UnitCost,
-            StockQuantity = dto.StockQuantity,
+            UnitCost = null,
+            StockQuantity = null,
             ReorderLevel = dto.ReorderLevel,
             IsActive = true,
         };
@@ -96,8 +96,6 @@ public sealed class IngredientService : IIngredientService
         entity.IngredientCategoryId = dto.IngredientCategoryId;
         entity.Name = name;
         entity.Unit = dto.Unit!.Value;
-        entity.UnitCost = dto.UnitCost;
-        entity.StockQuantity = dto.StockQuantity;
         entity.ReorderLevel = dto.ReorderLevel;
         entity.IsActive = dto.IsActive;
 
