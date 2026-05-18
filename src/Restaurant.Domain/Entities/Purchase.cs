@@ -8,6 +8,7 @@ public class Purchase : EntityBase, ITenantScoped
     public Guid ProviderId { get; set; }
     public string BillNumber { get; set; } = string.Empty;
     public DateTime PurchasedAtUtc { get; set; }
+    public DateTime PaymentDateUtc { get; set; }
     public decimal Subtotal { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }

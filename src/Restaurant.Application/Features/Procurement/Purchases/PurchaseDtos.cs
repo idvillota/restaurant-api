@@ -10,6 +10,7 @@ public sealed class PurchaseDto
     public string ProviderName { get; set; } = string.Empty;
     public string BillNumber { get; set; } = string.Empty;
     public DateTime PurchasedAtUtc { get; set; }
+    public DateTime PaymentDateUtc { get; set; }
     public decimal Subtotal { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }
@@ -35,6 +36,7 @@ public sealed class PurchaseListItemDto
     public string ProviderName { get; set; } = string.Empty;
     public string BillNumber { get; set; } = string.Empty;
     public DateTime PurchasedAtUtc { get; set; }
+    public DateTime PaymentDateUtc { get; set; }
     public decimal Subtotal { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }
@@ -62,8 +64,9 @@ public sealed class CreatePurchaseDto
     [MaxLength(80)]
     public string BillNumber { get; set; } = string.Empty;
 
-    [Required]
     public DateTime? PurchasedAtUtc { get; set; }
+
+    public DateTime? PaymentDateUtc { get; set; }
 
     [Range(0, double.MaxValue)]
     public decimal TaxAmount { get; set; }

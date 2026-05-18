@@ -426,6 +426,10 @@ public static class DevelopmentDataSeeder
             subtotal = decimal.Round(subtotal, 0, MidpointRounding.AwayFromZero);
             var tax = decimal.Round(subtotal * 0.19m, 0, MidpointRounding.AwayFromZero);
 
+            var purchasedAt = utc.AddDays(-daysAgo);
+            // Mitad al contado (misma fecha); mitad a crédito (pago un mes después).
+            var paymentAt = p < purchaseSpecs.Length / 2 ? purchasedAt : purchasedAt.AddMonths(1);
+
             await db.Purchases.AddAsync(
                 new Purchase
                 {
@@ -433,7 +437,8 @@ public static class DevelopmentDataSeeder
                     TenantId = tenantId,
                     ProviderId = DevelopmentSeedIds.ProviderIds[providerIndex],
                     BillNumber = bill,
-                    PurchasedAtUtc = utc.AddDays(-daysAgo),
+                    PurchasedAtUtc = purchasedAt,
+                    PaymentDateUtc = paymentAt,
                     Subtotal = subtotal,
                     TaxAmount = tax,
                     Total = subtotal + tax,

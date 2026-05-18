@@ -489,6 +489,9 @@ internal static class PagedEntityQueries
             "subtotal" => desc ? query.OrderByDescending(p => p.Subtotal) : query.OrderBy(p => p.Subtotal),
             "taxamount" => desc ? query.OrderByDescending(p => p.TaxAmount) : query.OrderBy(p => p.TaxAmount),
             "total" => desc ? query.OrderByDescending(p => p.Total) : query.OrderBy(p => p.Total),
+            "paymentdateutc" => desc
+                ? query.OrderByDescending(p => p.PaymentDateUtc)
+                : query.OrderBy(p => p.PaymentDateUtc),
             _ => desc ? query.OrderByDescending(p => p.PurchasedAtUtc) : query.OrderBy(p => p.PurchasedAtUtc),
         };
     }

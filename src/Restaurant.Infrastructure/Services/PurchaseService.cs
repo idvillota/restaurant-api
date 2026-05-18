@@ -70,9 +70,6 @@ public sealed class PurchaseService : IPurchaseService
         if (dto.Lines.Select(l => l.IngredientId).Distinct().Count() != dto.Lines.Count)
             throw new InvalidOperationException("Each ingredient can only appear once on a purchase.");
 
-        if (!dto.PurchasedAtUtc.HasValue)
-            throw new InvalidOperationException("Purchase date is required.");
-
         if (dto.TaxAmount < 0)
             throw new InvalidOperationException("Tax amount cannot be negative.");
 
@@ -126,12 +123,16 @@ public sealed class PurchaseService : IPurchaseService
         var taxAmount = decimal.Round(dto.TaxAmount, 2, MidpointRounding.AwayFromZero);
         var total = subtotal + taxAmount;
 
+        var purchasedAt = NormalizeUtc(dto.PurchasedAtUtc ?? DateTime.UtcNow);
+        var paymentAt = NormalizeUtc(dto.PaymentDateUtc ?? purchasedAt);
+
         var purchase = new Purchase
         {
             Id = purchaseId,
             ProviderId = dto.ProviderId,
             BillNumber = billNumber,
-            PurchasedAtUtc = dto.PurchasedAtUtc.Value,
+            PurchasedAtUtc = purchasedAt,
+            PaymentDateUtc = paymentAt,
             Subtotal = subtotal,
             TaxAmount = taxAmount,
             Total = total,
@@ -159,4 +160,31 @@ public sealed class PurchaseService : IPurchaseService
 
         return (await GetByIdAsync(purchaseId, cancellationToken))!;
     }
+
+    public async Task<PurchaseDto?> UpdatePaymentDateAsync(
+        Guid id,
+        UpdatePurchasePaymentDateDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!dto.PaymentDateUtc.HasValue)
+            throw new InvalidOperationException("Payment date is required.");
+
+        var entity = await _purchases.GetByIdAsync(id, cancellationToken);
+        if (entity is null)
+            return null;
+
+        entity.PaymentDateUtc = NormalizeUtc(dto.PaymentDateUtc.Value);
+        _purchases.Update(entity);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(id, cancellationToken);
+    }
+
+    private static DateTime NormalizeUtc(DateTime value) =>
+        value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
 }

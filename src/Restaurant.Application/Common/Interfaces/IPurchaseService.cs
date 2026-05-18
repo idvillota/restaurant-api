@@ -8,4 +8,8 @@ public interface IPurchaseService
     Task<PagedResult<PurchaseListItemDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default);
     Task<PurchaseDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseDto> CreateAsync(CreatePurchaseDto dto, CancellationToken cancellationToken = default);
+    Task<PurchaseDto?> UpdatePaymentDateAsync(
+        Guid id,
+        UpdatePurchasePaymentDateDto dto,
+        CancellationToken cancellationToken = default);
 }

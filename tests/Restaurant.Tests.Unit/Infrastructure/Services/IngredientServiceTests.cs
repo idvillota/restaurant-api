@@ -50,6 +50,28 @@ public sealed class IngredientServiceTests
         var stored = await fx.Db.Ingredients.AsNoTracking().SingleAsync();
         Assert.Equal(fx.TenantId, stored.TenantId);
         Assert.Equal(IngredientUnit.Kilogram, stored.Unit);
+        Assert.Null(stored.UnitCost);
+    }
+
+    [Fact]
+    public async Task CreateAsync_persists_optional_initial_unit_cost()
+    {
+        using var fx = new TenantDbFixture();
+        var catId = await SeedCategoryAsync(fx);
+        var sut = CreateSut(fx);
+
+        var dto = await sut.CreateAsync(
+            new CreateIngredientDto
+            {
+                IngredientCategoryId = catId,
+                Name = "Canela",
+                Unit = IngredientUnit.Gram,
+                UnitCost = 12.5m,
+            });
+
+        Assert.Equal(12.5m, dto.UnitCost);
+        var stored = await fx.Db.Ingredients.AsNoTracking().SingleAsync();
+        Assert.Equal(12.5m, stored.UnitCost);
     }
 
     [Fact]

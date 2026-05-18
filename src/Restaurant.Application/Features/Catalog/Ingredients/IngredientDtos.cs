@@ -30,6 +30,9 @@ public sealed class CreateIngredientDto
 
     [Range(0, double.MaxValue)]
     public decimal? ReorderLevel { get; set; }
+
+    [Range(0, double.MaxValue)]
+    public decimal? UnitCost { get; set; }
 }
 
 public sealed class UpdateIngredientDto

@@ -61,7 +61,7 @@ public sealed class IngredientService : IIngredientService
             IngredientCategoryId = dto.IngredientCategoryId,
             Name = name,
             Unit = dto.Unit!.Value,
-            UnitCost = null,
+            UnitCost = dto.UnitCost is > 0 ? dto.UnitCost : null,
             StockQuantity = null,
             ReorderLevel = dto.ReorderLevel,
             IsActive = true,

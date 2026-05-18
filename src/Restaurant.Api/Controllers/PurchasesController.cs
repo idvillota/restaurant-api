@@ -46,4 +46,24 @@ public sealed class PurchasesController : ControllerBase
             return Conflict(new { message = ex.Message });
         }
     }
+
+    [HttpPatch("{id:guid}/payment-date")]
+    public async Task<ActionResult<PurchaseDto>> UpdatePaymentDate(
+        Guid id,
+        [FromBody] UpdatePurchasePaymentDateDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var updated = await _service.UpdatePaymentDateAsync(id, dto, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 }
