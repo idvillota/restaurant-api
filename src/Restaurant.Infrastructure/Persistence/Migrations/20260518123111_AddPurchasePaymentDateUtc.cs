@@ -15,8 +15,13 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                 name: "PaymentDateUtc",
                 table: "Purchases",
                 type: "timestamp with time zone",
-                nullable: false,
-                defaultValueSql: "\"PurchasedAtUtc\"");
+                nullable: true);
+
+            migrationBuilder.Sql(
+                """UPDATE "Purchases" SET "PaymentDateUtc" = "PurchasedAtUtc" WHERE "PaymentDateUtc" IS NULL;""");
+
+            migrationBuilder.Sql(
+                """ALTER TABLE "Purchases" ALTER COLUMN "PaymentDateUtc" SET NOT NULL;""");
         }
 
         /// <inheritdoc />

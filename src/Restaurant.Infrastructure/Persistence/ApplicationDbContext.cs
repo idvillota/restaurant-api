@@ -35,6 +35,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<ReservationTable> ReservationTables => Set<ReservationTable>();
     public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
     public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
+    public DbSet<SalesOrderLineExcludedIngredient> SalesOrderLineExcludedIngredients =>
+        Set<SalesOrderLineExcludedIngredient>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Payment> Payments => Set<Payment>();
 
@@ -171,10 +173,12 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<SalesOrder>(e =>
         {
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId);
+            e.HasOne(x => x.DiningTable).WithMany().HasForeignKey(x => x.DiningTableId);
             e.Property(x => x.Number).HasMaxLength(40);
             e.Property(x => x.Subtotal).HasPrecision(18, 2);
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.TenantId, x.DiningTableId, x.Status });
         });
 
         modelBuilder.Entity<SalesOrderLine>(e =>
@@ -184,6 +188,16 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
             e.Property(x => x.Quantity).HasPrecision(18, 4);
+            e.Property(x => x.Notes).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<SalesOrderLineExcludedIngredient>(e =>
+        {
+            e.HasOne(x => x.SalesOrderLine)
+                .WithMany(x => x.ExcludedIngredients)
+                .HasForeignKey(x => x.SalesOrderLineId);
+            e.HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId);
+            e.HasIndex(x => new { x.SalesOrderLineId, x.IngredientId }).IsUnique();
         });
 
         modelBuilder.Entity<Invoice>(e =>
@@ -261,6 +275,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrderLine>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<SalesOrderLineExcludedIngredient>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Invoice>().HasQueryFilter(e =>

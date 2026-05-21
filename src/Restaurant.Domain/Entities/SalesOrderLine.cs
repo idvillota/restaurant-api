@@ -10,7 +10,10 @@ public class SalesOrderLine : EntityBase, ITenantScoped
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
+    public string? Notes { get; set; }
 
     public SalesOrder SalesOrder { get; set; } = null!;
     public Product Product { get; set; } = null!;
+    public ICollection<SalesOrderLineExcludedIngredient> ExcludedIngredients { get; set; } =
+        new List<SalesOrderLineExcludedIngredient>();
 }
