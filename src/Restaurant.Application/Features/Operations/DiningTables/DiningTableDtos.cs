@@ -9,8 +9,28 @@ public sealed class DiningTableDto
     public string Code { get; set; } = string.Empty;
     public int Capacity { get; set; }
     public string? Zone { get; set; }
+    public double? LayoutX { get; set; }
+    public double? LayoutY { get; set; }
     public ETableStatus Status { get; set; }
     public bool IsActive { get; set; }
+}
+
+public sealed class DiningTableLayoutItemDto
+{
+    [Required]
+    public Guid TableId { get; set; }
+
+    [Range(0, 100)]
+    public double LayoutX { get; set; }
+
+    [Range(0, 100)]
+    public double LayoutY { get; set; }
+}
+
+public sealed class UpdateDiningTableLayoutsDto
+{
+    [MinLength(1)]
+    public List<DiningTableLayoutItemDto> Items { get; set; } = [];
 }
 
 public sealed class SetDiningTableStatusDto

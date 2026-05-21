@@ -71,6 +71,8 @@ public sealed class SalesOrderService : ISalesOrderService
                     Zone = t.Zone,
                     Status = t.Status,
                     Capacity = t.Capacity,
+                    LayoutX = t.LayoutX,
+                    LayoutY = t.LayoutY,
                     OpenOrderId = order?.Id,
                     OpenOrderNumber = order?.Number,
                     OpenOrderTotal = order?.Total,

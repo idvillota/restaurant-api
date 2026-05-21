@@ -88,4 +88,23 @@ public sealed class DiningTablesController : ControllerBase
         var ok = await _service.SoftDeleteAsync(id, cancellationToken);
         return ok ? NoContent() : NotFound();
     }
+
+    [HttpPatch("layouts")]
+    public async Task<ActionResult<IReadOnlyList<DiningTableDto>>> UpdateLayouts(
+        [FromBody] UpdateDiningTableLayoutsDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var updated = await _service.UpdateLayoutsAsync(dto, cancellationToken);
+            return Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 }

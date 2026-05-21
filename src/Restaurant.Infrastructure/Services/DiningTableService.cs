@@ -102,4 +102,32 @@ public sealed class DiningTableService : IDiningTableService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return true;
     }
+
+    public async Task<IReadOnlyList<DiningTableDto>> UpdateLayoutsAsync(
+        UpdateDiningTableLayoutsDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = dto.Items.Select(i => i.TableId).Distinct().ToList();
+        var entities = await _tables.Query()
+            .Where(t => ids.Contains(t.Id) && t.IsActive)
+            .ToListAsync(cancellationToken);
+
+        if (entities.Count != ids.Count)
+            throw new InvalidOperationException("One or more tables were not found or are inactive.");
+
+        var byId = entities.ToDictionary(t => t.Id);
+        foreach (var item in dto.Items)
+        {
+            var entity = byId[item.TableId];
+            entity.LayoutX = ClampLayoutPercent(item.LayoutX);
+            entity.LayoutY = ClampLayoutPercent(item.LayoutY);
+            _tables.Update(entity);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return _mapper.Map<IReadOnlyList<DiningTableDto>>(entities.OrderBy(t => t.Code).ToList());
+    }
+
+    private static double ClampLayoutPercent(double value) =>
+        Math.Round(Math.Max(0, Math.Min(100, value)), 2);
 }

@@ -63,6 +63,8 @@ public sealed class TableServiceSummaryDto
     public string? Zone { get; set; }
     public ETableStatus Status { get; set; }
     public int Capacity { get; set; }
+    public double? LayoutX { get; set; }
+    public double? LayoutY { get; set; }
     public Guid? OpenOrderId { get; set; }
     public string? OpenOrderNumber { get; set; }
     public decimal? OpenOrderTotal { get; set; }

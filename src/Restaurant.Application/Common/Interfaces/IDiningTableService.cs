@@ -12,4 +12,8 @@ public interface IDiningTableService
     Task<DiningTableDto?> UpdateAsync(Guid id, UpdateDiningTableDto dto, CancellationToken cancellationToken = default);
     Task<DiningTableDto?> SetStatusAsync(Guid id, ETableStatus status, CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DiningTableDto>> UpdateLayoutsAsync(
+        UpdateDiningTableLayoutsDto dto,
+        CancellationToken cancellationToken = default);
 }

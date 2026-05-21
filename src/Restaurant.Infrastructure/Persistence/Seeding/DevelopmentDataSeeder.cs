@@ -477,6 +477,8 @@ public static class DevelopmentDataSeeder
         var zones = new[] { "Salón", "Salón", "Salón", "Terraza", "Terraza", "Barra", "Barra", "Privado", "Privado", "Ventana", "Ventana", "Rincón" };
         var capacities = new[] { 2, 2, 4, 4, 6, 2, 4, 8, 10, 2, 4, 6 };
 
+        var layoutIndexByZone = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
         for (var i = 0; i < DevelopmentSeedIds.DiningTableIds.Length; i++)
         {
             var status = i switch
@@ -486,6 +488,12 @@ public static class DevelopmentDataSeeder
                 _ => ETableStatus.Available,
             };
 
+            var zone = zones[i];
+            var zoneIndex = layoutIndexByZone.GetValueOrDefault(zone);
+            layoutIndexByZone[zone] = zoneIndex + 1;
+            var col = zoneIndex % 4;
+            var row = zoneIndex / 4;
+
             await db.DiningTables.AddAsync(
                 new DiningTable
                 {
@@ -493,7 +501,9 @@ public static class DevelopmentDataSeeder
                     TenantId = tenantId,
                     Code = $"T-{i + 1:00}",
                     Capacity = capacities[i],
-                    Zone = zones[i],
+                    Zone = zone,
+                    LayoutX = 8 + col * 22,
+                    LayoutY = 10 + row * 24,
                     Status = status,
                     IsActive = true,
                 },
