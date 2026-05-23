@@ -35,3 +35,6 @@ msbuild.wrn
 
 # Uploaded product images (local storage)
 uploads/
+
+# Kitchen tickets pending print (generated PDFs)
+orders/

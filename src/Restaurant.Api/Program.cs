@@ -127,6 +127,14 @@ var productImageRoot = Path.IsPathRooted(productImageOptions.RootPath)
     ? productImageOptions.RootPath
     : Path.Combine(app.Environment.ContentRootPath, productImageOptions.RootPath);
 Directory.CreateDirectory(productImageRoot);
+
+var kitchenTicketOptions = app.Configuration.GetSection(KitchenTicketOptions.SectionName).Get<KitchenTicketOptions>()
+    ?? new KitchenTicketOptions();
+var kitchenTicketRoot = Path.IsPathRooted(kitchenTicketOptions.RootPath)
+    ? kitchenTicketOptions.RootPath
+    : Path.Combine(app.Environment.ContentRootPath, kitchenTicketOptions.RootPath);
+Directory.CreateDirectory(kitchenTicketRoot);
+
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(productImageRoot),

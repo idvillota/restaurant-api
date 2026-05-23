@@ -32,7 +32,9 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
+        services.Configure<KitchenTicketOptions>(configuration.GetSection(KitchenTicketOptions.SectionName));
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
+        services.AddScoped<IKitchenTicketService, KitchenTicketService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductTypeService, ProductTypeService>();
         services.AddScoped<IProviderService, ProviderService>();

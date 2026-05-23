@@ -52,7 +52,7 @@ public sealed class SalesOrdersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/confirm")]
-    public async Task<ActionResult<SalesOrderDto>> ConfirmOrder(
+    public async Task<ActionResult<ConfirmSalesOrderResultDto>> ConfirmOrder(
         Guid id,
         [FromBody] ConfirmSalesOrderDto dto,
         CancellationToken cancellationToken = default)
@@ -62,8 +62,8 @@ public sealed class SalesOrdersController : ControllerBase
 
         try
         {
-            var updated = await _service.ConfirmOrderAsync(id, dto, cancellationToken);
-            return updated is null ? NotFound() : Ok(updated);
+            var result = await _service.ConfirmOrderAsync(id, dto, cancellationToken);
+            return result is null ? NotFound() : Ok(result);
         }
         catch (InvalidOperationException ex)
         {

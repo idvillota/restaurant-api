@@ -56,6 +56,14 @@ public sealed class ConfirmSalesOrderDto
     public List<AddSalesOrderLineDto> Lines { get; set; } = [];
 }
 
+public sealed class ConfirmSalesOrderResultDto
+{
+    public SalesOrderDto Order { get; set; } = null!;
+
+    /// <summary>Relative path under the kitchen tickets root (orders/files-without-print).</summary>
+    public string? KitchenTicketRelativePath { get; set; }
+}
+
 public sealed class TableServiceSummaryDto
 {
     public Guid TableId { get; set; }

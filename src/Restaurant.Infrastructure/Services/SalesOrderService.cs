@@ -19,6 +19,7 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly IInventoryAvailabilityService _inventory;
+    private readonly IKitchenTicketService _kitchenTickets;
 
     public SalesOrderService(
         IRepository<SalesOrder> orders,
@@ -29,7 +30,8 @@ public sealed class SalesOrderService : ISalesOrderService
         IRepository<ProductIngredient> productIngredients,
         IUnitOfWork unitOfWork,
         IMapper mapper,
-        IInventoryAvailabilityService inventory)
+        IInventoryAvailabilityService inventory,
+        IKitchenTicketService kitchenTickets)
     {
         _orders = orders;
         _lines = lines;
@@ -40,6 +42,7 @@ public sealed class SalesOrderService : ISalesOrderService
         _unitOfWork = unitOfWork;
         _mapper = mapper;
         _inventory = inventory;
+        _kitchenTickets = kitchenTickets;
     }
 
     public async Task<IReadOnlyList<TableServiceSummaryDto>> ListTableSummariesAsync(
@@ -158,7 +161,7 @@ public sealed class SalesOrderService : ISalesOrderService
         return await GetByIdAsync(orderId, cancellationToken);
     }
 
-    public async Task<SalesOrderDto?> ConfirmOrderAsync(
+    public async Task<ConfirmSalesOrderResultDto?> ConfirmOrderAsync(
         Guid orderId,
         ConfirmSalesOrderDto dto,
         CancellationToken cancellationToken = default)
@@ -190,7 +193,18 @@ public sealed class SalesOrderService : ISalesOrderService
         _orders.Update(order);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await GetByIdAsync(orderId, cancellationToken);
+        var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, dto.Lines, cancellationToken);
+        var ticketPath = await _kitchenTickets.GeneratePdfAsync(ticketModel, cancellationToken);
+
+        var orderDto = await GetByIdAsync(orderId, cancellationToken);
+        if (orderDto is null)
+            return null;
+
+        return new ConfirmSalesOrderResultDto
+        {
+            Order = orderDto,
+            KitchenTicketRelativePath = ticketPath,
+        };
     }
 
     private async Task ApplyLineToOrderAsync(
