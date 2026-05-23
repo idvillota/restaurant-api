@@ -6,6 +6,7 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Authorization;
+using Restaurant.Infrastructure.Services;
 
 namespace Restaurant.Infrastructure.Persistence.Seeding;
 
@@ -112,6 +113,10 @@ public static class DevelopmentDataSeeder
                 CurrencyCode = "COP",
                 IsActive = true,
             },
+            cancellationToken);
+
+        await db.TenantSettings.AddAsync(
+            new TenantSettings { TenantId = tenantId, MaxDiscountPercent = 15m },
             cancellationToken);
 
         await db.Users.AddRangeAsync(
@@ -510,23 +515,23 @@ public static class DevelopmentDataSeeder
                 cancellationToken);
         }
 
-        var customers = new (string Name, string? Email, string? Phone)[]
+        var customers = new (string Name, string? Email, string? Phone, string? TaxId)[]
         {
-            ("Cliente sin cita", null, null),
-            ("Ana Martínez", "ana.martinez@example.com", "555-1001"),
-            ("Juan Pérez", "juan.perez@example.com", "555-1002"),
-            ("Li Wei", "li.wei@example.com", "555-1003"),
-            ("Emma Rodríguez", "emma.rodriguez@example.com", "555-1004"),
-            ("Carlos Díaz", "carlos.diaz@example.com", "555-1005"),
-            ("Priya Patel", "priya.patel@example.com", "555-1006"),
-            ("Noah Wilson", "noah.wilson@example.com", "555-1007"),
-            ("Sara Kim", "sara.kim@example.com", "555-1008"),
-            ("Catering oficina", "catering@acme.example", "555-1009"),
+            ("Consumidor final", null, null, BillService.DefaultCustomerTaxId),
+            ("Ana Martínez", "ana.martinez@example.com", "555-1001", null),
+            ("Juan Pérez", "juan.perez@example.com", "555-1002", null),
+            ("Li Wei", "li.wei@example.com", "555-1003", null),
+            ("Emma Rodríguez", "emma.rodriguez@example.com", "555-1004", null),
+            ("Carlos Díaz", "carlos.diaz@example.com", "555-1005", null),
+            ("Priya Patel", "priya.patel@example.com", "555-1006", null),
+            ("Noah Wilson", "noah.wilson@example.com", "555-1007", null),
+            ("Sara Kim", "sara.kim@example.com", "555-1008", null),
+            ("Catering oficina", "catering@acme.example", "555-1009", null),
         };
 
         for (var i = 0; i < customers.Length; i++)
         {
-            var (name, email, phone) = customers[i];
+            var (name, email, phone, taxId) = customers[i];
             await db.Customers.AddAsync(
                 new Customer
                 {
@@ -535,6 +540,7 @@ public static class DevelopmentDataSeeder
                     Name = name,
                     Email = email,
                     Phone = phone,
+                    TaxId = taxId,
                     IsActive = true,
                 },
                 cancellationToken);
@@ -691,7 +697,7 @@ public static class DevelopmentDataSeeder
                     Id = DevelopmentSeedIds.InvoiceIds[o],
                     TenantId = tenantId,
                     SalesOrderId = orderId,
-                    CustomerId = customerId,
+                    CustomerId = customerId ?? DevelopmentSeedIds.CustomerIds[0],
                     Number = $"INV-{number}",
                     Status = invoiceStatus,
                     Subtotal = subtotal,

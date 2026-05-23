@@ -37,6 +37,9 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
     public DbSet<SalesOrderLineExcludedIngredient> SalesOrderLineExcludedIngredients =>
         Set<SalesOrderLineExcludedIngredient>();
+    public DbSet<TenantSettings> TenantSettings => Set<TenantSettings>();
+    public DbSet<Bill> Bills => Set<Bill>();
+    public DbSet<BillSalesOrder> BillSalesOrders => Set<BillSalesOrder>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Payment> Payments => Set<Payment>();
 
@@ -200,18 +203,49 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.SalesOrderLineId, x.IngredientId }).IsUnique();
         });
 
+        modelBuilder.Entity<TenantSettings>(e =>
+        {
+            e.HasKey(x => x.TenantId);
+            e.HasOne(x => x.Tenant).WithOne().HasForeignKey<TenantSettings>(x => x.TenantId);
+            e.Property(x => x.MaxDiscountPercent).HasPrecision(5, 2);
+        });
+
+        modelBuilder.Entity<Bill>(e =>
+        {
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId);
+            e.Property(x => x.Number).HasMaxLength(40);
+            e.Property(x => x.Subtotal).HasPrecision(18, 2);
+            e.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+            e.Property(x => x.DiscountPercent).HasPrecision(5, 2);
+            e.Property(x => x.TipAmount).HasPrecision(18, 2);
+            e.Property(x => x.TaxAmount).HasPrecision(18, 2);
+            e.Property(x => x.Total).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
+        });
+
+        modelBuilder.Entity<BillSalesOrder>(e =>
+        {
+            e.HasKey(x => new { x.BillId, x.SalesOrderId });
+            e.HasOne(x => x.Bill).WithMany(x => x.BillOrders).HasForeignKey(x => x.BillId);
+            e.HasOne(x => x.SalesOrder).WithMany().HasForeignKey(x => x.SalesOrderId);
+            e.HasIndex(x => x.SalesOrderId).IsUnique();
+        });
+
         modelBuilder.Entity<Invoice>(e =>
         {
+            e.HasOne(x => x.Bill).WithOne(x => x.Invoice).HasForeignKey<Invoice>(x => x.BillId);
             e.HasOne(x => x.SalesOrder).WithMany(x => x.Invoices).HasForeignKey(x => x.SalesOrderId);
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId);
             e.Property(x => x.Number).HasMaxLength(40);
             e.Property(x => x.Subtotal).HasPrecision(18, 2);
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
+            e.HasIndex(x => x.BillId).IsUnique();
         });
 
         modelBuilder.Entity<Payment>(e =>
         {
+            e.HasOne(x => x.Bill).WithMany(x => x.Payments).HasForeignKey(x => x.BillId);
             e.HasOne(x => x.SalesOrder).WithMany(x => x.Payments).HasForeignKey(x => x.SalesOrderId);
             e.HasOne(x => x.Invoice).WithMany(x => x.Payments).HasForeignKey(x => x.InvoiceId);
             e.Property(x => x.Amount).HasPrecision(18, 2);
@@ -278,6 +312,15 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrderLineExcludedIngredient>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<TenantSettings>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<Bill>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<BillSalesOrder>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Invoice>().HasQueryFilter(e =>

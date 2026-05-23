@@ -25,4 +25,7 @@ public static class InventoryCosting
 
     public static decimal AddStock(decimal? currentQuantity, decimal purchaseQuantity) =>
         (currentQuantity ?? 0m) + purchaseQuantity;
+
+    public static decimal SubtractStock(decimal? currentQuantity, decimal quantity) =>
+        (currentQuantity ?? 0m) - quantity;
 }

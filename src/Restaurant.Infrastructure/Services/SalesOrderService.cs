@@ -169,6 +169,9 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order is null)
             return null;
 
+        if (order.Status == SalesOrderStatus.Paid || order.Status == SalesOrderStatus.Voided)
+            throw new InvalidOperationException("Paid or voided orders cannot be modified.");
+
         if (order.Status != SalesOrderStatus.Draft && order.Status != SalesOrderStatus.Open)
             throw new InvalidOperationException("Only active table orders can be sent to the kitchen.");
 

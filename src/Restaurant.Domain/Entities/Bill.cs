@@ -3,22 +3,23 @@ using Restaurant.Domain.Enums;
 
 namespace Restaurant.Domain.Entities;
 
-public class Invoice : EntityBase, ITenantScoped
+public class Bill : EntityBase, ITenantScoped
 {
     public Guid TenantId { get; set; }
-    public Guid? BillId { get; set; }
-    public Guid? SalesOrderId { get; set; }
     public Guid CustomerId { get; set; }
     public string Number { get; set; } = string.Empty;
-    public InvoiceStatus Status { get; set; } = InvoiceStatus.Draft;
+    public BillStatus Status { get; set; } = BillStatus.Issued;
     public decimal Subtotal { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal? DiscountPercent { get; set; }
+    public decimal TipAmount { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }
     public DateTime IssuedAtUtc { get; set; }
-    public DateTime? DueAtUtc { get; set; }
+    public DateTime? PaidAtUtc { get; set; }
 
-    public Bill? Bill { get; set; }
-    public SalesOrder? SalesOrder { get; set; }
     public Customer Customer { get; set; } = null!;
+    public ICollection<BillSalesOrder> BillOrders { get; set; } = new List<BillSalesOrder>();
+    public Invoice? Invoice { get; set; }
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }
