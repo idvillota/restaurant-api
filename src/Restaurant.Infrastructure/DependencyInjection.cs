@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IBillService, BillService>();
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
+        services.AddScoped<IRolePermissionService, RolePermissionService>();
 
         return services;
     }

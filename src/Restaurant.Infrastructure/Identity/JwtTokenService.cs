@@ -16,7 +16,14 @@ public sealed class JwtTokenService : IJwtTokenService
         _settings = settings.Value;
     }
 
-    public string CreateAccessToken(Guid userId, Guid tenantId, string email, IReadOnlyList<string> roles)
+    public const string PermissionClaimType = "permission";
+
+    public string CreateAccessToken(
+        Guid userId,
+        Guid tenantId,
+        string email,
+        IReadOnlyList<string> roles,
+        IReadOnlyList<string> permissions)
     {
         var claims = new List<Claim>
         {
@@ -25,6 +32,7 @@ public sealed class JwtTokenService : IJwtTokenService
             new("tenant_id", tenantId.ToString()),
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+        claims.AddRange(permissions.Select(p => new Claim(PermissionClaimType, p)));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SigningKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

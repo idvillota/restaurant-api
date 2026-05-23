@@ -90,11 +90,14 @@ public static class DevelopmentDataSeeder
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Development seed completed for '{Slug}'. Logins: {AdminEmail} or {DemoEmail} (password: {Password})",
+            "Development seed completed for '{Slug}'. Logins (password {Password}): admin {AdminEmail}, {DemoEmail}, manager {ManagerEmail}, waitress {WaitressEmail}, cashier {CashierEmail}",
             DevelopmentSeedIds.TenantSlug,
+            DevelopmentSeedIds.AdminPassword,
             DevelopmentSeedIds.AdminEmail,
             DevelopmentSeedIds.DemoTestEmail,
-            DevelopmentSeedIds.AdminPassword);
+            DevelopmentSeedIds.ManagerEmail,
+            DevelopmentSeedIds.WaitressEmail,
+            DevelopmentSeedIds.CashierEmail);
     }
 
     private static async Task SeedIdentityAsync(
@@ -142,11 +145,41 @@ public static class DevelopmentDataSeeder
 
         var roles = new[]
         {
-            new Role { Id = DevelopmentSeedIds.OwnerRoleId, TenantId = tenantId, Name = SystemRoles.Owner, NormalizedName = "OWNER" },
+            new Role { Id = DevelopmentSeedIds.AdministratorRoleId, TenantId = tenantId, Name = SystemRoles.Administrator, NormalizedName = "ADMINISTRATOR" },
             new Role { Id = DevelopmentSeedIds.ManagerRoleId, TenantId = tenantId, Name = SystemRoles.Manager, NormalizedName = "MANAGER" },
-            new Role { Id = DevelopmentSeedIds.StaffRoleId, TenantId = tenantId, Name = SystemRoles.Staff, NormalizedName = "STAFF" },
+            new Role { Id = DevelopmentSeedIds.WaitressRoleId, TenantId = tenantId, Name = SystemRoles.Waitress, NormalizedName = "WAITRESS" },
+            new Role { Id = DevelopmentSeedIds.CashierRoleId, TenantId = tenantId, Name = SystemRoles.Cashier, NormalizedName = "CASHIER" },
         };
         await db.Roles.AddRangeAsync(roles, cancellationToken);
+
+        await db.Users.AddRangeAsync(
+            [
+                new User
+                {
+                    Id = DevelopmentSeedIds.ManagerUserId,
+                    Email = DevelopmentSeedIds.ManagerEmail,
+                    NormalizedEmail = DevelopmentSeedIds.ManagerEmail.ToUpperInvariant(),
+                    PasswordHash = passwordHasher.Hash(DevelopmentSeedIds.AdminPassword),
+                    DisplayName = "Gerente demo",
+                },
+                new User
+                {
+                    Id = DevelopmentSeedIds.WaitressUserId,
+                    Email = DevelopmentSeedIds.WaitressEmail,
+                    NormalizedEmail = DevelopmentSeedIds.WaitressEmail.ToUpperInvariant(),
+                    PasswordHash = passwordHasher.Hash(DevelopmentSeedIds.AdminPassword),
+                    DisplayName = "Mesera demo",
+                },
+                new User
+                {
+                    Id = DevelopmentSeedIds.CashierUserId,
+                    Email = DevelopmentSeedIds.CashierEmail,
+                    NormalizedEmail = DevelopmentSeedIds.CashierEmail.ToUpperInvariant(),
+                    PasswordHash = passwordHasher.Hash(DevelopmentSeedIds.AdminPassword),
+                    DisplayName = "Cajero demo",
+                },
+            ],
+            cancellationToken);
 
         var tenantUser = new TenantUser
         {
@@ -161,7 +194,7 @@ public static class DevelopmentDataSeeder
                 Id = Guid.Parse("a1000007-0007-4007-8007-000000000007"),
                 TenantId = tenantId,
                 TenantUserId = tenantUser.Id,
-                RoleId = DevelopmentSeedIds.OwnerRoleId,
+                RoleId = DevelopmentSeedIds.AdministratorRoleId,
             });
         await db.TenantUsers.AddAsync(tenantUser, cancellationToken);
 
@@ -178,9 +211,60 @@ public static class DevelopmentDataSeeder
                 Id = Guid.Parse("a100000a-0010-4010-8010-00000000000a"),
                 TenantId = tenantId,
                 TenantUserId = demoTestTenantUser.Id,
-                RoleId = DevelopmentSeedIds.OwnerRoleId,
+                RoleId = DevelopmentSeedIds.AdministratorRoleId,
             });
         await db.TenantUsers.AddAsync(demoTestTenantUser, cancellationToken);
+
+        var managerTenantUser = new TenantUser
+        {
+            Id = DevelopmentSeedIds.ManagerTenantUserId,
+            TenantId = tenantId,
+            UserId = DevelopmentSeedIds.ManagerUserId,
+            IsActive = true,
+        };
+        managerTenantUser.TenantUserRoles.Add(
+            new TenantUserRole
+            {
+                Id = Guid.Parse("a1000012-0018-4018-8018-000000000012"),
+                TenantId = tenantId,
+                TenantUserId = managerTenantUser.Id,
+                RoleId = DevelopmentSeedIds.ManagerRoleId,
+            });
+        await db.TenantUsers.AddAsync(managerTenantUser, cancellationToken);
+
+        var waitressTenantUser = new TenantUser
+        {
+            Id = DevelopmentSeedIds.WaitressTenantUserId,
+            TenantId = tenantId,
+            UserId = DevelopmentSeedIds.WaitressUserId,
+            IsActive = true,
+        };
+        waitressTenantUser.TenantUserRoles.Add(
+            new TenantUserRole
+            {
+                Id = Guid.Parse("a1000013-0019-4019-8019-000000000013"),
+                TenantId = tenantId,
+                TenantUserId = waitressTenantUser.Id,
+                RoleId = DevelopmentSeedIds.WaitressRoleId,
+            });
+        await db.TenantUsers.AddAsync(waitressTenantUser, cancellationToken);
+
+        var cashierTenantUser = new TenantUser
+        {
+            Id = DevelopmentSeedIds.CashierTenantUserId,
+            TenantId = tenantId,
+            UserId = DevelopmentSeedIds.CashierUserId,
+            IsActive = true,
+        };
+        cashierTenantUser.TenantUserRoles.Add(
+            new TenantUserRole
+            {
+                Id = Guid.Parse("a1000014-0020-4020-8020-000000000014"),
+                TenantId = tenantId,
+                TenantUserId = cashierTenantUser.Id,
+                RoleId = DevelopmentSeedIds.CashierRoleId,
+            });
+        await db.TenantUsers.AddAsync(cashierTenantUser, cancellationToken);
     }
 
     private static async Task SeedCatalogAsync(ApplicationDbContext db, Guid tenantId, CancellationToken cancellationToken)
@@ -730,6 +814,57 @@ public static class DevelopmentDataSeeder
                     },
                     cancellationToken);
             }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await SeedCheckoutBillsAsync(db, tenantId, utc, cancellationToken);
+    }
+
+    private static async Task SeedCheckoutBillsAsync(
+        ApplicationDbContext db,
+        Guid tenantId,
+        DateTime utc,
+        CancellationToken cancellationToken)
+    {
+        var paidOrderIndexes = new[] { 0, 1, 4 };
+        for (var i = 0; i < paidOrderIndexes.Length; i++)
+        {
+            var o = paidOrderIndexes[i];
+            var orderId = DevelopmentSeedIds.SalesOrderIds[o];
+            var order = await db.SalesOrders.IgnoreQueryFilters().FirstAsync(s => s.Id == orderId, cancellationToken);
+            var billId = DevelopmentSeedIds.BillIds[i];
+            var paidAt = utc.AddDays(-(order.ClosedAtUtc.HasValue ? 2 : 1));
+
+            await db.Bills.AddAsync(
+                new Bill
+                {
+                    Id = billId,
+                    TenantId = tenantId,
+                    CustomerId = order.CustomerId ?? DevelopmentSeedIds.CustomerIds[0],
+                    Number = $"BILL-{1001 + i}",
+                    Status = BillStatus.Paid,
+                    Subtotal = order.Subtotal,
+                    DiscountAmount = 0,
+                    TipAmount = 0,
+                    TaxAmount = order.TaxAmount,
+                    Total = order.Total,
+                    IssuedAtUtc = paidAt.AddMinutes(-5),
+                    PaidAtUtc = paidAt,
+                },
+                cancellationToken);
+
+            await db.BillSalesOrders.AddAsync(
+                new BillSalesOrder
+                {
+                    TenantId = tenantId,
+                    BillId = billId,
+                    SalesOrderId = orderId,
+                },
+                cancellationToken);
+
+            var payment = await db.Payments.IgnoreQueryFilters()
+                .FirstAsync(p => p.SalesOrderId == orderId, cancellationToken);
+            payment.BillId = billId;
         }
     }
 

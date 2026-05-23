@@ -19,6 +19,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<TenantUser> TenantUsers => Set<TenantUser>();
     public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Feature> Features => Set<Feature>();
+    public DbSet<RoleFeature> RoleFeatures => Set<RoleFeature>();
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
@@ -80,6 +82,21 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.TenantUser).WithMany(x => x.TenantUserRoles).HasForeignKey(x => x.TenantUserId);
             e.HasOne(x => x.Role).WithMany(x => x.TenantUserRoles).HasForeignKey(x => x.RoleId);
             e.HasIndex(x => new { x.TenantUserId, x.RoleId }).IsUnique();
+        });
+
+        modelBuilder.Entity<Feature>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Code).HasMaxLength(80);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Module).HasMaxLength(80);
+        });
+
+        modelBuilder.Entity<RoleFeature>(e =>
+        {
+            e.HasOne(x => x.Role).WithMany(x => x.RoleFeatures).HasForeignKey(x => x.RoleId);
+            e.HasOne(x => x.Feature).WithMany(x => x.RoleFeatures).HasForeignKey(x => x.FeatureId);
+            e.HasIndex(x => new { x.RoleId, x.FeatureId }).IsUnique();
         });
 
         modelBuilder.Entity<Employee>(e =>
@@ -261,6 +278,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Role>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<RoleFeature>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<TenantUserRole>().HasQueryFilter(e =>

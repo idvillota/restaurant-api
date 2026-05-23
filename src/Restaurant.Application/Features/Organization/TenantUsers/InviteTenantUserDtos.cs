@@ -19,9 +19,9 @@ public sealed class InviteTenantUserDto
     [MaxLength(200)]
     public string? DisplayName { get; set; }
 
-    /// <summary>Manager or Staff (Owner cannot be assigned via invite).</summary>
+    /// <summary>Manager, Waitress, or Cashier (Administrator cannot be assigned via invite).</summary>
     [Required]
-    [RegularExpression("^(Manager|Staff)$", ErrorMessage = "Role must be Manager or Staff.")]
+    [RegularExpression("^(Manager|Waitress|Cashier|Staff)$", ErrorMessage = "Role must be Manager, Waitress, or Cashier.")]
     public string Role { get; set; } = string.Empty;
 }
 

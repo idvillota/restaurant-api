@@ -29,6 +29,9 @@ internal static class DevelopmentSeedIds
     public const string TenantSlug = "demo-bistro";
     public const string AdminEmail = "owner@demo-bistro.local";
     public const string DemoTestEmail = "idvillota@gmail.com";
+    public const string ManagerEmail = "manager@demo-bistro.local";
+    public const string WaitressEmail = "mesera@demo-bistro.local";
+    public const string CashierEmail = "cajero@demo-bistro.local";
     public const string AdminPassword = "Demo123!";
 
     public static readonly Guid TenantId = Guid.Parse("a1000001-0001-4001-8001-000000000001");
@@ -36,9 +39,16 @@ internal static class DevelopmentSeedIds
     public static readonly Guid AdminTenantUserId = Guid.Parse("a1000003-0003-4003-8003-000000000003");
     public static readonly Guid DemoTestUserId = Guid.Parse("a1000008-0008-4008-8008-000000000008");
     public static readonly Guid DemoTestTenantUserId = Guid.Parse("a1000009-0009-4009-8009-000000000009");
-    public static readonly Guid OwnerRoleId = Guid.Parse("a1000004-0004-4004-8004-000000000004");
+    public static readonly Guid AdministratorRoleId = Guid.Parse("a1000004-0004-4004-8004-000000000004");
     public static readonly Guid ManagerRoleId = Guid.Parse("a1000005-0005-4005-8005-000000000005");
-    public static readonly Guid StaffRoleId = Guid.Parse("a1000006-0006-4006-8006-000000000006");
+    public static readonly Guid WaitressRoleId = Guid.Parse("a1000006-0006-4006-8006-000000000006");
+    public static readonly Guid CashierRoleId = Guid.Parse("a1000011-0017-4017-8017-000000000011");
+    public static readonly Guid ManagerUserId = Guid.Parse("a100000b-0011-4011-8011-00000000000b");
+    public static readonly Guid WaitressUserId = Guid.Parse("a100000c-0012-4012-8012-00000000000c");
+    public static readonly Guid CashierUserId = Guid.Parse("a100000d-0013-4013-8013-00000000000d");
+    public static readonly Guid ManagerTenantUserId = Guid.Parse("a100000e-0014-4014-8014-00000000000e");
+    public static readonly Guid WaitressTenantUserId = Guid.Parse("a100000f-0015-4015-8015-00000000000f");
+    public static readonly Guid CashierTenantUserId = Guid.Parse("a1000010-0016-4016-8016-000000000010");
 
     public static readonly Guid[] IngredientCategoryIds =
     [
@@ -198,6 +208,13 @@ internal static class DevelopmentSeedIds
         Guid.Parse("15000008-0008-4008-8008-000000000008"),
         Guid.Parse("15000009-0009-4009-8009-000000000009"),
         Guid.Parse("1500000a-0010-4010-8010-00000000000a"),
+    ];
+
+    public static readonly Guid[] BillIds =
+    [
+        Guid.Parse("18000001-0001-4001-8001-000000000001"),
+        Guid.Parse("18000002-0002-4002-8002-000000000002"),
+        Guid.Parse("18000003-0003-4003-8003-000000000003"),
     ];
 
     public static readonly Guid[] PaymentIds =

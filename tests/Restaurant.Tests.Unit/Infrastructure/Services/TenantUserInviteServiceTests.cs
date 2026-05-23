@@ -20,7 +20,7 @@ public sealed class TenantUserInviteServiceTests
             IsActive = true,
         });
 
-        foreach (var name in new[] { SystemRoles.Owner, SystemRoles.Manager, SystemRoles.Staff })
+        foreach (var name in new[] { SystemRoles.Administrator, SystemRoles.Manager, SystemRoles.Waitress, SystemRoles.Cashier })
         {
             await fx.Db.Roles.AddAsync(new Role
             {
@@ -54,7 +54,7 @@ public sealed class TenantUserInviteServiceTests
 
         Assert.Equal("newchef@example.com", result.Email);
         Assert.Single(result.Roles);
-        Assert.Equal(SystemRoles.Staff, result.Roles[0]);
+        Assert.Equal(SystemRoles.Waitress, result.Roles[0]);
 
         var user = await fx.Db.Users.AsNoTracking().SingleAsync(u => u.Email == "newchef@example.com");
         Assert.Equal(result.UserId, user.Id);
@@ -177,7 +177,7 @@ public sealed class TenantUserInviteServiceTests
             Slug = "inactive",
             IsActive = false,
         });
-        foreach (var name in new[] { SystemRoles.Owner, SystemRoles.Manager, SystemRoles.Staff })
+        foreach (var name in new[] { SystemRoles.Administrator, SystemRoles.Manager, SystemRoles.Waitress, SystemRoles.Cashier })
         {
             await fx.Db.Roles.AddAsync(new Role
             {

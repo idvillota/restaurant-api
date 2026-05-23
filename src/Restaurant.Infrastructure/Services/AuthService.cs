@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Auth;
 using Restaurant.Domain.Entities;
+using Restaurant.Application.Authorization;
 using Restaurant.Infrastructure.Authorization;
 
 namespace Restaurant.Infrastructure.Services;
@@ -12,12 +13,21 @@ public sealed class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly IRolePermissionService _rolePermissions;
+    private readonly ICurrentTenantContext _tenantContext;
 
-    public AuthService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IJwtTokenService jwtTokenService)
+    public AuthService(
+        IUnitOfWork unitOfWork,
+        IPasswordHasher passwordHasher,
+        IJwtTokenService jwtTokenService,
+        IRolePermissionService rolePermissions,
+        ICurrentTenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
+        _rolePermissions = rolePermissions;
+        _tenantContext = tenantContext;
     }
 
     public async Task<AuthResponseDto> RegisterTenantAsync(RegisterTenantDto dto, CancellationToken cancellationToken = default)
@@ -52,9 +62,10 @@ public sealed class AuthService : IAuthService
 
         var roles = new[]
         {
-            NewRole(tenant.Id, SystemRoles.Owner),
+            NewRole(tenant.Id, SystemRoles.Administrator),
             NewRole(tenant.Id, SystemRoles.Manager),
-            NewRole(tenant.Id, SystemRoles.Staff),
+            NewRole(tenant.Id, SystemRoles.Waitress),
+            NewRole(tenant.Id, SystemRoles.Cashier),
         };
 
         var tenantUser = new TenantUser
@@ -64,13 +75,13 @@ public sealed class AuthService : IAuthService
             UserId = user.Id,
         };
 
-        var ownerRole = roles.First(r => r.Name == SystemRoles.Owner);
+        var adminRole = roles.First(r => r.Name == SystemRoles.Administrator);
         tenantUser.TenantUserRoles.Add(new TenantUserRole
         {
             Id = Guid.NewGuid(),
             TenantId = tenant.Id,
             TenantUserId = tenantUser.Id,
-            RoleId = ownerRole.Id,
+            RoleId = adminRole.Id,
         });
 
         await tenants.AddAsync(tenant, cancellationToken);
@@ -79,7 +90,24 @@ public sealed class AuthService : IAuthService
         await tenantUsers.AddAsync(tenantUser, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var token = _jwtTokenService.CreateAccessToken(user.Id, tenant.Id, user.Email, new[] { SystemRoles.Owner });
+        _tenantContext.TenantId = tenant.Id;
+
+        await _rolePermissions.UpdateRolePermissionsAsync(
+            adminRole.Id,
+            new Application.Features.Organization.RolePermissions.UpdateRolePermissionsDto
+            {
+                FeatureCodes = Application.Authorization.FeatureCodes.All,
+            },
+            cancellationToken);
+        await AssignDefaultRolePermissionsAsync(tenant.Id, roles.Where(r => r.Id != adminRole.Id), cancellationToken);
+
+        var permissions = await _rolePermissions.GetPermissionCodesForUserAsync(user.Id, tenant.Id, cancellationToken);
+        var token = _jwtTokenService.CreateAccessToken(
+            user.Id,
+            tenant.Id,
+            user.Email,
+            new[] { SystemRoles.Administrator },
+            permissions);
         return new AuthResponseDto
         {
             AccessToken = token,
@@ -87,7 +115,8 @@ public sealed class AuthService : IAuthService
             TenantId = tenant.Id,
             TenantSlug = tenant.Slug,
             Email = user.Email,
-            Roles = new[] { SystemRoles.Owner },
+            Roles = new[] { SystemRoles.Administrator },
+            Permissions = permissions,
         };
     }
 
@@ -129,7 +158,16 @@ public sealed class AuthService : IAuthService
         }
 
         var roles = membership.TenantUserRoles.Select(tur => tur.Role.Name).Distinct().ToList();
-        var token = _jwtTokenService.CreateAccessToken(user.Id, membership.TenantId, user.Email, roles);
+        var permissions = await _rolePermissions.GetPermissionCodesForUserAsync(
+            user.Id,
+            membership.TenantId,
+            cancellationToken);
+        var token = _jwtTokenService.CreateAccessToken(
+            user.Id,
+            membership.TenantId,
+            user.Email,
+            roles,
+            permissions);
         return new AuthResponseDto
         {
             AccessToken = token,
@@ -138,7 +176,25 @@ public sealed class AuthService : IAuthService
             TenantSlug = membership.Tenant.Slug,
             Email = user.Email,
             Roles = roles,
+            Permissions = permissions,
         };
+    }
+
+    private async Task AssignDefaultRolePermissionsAsync(
+        Guid tenantId,
+        IEnumerable<Role> roles,
+        CancellationToken cancellationToken)
+    {
+        foreach (var role in roles)
+        {
+            if (!FeatureCatalog.DefaultFeaturesByRole.TryGetValue(role.Name, out var codes))
+                continue;
+
+            await _rolePermissions.UpdateRolePermissionsAsync(
+                role.Id,
+                new Application.Features.Organization.RolePermissions.UpdateRolePermissionsDto { FeatureCodes = codes },
+                cancellationToken);
+        }
     }
 
     private static Role NewRole(Guid tenantId, string name)

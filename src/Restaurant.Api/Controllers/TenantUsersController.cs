@@ -7,7 +7,7 @@ using Restaurant.Infrastructure.Authorization;
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = $"{SystemRoles.Owner},{SystemRoles.Manager}")]
+[Authorize(Roles = $"{SystemRoles.Administrator},{SystemRoles.Owner},{SystemRoles.Manager}")]
 [Route("api/[controller]")]
 public sealed class TenantUsersController : ControllerBase
 {

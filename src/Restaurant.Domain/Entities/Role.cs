@@ -10,4 +10,5 @@ public class Role : EntityBase, ITenantScoped
 
     public Tenant Tenant { get; set; } = null!;
     public ICollection<TenantUserRole> TenantUserRoles { get; set; } = new List<TenantUserRole>();
+    public ICollection<RoleFeature> RoleFeatures { get; set; } = new List<RoleFeature>();
 }

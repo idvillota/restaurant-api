@@ -86,6 +86,9 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
 
+    var permissionLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    await PermissionBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
+
     if (app.Environment.IsDevelopment())
     {
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();

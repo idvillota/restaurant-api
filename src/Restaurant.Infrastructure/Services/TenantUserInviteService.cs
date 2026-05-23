@@ -36,16 +36,18 @@ public sealed class TenantUserInviteService : ITenantUserInviteService
             throw new InvalidOperationException("Tenant is not active.");
 
         var roleName = dto.Role.Trim();
-        if (string.Equals(roleName, SystemRoles.Owner, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Owner role cannot be assigned through invite.");
+        if (string.Equals(roleName, SystemRoles.Owner, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(roleName, SystemRoles.Administrator, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Administrator role cannot be assigned through invite.");
 
-        if (!string.Equals(roleName, SystemRoles.Manager, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(roleName, SystemRoles.Staff, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Role must be Manager or Staff.");
-
-        var normalizedRole = roleName.Equals(SystemRoles.Manager, StringComparison.OrdinalIgnoreCase)
-            ? SystemRoles.Manager
-            : SystemRoles.Staff;
+        var normalizedRole = roleName.ToUpperInvariant() switch
+        {
+            "MANAGER" => SystemRoles.Manager,
+            "WAITRESS" => SystemRoles.Waitress,
+            "CASHIER" => SystemRoles.Cashier,
+            "STAFF" => SystemRoles.Waitress,
+            _ => throw new InvalidOperationException("Role must be Manager, Waitress, or Cashier."),
+        };
 
         var users = _unitOfWork.Repository<User>();
         var tenantUsers = _unitOfWork.Repository<TenantUser>();
