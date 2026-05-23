@@ -17,12 +17,18 @@ public sealed class BillService : IBillService
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IInventoryAvailabilityService _inventory;
 
-    public BillService(ApplicationDbContext db, ICurrentTenantContext tenantContext, IUnitOfWork unitOfWork)
+    public BillService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IUnitOfWork unitOfWork,
+        IInventoryAvailabilityService inventory)
     {
         _db = db;
         _tenantContext = tenantContext;
         _unitOfWork = unitOfWork;
+        _inventory = inventory;
     }
 
     public async Task<IReadOnlyList<PayableTableGroupDto>> ListPayableByTableSearchAsync(
@@ -67,6 +73,9 @@ public sealed class BillService : IBillService
             throw new InvalidOperationException("Add at least one payment.");
 
         var totals = await BuildCheckoutTotalsAsync(dto, cancellationToken);
+        var stockCheck = await _inventory.CheckOrdersForPaymentAsync(dto.SalesOrderIds, cancellationToken);
+        _inventory.EnsureAvailable(stockCheck);
+
         var paymentSum = dto.Payments.Sum(p => p.Amount);
         if (paymentSum < totals.TotalDue)
             throw new InvalidOperationException(
@@ -185,6 +194,9 @@ public sealed class BillService : IBillService
 
         if (orders.Count != dto.SalesOrderIds.Distinct().Count())
             throw new InvalidOperationException("One or more orders are not open or were not found.");
+
+        var stockCheck = await _inventory.CheckOrdersForPaymentAsync(dto.SalesOrderIds, cancellationToken);
+        _inventory.EnsureAvailable(stockCheck);
 
         var lines = orders.SelectMany(MapOrderLines).ToList();
         var subtotal = lines.Sum(l => l.LineTotal);

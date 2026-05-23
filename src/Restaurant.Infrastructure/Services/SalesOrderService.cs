@@ -18,6 +18,7 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IRepository<ProductIngredient> _productIngredients;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly IInventoryAvailabilityService _inventory;
 
     public SalesOrderService(
         IRepository<SalesOrder> orders,
@@ -27,7 +28,8 @@ public sealed class SalesOrderService : ISalesOrderService
         IRepository<Product> products,
         IRepository<ProductIngredient> productIngredients,
         IUnitOfWork unitOfWork,
-        IMapper mapper)
+        IMapper mapper,
+        IInventoryAvailabilityService inventory)
     {
         _orders = orders;
         _lines = lines;
@@ -37,6 +39,7 @@ public sealed class SalesOrderService : ISalesOrderService
         _productIngredients = productIngredients;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _inventory = inventory;
     }
 
     public async Task<IReadOnlyList<TableServiceSummaryDto>> ListTableSummariesAsync(
@@ -174,6 +177,9 @@ public sealed class SalesOrderService : ISalesOrderService
 
         if (order.Status != SalesOrderStatus.Draft && order.Status != SalesOrderStatus.Open)
             throw new InvalidOperationException("Only active table orders can be sent to the kitchen.");
+
+        var stockCheck = await _inventory.CheckKitchenBatchAsync(orderId, dto.Lines, cancellationToken);
+        _inventory.EnsureAvailable(stockCheck);
 
         foreach (var lineDto in dto.Lines)
             await ApplyLineToOrderAsync(order, lineDto, cancellationToken);
