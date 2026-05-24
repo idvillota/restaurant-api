@@ -20,6 +20,7 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IMapper _mapper;
     private readonly IInventoryAvailabilityService _inventory;
     private readonly IKitchenTicketService _kitchenTickets;
+    private readonly IOperationalBusinessDayService _operationalDay;
 
     public SalesOrderService(
         IRepository<SalesOrder> orders,
@@ -31,7 +32,8 @@ public sealed class SalesOrderService : ISalesOrderService
         IUnitOfWork unitOfWork,
         IMapper mapper,
         IInventoryAvailabilityService inventory,
-        IKitchenTicketService kitchenTickets)
+        IKitchenTicketService kitchenTickets,
+        IOperationalBusinessDayService operationalDay)
     {
         _orders = orders;
         _lines = lines;
@@ -43,6 +45,7 @@ public sealed class SalesOrderService : ISalesOrderService
         _mapper = mapper;
         _inventory = inventory;
         _kitchenTickets = kitchenTickets;
+        _operationalDay = operationalDay;
     }
 
     public async Task<IReadOnlyList<TableServiceSummaryDto>> ListTableSummariesAsync(
@@ -98,6 +101,8 @@ public sealed class SalesOrderService : ISalesOrderService
 
     public async Task<SalesOrderDto> StartOrderForTableAsync(Guid tableId, CancellationToken cancellationToken = default)
     {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
         var table = await _tables.GetByIdAsync(tableId, cancellationToken);
         if (table is null || !table.IsActive)
             throw new InvalidOperationException("Table was not found or is inactive.");
@@ -144,6 +149,8 @@ public sealed class SalesOrderService : ISalesOrderService
         AddSalesOrderLineDto dto,
         CancellationToken cancellationToken = default)
     {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
         var order = await OrderWithLinesQuery(tracked: true)
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
@@ -166,6 +173,8 @@ public sealed class SalesOrderService : ISalesOrderService
         ConfirmSalesOrderDto dto,
         CancellationToken cancellationToken = default)
     {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
         if (dto.Lines.Count == 0)
             throw new InvalidOperationException("Add at least one item before creating the order.");
 
@@ -425,5 +434,13 @@ public sealed class SalesOrderService : ISalesOrderService
         order.Subtotal = order.Lines.Sum(l => l.LineTotal);
         order.TaxAmount = 0;
         order.Total = order.Subtotal;
+    }
+
+    private async Task EnsureSalonOperationsAllowedAsync(CancellationToken cancellationToken)
+    {
+        var day = await _operationalDay.ResolveAsync(cancellationToken);
+        if (day.ClosureStatus == DailyClosureStatus.Closed)
+            throw new InvalidOperationException(
+                "El día operativo está cerrado. Tras el cierre diario, el sistema pasa al siguiente día operativo: abra un turno de caja antes de tomar pedidos o cobrar.");
     }
 }

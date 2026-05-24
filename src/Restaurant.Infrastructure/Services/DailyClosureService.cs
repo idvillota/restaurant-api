@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common;
 using Restaurant.Application.Features.Cashier;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
@@ -67,10 +68,34 @@ public sealed class DailyClosureService : IDailyClosureService
         closure.ClosedAtUtc = DateTime.UtcNow;
         closure.ClosedByUserId = userId;
         closure.Notes = dto.Notes?.Trim();
-        _db.DailyClosures.Update(closure);
+
+        var nextBusinessDate = businessDate.AddDays(1);
+        var settings = await GetOrCreateTenantSettingsAsync(tenantId, cancellationToken);
+        settings.ActiveOperationalBusinessDate = nextBusinessDate;
         await _db.SaveChangesAsync(cancellationToken);
 
-        return await BuildDailyReportAsync(tenantId, businessDate, cancellationToken);
+        var report = await BuildDailyReportAsync(tenantId, businessDate, cancellationToken);
+        report.NextOperationalBusinessDate = nextBusinessDate;
+        return report;
+    }
+
+    private async Task<TenantSettings> GetOrCreateTenantSettingsAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
+        if (settings is not null)
+            return settings;
+
+        settings = new TenantSettings
+        {
+            TenantId = tenantId,
+            MaxDiscountPercent = 10m,
+            OperationalDayCutoffHour = 4,
+        };
+        await _db.TenantSettings.AddAsync(settings, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+        return settings;
     }
 
     public async Task<IReadOnlyList<DailyClosureSummaryDto>> ListClosuresAsync(

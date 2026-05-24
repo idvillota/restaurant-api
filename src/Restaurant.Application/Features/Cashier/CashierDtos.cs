@@ -114,6 +114,9 @@ public sealed class DailyShiftRollupDto
 
 public sealed class DailyClosureReportDto
 {
+    /// <summary>Set when the day was just closed; use to open shifts for late sales on the next operational day.</summary>
+    public DateOnly? NextOperationalBusinessDate { get; set; }
+
     public DailyClosureSummaryDto Closure { get; set; } = null!;
     public decimal TotalSales { get; set; }
     public int BillCount { get; set; }
@@ -137,6 +140,9 @@ public sealed class CloseDailyClosureDto
 public sealed class BusinessDayContextDto
 {
     public DateOnly BusinessDate { get; set; }
+    /// <summary>Operational date from clock and cutoff only (before manual advance).</summary>
+    public DateOnly ClockBusinessDate { get; set; }
+    public bool IsAdvancedBeyondClock { get; set; }
     public int OperationalDayCutoffHour { get; set; }
     public DailyClosureStatus DailyClosureStatus { get; set; }
     public int OpenShiftsCount { get; set; }

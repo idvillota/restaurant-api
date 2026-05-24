@@ -43,7 +43,8 @@ public sealed class CashierShiftServiceTests
         fx.TenantContext.UserId = userId;
         await SeedTenantUserAsync(fx, userId, "cashier@test.local");
 
-        var sut = new CashierShiftService(fx.Db, fx.TenantContext);
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
         var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
 
         Assert.Equal("cashier@test.local", shift.CashierEmail);

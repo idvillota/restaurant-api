@@ -12,28 +12,34 @@ public sealed class CashierShiftService : ICashierShiftService
 {
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IOperationalBusinessDayService _operationalDay;
 
-    public CashierShiftService(ApplicationDbContext db, ICurrentTenantContext tenantContext)
+    public CashierShiftService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IOperationalBusinessDayService operationalDay)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _operationalDay = operationalDay;
     }
 
     public async Task<BusinessDayContextDto> GetBusinessDayContextAsync(CancellationToken cancellationToken = default)
     {
-        var (tenantId, _, businessDate, cutoffHour) = await ResolveBusinessContextAsync(cancellationToken);
-        var closure = await GetOrCreateDailyClosureAsync(tenantId, businessDate, cancellationToken);
+        var (tenantId, _, day) = await ResolveContextAsync(cancellationToken);
         var openShiftsCount = await _db.CashierShifts.CountAsync(
-            s => s.TenantId == tenantId && s.BusinessDate == businessDate && s.Status == CashierShiftStatus.Open,
+            s => s.TenantId == tenantId && s.BusinessDate == day.BusinessDate && s.Status == CashierShiftStatus.Open,
             cancellationToken);
 
         var myOpen = await GetMyOpenShiftAsync(cancellationToken);
 
         return new BusinessDayContextDto
         {
-            BusinessDate = businessDate,
-            OperationalDayCutoffHour = cutoffHour,
-            DailyClosureStatus = closure.Status,
+            BusinessDate = day.BusinessDate,
+            ClockBusinessDate = day.ClockBusinessDate,
+            IsAdvancedBeyondClock = day.IsAdvancedBeyondClock,
+            OperationalDayCutoffHour = day.OperationalDayCutoffHour,
+            DailyClosureStatus = day.ClosureStatus,
             OpenShiftsCount = openShiftsCount,
             MyOpenShift = myOpen,
         };
@@ -41,12 +47,16 @@ public sealed class CashierShiftService : ICashierShiftService
 
     public async Task<CashierShiftSummaryDto?> GetMyOpenShiftAsync(CancellationToken cancellationToken = default)
     {
-        var (tenantId, userId, _, _) = await ResolveBusinessContextAsync(cancellationToken);
+        var (tenantId, userId, day) = await ResolveContextAsync(cancellationToken);
         var shift = await _db.CashierShifts
             .AsNoTracking()
             .Include(s => s.CashierUser)
             .FirstOrDefaultAsync(
-                s => s.TenantId == tenantId && s.CashierUserId == userId && s.Status == CashierShiftStatus.Open,
+                s =>
+                    s.TenantId == tenantId &&
+                    s.CashierUserId == userId &&
+                    s.BusinessDate == day.BusinessDate &&
+                    s.Status == CashierShiftStatus.Open,
                 cancellationToken);
 
         return shift is null ? null : MapSummary(shift);
@@ -56,11 +66,16 @@ public sealed class CashierShiftService : ICashierShiftService
         OpenCashierShiftDto dto,
         CancellationToken cancellationToken = default)
     {
-        var (tenantId, userId, businessDate, _) = await ResolveBusinessContextAsync(cancellationToken);
-        await EnsureDayNotClosedAsync(tenantId, businessDate, cancellationToken);
+        var (tenantId, userId, day) = await ResolveContextAsync(cancellationToken);
+        EnsureDayOpen(day);
 
+        var businessDate = day.BusinessDate;
         var existing = await _db.CashierShifts.AnyAsync(
-            s => s.TenantId == tenantId && s.CashierUserId == userId && s.Status == CashierShiftStatus.Open,
+            s =>
+                s.TenantId == tenantId &&
+                s.CashierUserId == userId &&
+                s.BusinessDate == businessDate &&
+                s.Status == CashierShiftStatus.Open,
             cancellationToken);
         if (existing)
             throw new InvalidOperationException("You already have an open cashier shift.");
@@ -90,7 +105,7 @@ public sealed class CashierShiftService : ICashierShiftService
         CloseCashierShiftDto dto,
         CancellationToken cancellationToken = default)
     {
-        var (tenantId, userId, _, _) = await ResolveBusinessContextAsync(cancellationToken);
+        var (tenantId, userId, _) = await ResolveContextAsync(cancellationToken);
         var shift = await _db.CashierShifts
             .Include(s => s.CashierUser)
             .FirstOrDefaultAsync(s => s.Id == shiftId && s.TenantId == tenantId, cancellationToken)
@@ -158,8 +173,9 @@ public sealed class CashierShiftService : ICashierShiftService
         CreateCashMovementDto dto,
         CancellationToken cancellationToken = default)
     {
-        var (tenantId, userId, businessDate, _) = await ResolveBusinessContextAsync(cancellationToken);
-        await EnsureDayNotClosedAsync(tenantId, businessDate, cancellationToken);
+        var (tenantId, userId, day) = await ResolveContextAsync(cancellationToken);
+        EnsureDayOpen(day);
+        var businessDate = day.BusinessDate;
 
         if (dto.Amount <= 0)
             throw new InvalidOperationException("Amount must be greater than zero.");
@@ -178,7 +194,11 @@ public sealed class CashierShiftService : ICashierShiftService
         else
         {
             shift = await _db.CashierShifts.FirstOrDefaultAsync(
-                s => s.TenantId == tenantId && s.CashierUserId == userId && s.Status == CashierShiftStatus.Open,
+                s =>
+                    s.TenantId == tenantId &&
+                    s.CashierUserId == userId &&
+                    s.BusinessDate == businessDate &&
+                    s.Status == CashierShiftStatus.Open,
                 cancellationToken);
         }
 
@@ -212,11 +232,15 @@ public sealed class CashierShiftService : ICashierShiftService
 
     public async Task<(Guid ShiftId, Guid UserId)> RequireOpenShiftAsync(CancellationToken cancellationToken = default)
     {
-        var (tenantId, userId, businessDate, _) = await ResolveBusinessContextAsync(cancellationToken);
-        await EnsureDayNotClosedAsync(tenantId, businessDate, cancellationToken);
+        var (tenantId, userId, day) = await ResolveContextAsync(cancellationToken);
+        EnsureDayOpen(day);
 
         var shift = await _db.CashierShifts.FirstOrDefaultAsync(
-            s => s.TenantId == tenantId && s.CashierUserId == userId && s.Status == CashierShiftStatus.Open,
+            s =>
+                s.TenantId == tenantId &&
+                s.CashierUserId == userId &&
+                s.BusinessDate == day.BusinessDate &&
+                s.Status == CashierShiftStatus.Open,
             cancellationToken);
 
         if (shift is null)
@@ -286,58 +310,20 @@ public sealed class CashierShiftService : ICashierShiftService
         };
     }
 
-    private async Task EnsureDayNotClosedAsync(
-        Guid tenantId,
-        DateOnly businessDate,
-        CancellationToken cancellationToken)
+    private static void EnsureDayOpen(EffectiveOperationalDay day)
     {
-        var closure = await _db.DailyClosures.AsNoTracking()
-            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.BusinessDate == businessDate, cancellationToken);
-
-        if (closure?.Status == DailyClosureStatus.Closed)
-            throw new InvalidOperationException("The operational day is already closed.");
+        if (day.ClosureStatus == DailyClosureStatus.Closed)
+            throw new InvalidOperationException(
+                "The operational day is closed. After daily closure, the system should advance to the next open day; refresh the page or contact a manager.");
     }
 
-    private async Task<DailyClosure> GetOrCreateDailyClosureAsync(
-        Guid tenantId,
-        DateOnly businessDate,
-        CancellationToken cancellationToken)
-    {
-        var closure = await _db.DailyClosures
-            .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.BusinessDate == businessDate, cancellationToken);
-
-        if (closure is not null)
-            return closure;
-
-        closure = new DailyClosure
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            BusinessDate = businessDate,
-            Status = DailyClosureStatus.Open,
-        };
-        await _db.DailyClosures.AddAsync(closure, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
-        return closure;
-    }
-
-    private async Task<(Guid TenantId, Guid UserId, DateOnly BusinessDate, int CutoffHour)> ResolveBusinessContextAsync(
+    private async Task<(Guid TenantId, Guid UserId, EffectiveOperationalDay Day)> ResolveContextAsync(
         CancellationToken cancellationToken)
     {
         var tenantId = ResolveTenantId();
         var userId = ResolveUserId();
-        var tenant = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken)
-            ?? throw new InvalidOperationException("Tenant not found.");
-
-        var settings = await _db.TenantSettings.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.TenantId == tenantId, cancellationToken);
-        var cutoffHour = settings?.OperationalDayCutoffHour ?? 4;
-        var businessDate = BusinessDayCalculator.ResolveBusinessDate(
-            DateTime.UtcNow,
-            tenant.TimeZoneId,
-            cutoffHour);
-
-        return (tenantId, userId, businessDate, cutoffHour);
+        var day = await _operationalDay.ResolveAsync(cancellationToken);
+        return (tenantId, userId, day);
     }
 
     private static CashierShiftSummaryDto MapSummary(CashierShift shift, string? cashierEmail = null) =>
