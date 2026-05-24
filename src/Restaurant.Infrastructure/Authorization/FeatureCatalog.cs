@@ -24,6 +24,8 @@ public static class FeatureCatalog
         new(Guid.Parse("f100000e-0014-4014-8014-00000000000e"), FeatureCodes.OrganizationEmployees, "Empleados", "Administración", 140),
         new(Guid.Parse("f100000f-0015-4015-8015-00000000000f"), FeatureCodes.OrganizationTeam, "Invitar equipo", "Administración", 150),
         new(Guid.Parse("f1000010-0016-4016-8016-000000000010"), FeatureCodes.OrganizationRoles, "Roles y permisos", "Administración", 160),
+        new(Guid.Parse("f1000011-0017-4017-8017-000000000011"), FeatureCodes.CashierShifts, "Turnos de caja", "Servicio", 35),
+        new(Guid.Parse("f1000012-0018-4018-8018-000000000012"), FeatureCodes.ReportsDailyClosure, "Cierre diario", "Administración", 165),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =
@@ -39,6 +41,7 @@ public static class FeatureCatalog
                 FeatureCodes.DashboardView,
                 FeatureCodes.ServiceSalon,
                 FeatureCodes.PaymentsCheckout,
+                FeatureCodes.CashierShifts,
                 FeatureCodes.ReservationsManage,
                 FeatureCodes.CustomersManage,
                 FeatureCodes.TablesManage,
@@ -51,6 +54,7 @@ public static class FeatureCatalog
                 FeatureCodes.ProcurementProviders,
                 FeatureCodes.OrganizationEmployees,
                 FeatureCodes.OrganizationTeam,
+                FeatureCodes.ReportsDailyClosure,
             ],
             [SystemRoles.Waitress] =
             [
@@ -71,6 +75,7 @@ public static class FeatureCatalog
                 FeatureCodes.DashboardView,
                 FeatureCodes.ServiceSalon,
                 FeatureCodes.PaymentsCheckout,
+                FeatureCodes.CashierShifts,
                 FeatureCodes.CustomersManage,
             ],
         };

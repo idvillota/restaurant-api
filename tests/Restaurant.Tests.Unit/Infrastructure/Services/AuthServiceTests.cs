@@ -32,14 +32,18 @@ public sealed class AuthServiceTests
 
     private static AuthService CreateSut(NoTenantDbFixture fx, Mock<IJwtTokenService>? jwt = null)
     {
+        var useDefaultJwt = jwt is null;
         jwt ??= new Mock<IJwtTokenService>();
-        jwt.Setup(j => j.CreateAccessToken(
-                It.IsAny<Guid>(),
-                It.IsAny<Guid>(),
-                It.IsAny<string>(),
-                It.IsAny<IReadOnlyList<string>>(),
-                It.IsAny<IReadOnlyList<string>>()))
-            .Returns("test-token");
+        if (useDefaultJwt)
+        {
+            jwt.Setup(j => j.CreateAccessToken(
+                    It.IsAny<Guid>(),
+                    It.IsAny<Guid>(),
+                    It.IsAny<string>(),
+                    It.IsAny<IReadOnlyList<string>>(),
+                    It.IsAny<IReadOnlyList<string>>()))
+                .Returns("test-token");
+        }
 
         var tenantContext = new Restaurant.Infrastructure.Common.CurrentTenantContext();
         IRolePermissionService rolePermissions = new RolePermissionService(fx.Db, tenantContext);

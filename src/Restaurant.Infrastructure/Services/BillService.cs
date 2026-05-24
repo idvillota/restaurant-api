@@ -18,17 +18,20 @@ public sealed class BillService : IBillService
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IInventoryAvailabilityService _inventory;
+    private readonly ICashierShiftService _cashierShifts;
 
     public BillService(
         ApplicationDbContext db,
         ICurrentTenantContext tenantContext,
         IUnitOfWork unitOfWork,
-        IInventoryAvailabilityService inventory)
+        IInventoryAvailabilityService inventory,
+        ICashierShiftService cashierShifts)
     {
         _db = db;
         _tenantContext = tenantContext;
         _unitOfWork = unitOfWork;
         _inventory = inventory;
+        _cashierShifts = cashierShifts;
     }
 
     public async Task<IReadOnlyList<PayableTableGroupDto>> ListPayableByTableSearchAsync(
@@ -88,6 +91,8 @@ public sealed class BillService : IBillService
         if (orders.Count != dto.SalesOrderIds.Distinct().Count())
             throw new InvalidOperationException("One or more orders are not open or were not found.");
 
+        var (shiftId, processedByUserId) = await _cashierShifts.RequireOpenShiftAsync(cancellationToken);
+
         var customer = await ResolveCustomerAsync(dto.CustomerId, cancellationToken);
         var now = DateTime.UtcNow;
         var billId = Guid.NewGuid();
@@ -109,6 +114,8 @@ public sealed class BillService : IBillService
             Total = totals.TotalDue,
             IssuedAtUtc = now,
             PaidAtUtc = now,
+            CashierShiftId = shiftId,
+            ProcessedByUserId = processedByUserId,
         };
 
         await _db.Bills.AddAsync(bill, cancellationToken);
@@ -154,6 +161,8 @@ public sealed class BillService : IBillService
                     Status = PaymentStatus.Completed,
                     ExternalReference = paymentDto.ExternalReference?.Trim(),
                     PaidAtUtc = now,
+                    CashierShiftId = shiftId,
+                    ProcessedByUserId = processedByUserId,
                 },
                 cancellationToken);
         }
@@ -373,7 +382,12 @@ public sealed class BillService : IBillService
         if (settings is not null)
             return settings;
 
-        settings = new TenantSettings { TenantId = tenantId, MaxDiscountPercent = 10m };
+        settings = new TenantSettings
+        {
+            TenantId = tenantId,
+            MaxDiscountPercent = 10m,
+            OperationalDayCutoffHour = 4,
+        };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         return settings;

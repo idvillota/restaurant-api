@@ -6,12 +6,16 @@ namespace Restaurant.Application.Features.Sales.Bills;
 public sealed class TenantSettingsDto
 {
     public decimal MaxDiscountPercent { get; set; }
+    public int OperationalDayCutoffHour { get; set; }
 }
 
 public sealed class UpdateTenantSettingsDto
 {
     [Range(0, 100)]
     public decimal MaxDiscountPercent { get; set; }
+
+    [Range(0, 23)]
+    public int OperationalDayCutoffHour { get; set; } = 4;
 }
 
 public sealed class PayableTableGroupDto

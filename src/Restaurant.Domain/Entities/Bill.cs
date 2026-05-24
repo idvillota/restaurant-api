@@ -17,8 +17,11 @@ public class Bill : EntityBase, ITenantScoped
     public decimal Total { get; set; }
     public DateTime IssuedAtUtc { get; set; }
     public DateTime? PaidAtUtc { get; set; }
+    public Guid? CashierShiftId { get; set; }
+    public Guid? ProcessedByUserId { get; set; }
 
     public Customer Customer { get; set; } = null!;
+    public CashierShift? CashierShift { get; set; }
     public ICollection<BillSalesOrder> BillOrders { get; set; } = new List<BillSalesOrder>();
     public Invoice? Invoice { get; set; }
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();

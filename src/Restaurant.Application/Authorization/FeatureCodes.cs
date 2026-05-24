@@ -18,6 +18,8 @@ public static class FeatureCodes
     public const string OrganizationEmployees = "organization.employees";
     public const string OrganizationTeam = "organization.team";
     public const string OrganizationRoles = "organization.roles";
+    public const string CashierShifts = "cashier.shifts";
+    public const string ReportsDailyClosure = "reports.daily_closure";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -37,5 +39,7 @@ public static class FeatureCodes
         OrganizationEmployees,
         OrganizationTeam,
         OrganizationRoles,
+        CashierShifts,
+        ReportsDailyClosure,
     ];
 }

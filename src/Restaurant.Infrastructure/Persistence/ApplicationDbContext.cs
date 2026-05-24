@@ -44,6 +44,9 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<BillSalesOrder> BillSalesOrders => Set<BillSalesOrder>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
+    public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
+    public DbSet<CashMovement> CashMovements => Set<CashMovement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -227,9 +230,38 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.MaxDiscountPercent).HasPrecision(5, 2);
         });
 
+        modelBuilder.Entity<CashierShift>(e =>
+        {
+            e.HasOne(x => x.CashierUser).WithMany().HasForeignKey(x => x.CashierUserId);
+            e.Property(x => x.OpeningFloat).HasPrecision(18, 2);
+            e.Property(x => x.ExpectedCash).HasPrecision(18, 2);
+            e.Property(x => x.CountedCash).HasPrecision(18, 2);
+            e.Property(x => x.ClosingNotes).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.CashierUserId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.BusinessDate });
+        });
+
+        modelBuilder.Entity<DailyClosure>(e =>
+        {
+            e.HasOne(x => x.ClosedByUser).WithMany().HasForeignKey(x => x.ClosedByUserId);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.BusinessDate }).IsUnique();
+        });
+
+        modelBuilder.Entity<CashMovement>(e =>
+        {
+            e.HasOne(x => x.CashierShift).WithMany(x => x.CashMovements).HasForeignKey(x => x.CashierShiftId);
+            e.HasOne(x => x.Purchase).WithMany().HasForeignKey(x => x.PurchaseId);
+            e.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Description).HasMaxLength(300);
+            e.HasIndex(x => new { x.TenantId, x.BusinessDate });
+        });
+
         modelBuilder.Entity<Bill>(e =>
         {
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId);
+            e.HasOne(x => x.CashierShift).WithMany().HasForeignKey(x => x.CashierShiftId);
             e.Property(x => x.Number).HasMaxLength(40);
             e.Property(x => x.Subtotal).HasPrecision(18, 2);
             e.Property(x => x.DiscountAmount).HasPrecision(18, 2);
@@ -265,6 +297,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Bill).WithMany(x => x.Payments).HasForeignKey(x => x.BillId);
             e.HasOne(x => x.SalesOrder).WithMany(x => x.Payments).HasForeignKey(x => x.SalesOrderId);
             e.HasOne(x => x.Invoice).WithMany(x => x.Payments).HasForeignKey(x => x.InvoiceId);
+            e.HasOne(x => x.CashierShift).WithMany(x => x.Payments).HasForeignKey(x => x.CashierShiftId);
             e.Property(x => x.Amount).HasPrecision(18, 2);
         });
 
@@ -347,6 +380,15 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Payment>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<CashierShift>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<DailyClosure>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<CashMovement>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 

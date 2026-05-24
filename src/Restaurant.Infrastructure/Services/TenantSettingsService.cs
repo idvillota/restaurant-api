@@ -30,6 +30,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
     {
         var settings = await GetOrCreateSettingsAsync(cancellationToken);
         settings.MaxDiscountPercent = dto.MaxDiscountPercent;
+        settings.OperationalDayCutoffHour = dto.OperationalDayCutoffHour;
         _db.TenantSettings.Update(settings);
         await _db.SaveChangesAsync(cancellationToken);
         return Map(settings);
@@ -42,7 +43,12 @@ public sealed class TenantSettingsService : ITenantSettingsService
         if (settings is not null)
             return settings;
 
-        settings = new TenantSettings { TenantId = tenantId, MaxDiscountPercent = 10m };
+        settings = new TenantSettings
+        {
+            TenantId = tenantId,
+            MaxDiscountPercent = 10m,
+            OperationalDayCutoffHour = 4,
+        };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         return settings;
@@ -56,5 +62,9 @@ public sealed class TenantSettingsService : ITenantSettingsService
     }
 
     private static TenantSettingsDto Map(TenantSettings settings) =>
-        new() { MaxDiscountPercent = settings.MaxDiscountPercent };
+        new()
+        {
+            MaxDiscountPercent = settings.MaxDiscountPercent,
+            OperationalDayCutoffHour = settings.OperationalDayCutoffHour,
+        };
 }

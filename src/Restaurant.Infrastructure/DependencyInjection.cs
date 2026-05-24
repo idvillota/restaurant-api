@@ -48,6 +48,8 @@ public static class DependencyInjection
         services.AddScoped<ISalesOrderService, SalesOrderService>();
         services.AddScoped<IBillService, BillService>();
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
+        services.AddScoped<ICashierShiftService, CashierShiftService>();
+        services.AddScoped<IDailyClosureService, DailyClosureService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
 

@@ -54,6 +54,7 @@ public static class DevelopmentDataSeeder
     {
         if (await db.Tenants.IgnoreQueryFilters().AnyAsync(t => t.Slug == DevelopmentSeedIds.TenantSlug, cancellationToken))
         {
+            await EnsureDemoRoleUsersAsync(db, passwordHasher, DevelopmentSeedIds.TenantId, logger, cancellationToken);
             logger.LogInformation(
                 "Development seed skipped: tenant '{Slug}' already exists.",
                 DevelopmentSeedIds.TenantSlug);
@@ -265,6 +266,100 @@ public static class DevelopmentDataSeeder
                 RoleId = DevelopmentSeedIds.CashierRoleId,
             });
         await db.TenantUsers.AddAsync(cashierTenantUser, cancellationToken);
+    }
+
+    /// <summary>
+    /// Adds demo manager/waitress/cashier accounts when the tenant already exists (e.g. after RBAC migrations).
+    /// </summary>
+    private static async Task EnsureDemoRoleUsersAsync(
+        ApplicationDbContext db,
+        IPasswordHasher passwordHasher,
+        Guid tenantId,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var rolesByName = await db.Roles.IgnoreQueryFilters()
+            .Where(r => r.TenantId == tenantId)
+            .ToDictionaryAsync(r => r.Name, r => r.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var demoAccounts = new (Guid UserId, string Email, string DisplayName, Guid TenantUserId, string RoleName, Guid TenantUserRoleId)[]
+        {
+            (
+                DevelopmentSeedIds.ManagerUserId,
+                DevelopmentSeedIds.ManagerEmail,
+                "Gerente demo",
+                DevelopmentSeedIds.ManagerTenantUserId,
+                SystemRoles.Manager,
+                Guid.Parse("a1000012-0018-4018-8018-000000000012")),
+            (
+                DevelopmentSeedIds.WaitressUserId,
+                DevelopmentSeedIds.WaitressEmail,
+                "Mesera demo",
+                DevelopmentSeedIds.WaitressTenantUserId,
+                SystemRoles.Waitress,
+                Guid.Parse("a1000013-0019-4019-8019-000000000013")),
+            (
+                DevelopmentSeedIds.CashierUserId,
+                DevelopmentSeedIds.CashierEmail,
+                "Cajero demo",
+                DevelopmentSeedIds.CashierTenantUserId,
+                SystemRoles.Cashier,
+                Guid.Parse("a1000014-0020-4020-8020-000000000014")),
+        };
+
+        var added = 0;
+        foreach (var account in demoAccounts)
+        {
+            if (!rolesByName.TryGetValue(account.RoleName, out var roleId))
+                continue;
+
+            var userExists = await db.Users.IgnoreQueryFilters()
+                .AnyAsync(u => u.Id == account.UserId || u.NormalizedEmail == account.Email.ToUpperInvariant(), cancellationToken);
+            if (userExists)
+                continue;
+
+            await db.Users.AddAsync(
+                new User
+                {
+                    Id = account.UserId,
+                    Email = account.Email,
+                    NormalizedEmail = account.Email.ToUpperInvariant(),
+                    PasswordHash = passwordHasher.Hash(DevelopmentSeedIds.AdminPassword),
+                    DisplayName = account.DisplayName,
+                },
+                cancellationToken);
+
+            var tenantUser = new TenantUser
+            {
+                Id = account.TenantUserId,
+                TenantId = tenantId,
+                UserId = account.UserId,
+                IsActive = true,
+            };
+            tenantUser.TenantUserRoles.Add(
+                new TenantUserRole
+                {
+                    Id = account.TenantUserRoleId,
+                    TenantId = tenantId,
+                    TenantUserId = tenantUser.Id,
+                    RoleId = roleId,
+                });
+            await db.TenantUsers.AddAsync(tenantUser, cancellationToken);
+            added++;
+        }
+
+        if (added > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            logger.LogInformation(
+                "Ensured {Count} demo role user(s) for '{Slug}' (password {Password}): manager {ManagerEmail}, waitress {WaitressEmail}, cashier {CashierEmail}",
+                added,
+                DevelopmentSeedIds.TenantSlug,
+                DevelopmentSeedIds.AdminPassword,
+                DevelopmentSeedIds.ManagerEmail,
+                DevelopmentSeedIds.WaitressEmail,
+                DevelopmentSeedIds.CashierEmail);
+        }
     }
 
     private static async Task SeedCatalogAsync(ApplicationDbContext db, Guid tenantId, CancellationToken cancellationToken)
