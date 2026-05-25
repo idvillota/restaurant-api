@@ -66,24 +66,28 @@ internal static class SalesReceiptXmlBuilder
                         new XElement(Ns + "Impoconsumo", line.ImpoconsumoAmount.ToString(inv)),
                         El(Ns + "Notas", line.Notes)))));
 
-        var categorias = new XElement(
-            Ns + "TotalesPorCategoria",
-            receipt.CategoryTotals.Select(cat =>
+        var pagos = new XElement(
+            Ns + "Pagos",
+            receipt.Payments.Select(p =>
                 new XElement(
-                    Ns + "Categoria",
-                    new XAttribute("nombre", cat.CategoryName),
-                    cat.Total.ToString(inv))));
+                    Ns + "Pago",
+                    new XElement(Ns + "Metodo", p.MethodLabel),
+                    new XElement(Ns + "Monto", p.Amount.ToString(inv)))));
 
         var totales = new XElement(
             Ns + "Totales",
             Content(
+                new XElement(Ns + "Articulos", receipt.ArticleCount.ToString(inv)),
                 new XElement(Ns + "Subtotal", receipt.Subtotal.ToString(inv)),
                 new XElement(Ns + "Descuento", receipt.DiscountAmount.ToString(inv)),
                 El(Ns + "DescuentoPorcentaje", receipt.DiscountPercent?.ToString(inv)),
+                new XElement(Ns + "BaseImpoconsumo", receipt.ImpoconsumoBase.ToString(inv)),
                 new XElement(Ns + "ImpoconsumoPorcentaje", receipt.ImpoconsumoPercent.ToString(inv)),
                 new XElement(Ns + "Impoconsumo", receipt.ImpoconsumoAmount.ToString(inv)),
                 new XElement(Ns + "Propina", receipt.TipAmount.ToString(inv)),
                 new XElement(Ns + "Total", receipt.Total.ToString(inv)),
+                new XElement(Ns + "Entregado", receipt.AmountTendered.ToString(inv)),
+                new XElement(Ns + "Cambio", receipt.ChangeDue.ToString(inv)),
                 new XElement(Ns + "Moneda", receipt.CurrencyCode)));
 
         var root = new XElement(
@@ -96,7 +100,7 @@ internal static class SalesReceiptXmlBuilder
                 cliente,
                 El(Ns + "Cajero", receipt.CashierName),
                 items,
-                categorias,
+                pagos,
                 totales));
 
         var doc = new XDocument(new XDeclaration("1.0", "utf-8", "yes"), root);

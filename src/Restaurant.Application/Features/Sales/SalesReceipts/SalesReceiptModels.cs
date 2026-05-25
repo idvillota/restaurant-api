@@ -15,6 +15,13 @@ public sealed class SalesReceiptTenantInfo
     public string? DianResolutionNumber { get; set; }
     public int DianResolutionFrom { get; set; }
     public int DianResolutionTo { get; set; }
+    public string? InvoiceNumberPrefix { get; set; }
+}
+
+public sealed class SalesReceiptPaymentModel
+{
+    public string MethodLabel { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
 }
 
 public sealed class SalesReceiptLineModel
@@ -47,8 +54,12 @@ public sealed class SalesReceiptModel
     public string? CustomerTaxId { get; set; }
     public string? CashierName { get; set; }
     public IReadOnlyList<SalesReceiptLineModel> Lines { get; set; } = [];
-    public IReadOnlyList<SalesReceiptCategoryTotalModel> CategoryTotals { get; set; } = [];
+    public IReadOnlyList<SalesReceiptPaymentModel> Payments { get; set; } = [];
     public decimal Subtotal { get; set; }
+    public decimal ImpoconsumoBase { get; set; }
+    public int ArticleCount { get; set; }
+    public decimal AmountTendered { get; set; }
+    public decimal ChangeDue { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal? DiscountPercent { get; set; }
     public decimal ImpoconsumoPercent { get; set; }

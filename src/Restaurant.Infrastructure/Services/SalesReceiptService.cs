@@ -6,6 +6,7 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Sales.SalesReceipts;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Persistence;
 using Restaurant.Infrastructure.SalesReceipts;
 
@@ -46,7 +47,7 @@ public sealed class SalesReceiptService : ISalesReceiptService
         var lines = await _db.BillLines
             .AsNoTracking()
             .Where(l => l.BillId == bill.Id)
-            .OrderBy(l => l.ProductTypeName)
+            .OrderBy(l => l.CreatedAtUtc)
             .ThenBy(l => l.ProductName)
             .ToListAsync(cancellationToken);
 
@@ -56,15 +57,15 @@ public sealed class SalesReceiptService : ISalesReceiptService
 
         var tenantEntity = await _db.Tenants.AsNoTracking().FirstAsync(t => t.Id == bill.TenantId, cancellationToken);
 
-        var categoryTotals = lines
-            .GroupBy(l => string.IsNullOrWhiteSpace(l.ProductTypeName) ? "Otros" : l.ProductTypeName)
-            .Select(g => new SalesReceiptCategoryTotalModel
-            {
-                CategoryName = g.Key,
-                Total = g.Sum(x => x.LineTotal),
-            })
-            .OrderBy(c => c.CategoryName)
-            .ToList();
+        var payments = await _db.Payments
+            .AsNoTracking()
+            .Where(p => p.BillId == bill.Id)
+            .ToListAsync(cancellationToken);
+
+        var amountTendered = payments.Sum(p => p.Amount);
+        var changeDue = Math.Max(0, amountTendered - bill.Total);
+        var impoconsumoBase = Math.Max(0, bill.Subtotal - bill.DiscountAmount);
+        var articleCount = (int)lines.Sum(l => l.Quantity);
 
         return new SalesReceiptModel
         {
@@ -90,14 +91,24 @@ public sealed class SalesReceiptService : ISalesReceiptService
                 ImpoconsumoAmount = l.ImpoconsumoAmount,
                 Notes = l.Notes,
             }).ToList(),
-            CategoryTotals = categoryTotals,
+            Payments = payments
+                .Select(p => new SalesReceiptPaymentModel
+                {
+                    MethodLabel = PaymentMethodLabel(p.Method),
+                    Amount = p.Amount,
+                })
+                .ToList(),
             Subtotal = bill.Subtotal,
             DiscountAmount = bill.DiscountAmount,
             DiscountPercent = bill.DiscountPercent,
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
             ImpoconsumoAmount = bill.TaxAmount,
+            ImpoconsumoBase = impoconsumoBase,
             TipAmount = bill.TipAmount,
             Total = bill.Total,
+            ArticleCount = articleCount,
+            AmountTendered = amountTendered,
+            ChangeDue = changeDue,
             CurrencyCode = tenantEntity.CurrencyCode,
         };
     }
@@ -146,6 +157,16 @@ public sealed class SalesReceiptService : ISalesReceiptService
             DianResolutionNumber = settings.DianResolutionNumber,
             DianResolutionFrom = settings.DianResolutionFrom,
             DianResolutionTo = settings.DianResolutionTo,
+            InvoiceNumberPrefix = settings.InvoiceNumberPrefix,
+        };
+
+    private static string PaymentMethodLabel(PaymentMethod method) =>
+        method switch
+        {
+            PaymentMethod.Cash => "EFECTIVO",
+            PaymentMethod.Card => "TARJETA",
+            PaymentMethod.Transfer => "TRANSFERENCIA",
+            _ => "OTRO",
         };
 
     private static string SanitizeFileToken(string value)
