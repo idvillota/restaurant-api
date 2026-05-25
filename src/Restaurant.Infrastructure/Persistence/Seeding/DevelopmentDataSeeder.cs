@@ -835,6 +835,7 @@ public static class DevelopmentDataSeeder
                         Quantity = qty,
                         UnitPrice = unitPrice,
                         LineTotal = lineTotal,
+                        SentToKitchenAtUtc = utc,
                     });
             }
 

@@ -6,6 +6,7 @@ using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Persistence;
+using Restaurant.Infrastructure.SalesReceipts;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -19,19 +20,22 @@ public sealed class BillService : IBillService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IInventoryAvailabilityService _inventory;
     private readonly ICashierShiftService _cashierShifts;
+    private readonly ISalesReceiptService _salesReceipts;
 
     public BillService(
         ApplicationDbContext db,
         ICurrentTenantContext tenantContext,
         IUnitOfWork unitOfWork,
         IInventoryAvailabilityService inventory,
-        ICashierShiftService cashierShifts)
+        ICashierShiftService cashierShifts,
+        ISalesReceiptService salesReceipts)
     {
         _db = db;
         _tenantContext = tenantContext;
         _unitOfWork = unitOfWork;
         _inventory = inventory;
         _cashierShifts = cashierShifts;
+        _salesReceipts = salesReceipts;
     }
 
     public async Task<IReadOnlyList<PayableTableGroupDto>> ListPayableByTableSearchAsync(
@@ -80,9 +84,14 @@ public sealed class BillService : IBillService
         _inventory.EnsureAvailable(stockCheck);
 
         var paymentSum = dto.Payments.Sum(p => p.Amount);
-        if (paymentSum < totals.TotalDue)
+        var roundedPaymentSum = decimal.Round(paymentSum, 2, MidpointRounding.AwayFromZero);
+        var roundedTotalDue = decimal.Round(totals.TotalDue, 2, MidpointRounding.AwayFromZero);
+        if (roundedPaymentSum < roundedTotalDue)
             throw new InvalidOperationException(
                 $"Payments ({paymentSum:N2}) do not cover the total due ({totals.TotalDue:N2}).");
+        if (roundedPaymentSum > roundedTotalDue)
+            throw new InvalidOperationException(
+                $"Payments ({paymentSum:N2}) exceed the total due ({totals.TotalDue:N2}). Adjust amounts or add a tip instead.");
 
         var orders = await LoadOpenOrdersQuery()
             .Where(o => dto.SalesOrderIds.Contains(o.Id))
@@ -91,14 +100,22 @@ public sealed class BillService : IBillService
         if (orders.Count != dto.SalesOrderIds.Distinct().Count())
             throw new InvalidOperationException("One or more orders are not open or were not found.");
 
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
         var (shiftId, processedByUserId) = await _cashierShifts.RequireOpenShiftAsync(cancellationToken);
+        var cashierName = await ResolveCashierDisplayNameAsync(processedByUserId, cancellationToken);
 
         var customer = await ResolveCustomerAsync(dto.CustomerId, cancellationToken);
         var now = DateTime.UtcNow;
         var billId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
         var billNumber = await GenerateBillNumberAsync(cancellationToken);
-        var invoiceNumber = $"INV-{billNumber}";
+        var dianConsecutive = await AllocateDianConsecutiveAsync(settings, cancellationToken);
+        var invoiceNumber = BillCheckoutCalculator.FormatInvoiceDisplayNumber(
+            settings.InvoiceNumberPrefix,
+            dianConsecutive);
+
+        var tableCodes = string.Join(", ", orders.Select(o => o.DiningTable?.Code).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct());
+        var orderNumbers = string.Join(", ", orders.Select(o => o.Number).Distinct());
 
         var bill = new Bill
         {
@@ -110,15 +127,42 @@ public sealed class BillService : IBillService
             DiscountAmount = totals.DiscountAmount,
             DiscountPercent = totals.DiscountPercent,
             TipAmount = totals.TipAmount,
-            TaxAmount = totals.TaxAmount,
+            TaxAmount = totals.ImpoconsumoAmount,
             Total = totals.TotalDue,
             IssuedAtUtc = now,
             PaidAtUtc = now,
             CashierShiftId = shiftId,
             ProcessedByUserId = processedByUserId,
+            DianConsecutiveNumber = dianConsecutive,
+            ProcessedByDisplayName = cashierName,
+            TableCodesSnapshot = string.IsNullOrWhiteSpace(tableCodes) ? null : tableCodes,
+            OrderNumbersSnapshot = orderNumbers,
         };
 
         await _db.Bills.AddAsync(bill, cancellationToken);
+
+        foreach (var line in totals.Lines)
+        {
+            await _db.BillLines.AddAsync(
+                new BillLine
+                {
+                    Id = Guid.NewGuid(),
+                    BillId = billId,
+                    SalesOrderLineId = line.LineId,
+                    ProductId = line.ProductId,
+                    ProductName = line.ProductName,
+                    ProductTypeName = line.ProductTypeName,
+                    Quantity = line.Quantity,
+                    UnitPrice = line.UnitPrice,
+                    LineTotal = line.LineTotal,
+                    ImpoconsumoAmount = BillCheckoutCalculator.AllocateLineImpoconsumo(
+                        line.LineTotal,
+                        totals.Subtotal,
+                        totals.ImpoconsumoAmount),
+                    Notes = line.Notes,
+                },
+                cancellationToken);
+        }
 
         foreach (var order in orders)
         {
@@ -169,6 +213,13 @@ public sealed class BillService : IBillService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        var receiptModel = await _salesReceipts.BuildModelAsync(bill, settings, cancellationToken);
+        var receiptFiles = await _salesReceipts.GenerateFilesAsync(receiptModel, cancellationToken);
+        bill.ReceiptPdfRelativePath = receiptFiles.PdfRelativePath;
+        bill.ReceiptXmlRelativePath = receiptFiles.XmlRelativePath;
+        _db.Bills.Update(bill);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
         return new BillDto
         {
             Id = billId,
@@ -180,11 +231,16 @@ public sealed class BillService : IBillService
             DiscountAmount = totals.DiscountAmount,
             DiscountPercent = totals.DiscountPercent,
             TipAmount = totals.TipAmount,
-            TaxAmount = totals.TaxAmount,
+            ImpoconsumoPercent = settings.ImpoconsumoPercent,
+            ImpoconsumoAmount = totals.ImpoconsumoAmount,
+            TaxAmount = totals.ImpoconsumoAmount,
             Total = totals.TotalDue,
             PaidAtUtc = now,
             InvoiceId = invoiceId,
             InvoiceNumber = invoiceNumber,
+            DianConsecutiveNumber = dianConsecutive,
+            ReceiptPdfRelativePath = receiptFiles.PdfRelativePath,
+            ReceiptXmlRelativePath = receiptFiles.XmlRelativePath,
             SalesOrderIds = orders.Select(o => o.Id).ToList(),
         };
     }
@@ -215,8 +271,11 @@ public sealed class BillService : IBillService
             dto.DiscountPercent,
             dto.DiscountAmount);
         var tip = Math.Max(0, dto.TipAmount);
-        var tax = 0m;
-        var totalDue = Math.Max(0, subtotal - discountAmount + tip + tax);
+        var (impoconsumo, totalDue) = BillCheckoutCalculator.ComputeTotals(
+            subtotal,
+            discountAmount,
+            tip,
+            settings.ImpoconsumoPercent);
 
         return new CheckoutTotalsDto
         {
@@ -225,10 +284,54 @@ public sealed class BillService : IBillService
             DiscountPercent = discountPercent,
             MaxDiscountPercent = settings.MaxDiscountPercent,
             TipAmount = tip,
-            TaxAmount = tax,
-            TotalDue = decimal.Round(totalDue, 2, MidpointRounding.AwayFromZero),
+            ImpoconsumoPercent = settings.ImpoconsumoPercent,
+            ImpoconsumoAmount = impoconsumo,
+            TaxAmount = impoconsumo,
+            TotalDue = totalDue,
             Lines = lines,
+            CategoryTotals = BillCheckoutCalculator.BuildCategoryTotals(lines),
         };
+    }
+
+    private async Task<int> AllocateDianConsecutiveAsync(
+        TenantSettings settings,
+        CancellationToken cancellationToken)
+    {
+        if (settings.DianResolutionFrom <= 0 || settings.DianResolutionTo < settings.DianResolutionFrom)
+            throw new InvalidOperationException(
+                "Configure el rango de numeración DIAN en Configuración del local (desde / hasta).");
+
+        var maxUsed = await _db.Bills
+            .Where(b => b.DianConsecutiveNumber > 0)
+            .MaxAsync(b => (int?)b.DianConsecutiveNumber, cancellationToken) ?? 0;
+
+        var next = settings.DianNextConsecutive;
+        if (next < settings.DianResolutionFrom)
+            next = settings.DianResolutionFrom;
+        if (next <= maxUsed)
+            next = maxUsed + 1;
+
+        if (next > settings.DianResolutionTo)
+            throw new InvalidOperationException(
+                $"Se agotó el rango autorizado por la DIAN ({settings.DianResolutionFrom}–{settings.DianResolutionTo}). Actualice la resolución en configuración.");
+
+        settings.DianNextConsecutive = next + 1;
+        _db.TenantSettings.Update(settings);
+        return next;
+    }
+
+    private async Task<string?> ResolveCashierDisplayNameAsync(
+        Guid? userId,
+        CancellationToken cancellationToken)
+    {
+        if (userId is null)
+            return null;
+
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user is null)
+            return null;
+
+        return string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName.Trim();
     }
 
     internal static (decimal Amount, decimal? Percent) ComputeDiscount(
@@ -399,6 +502,7 @@ public sealed class BillService : IBillService
             .Include(o => o.DiningTable)
             .Include(o => o.Lines)
             .ThenInclude(l => l.Product)
+            .ThenInclude(p => p.ProductType)
             .Include(o => o.Lines)
             .ThenInclude(l => l.ExcludedIngredients)
             .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any());
@@ -419,6 +523,7 @@ public sealed class BillService : IBillService
                 TableCode = order.DiningTable?.Code,
                 ProductId = l.ProductId,
                 ProductName = l.Product.Name,
+                ProductTypeName = l.Product.ProductType?.Name ?? "Otros",
                 Quantity = l.Quantity,
                 UnitPrice = l.UnitPrice,
                 LineTotal = l.LineTotal,
@@ -439,6 +544,7 @@ public sealed class BillService : IBillService
                 TableCode = order.DiningTable?.Code,
                 ProductId = l.ProductId,
                 ProductName = l.Product.Name,
+                ProductTypeName = l.Product.ProductType?.Name ?? "Otros",
                 Quantity = l.Quantity,
                 UnitPrice = l.UnitPrice,
                 LineTotal = l.LineTotal,

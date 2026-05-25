@@ -12,5 +12,22 @@ public class TenantSettings : ITenantScoped
     /// <summary>When set and ahead of the clock-based operational date, operations use this date (e.g. after daily closure advances to the next day).</summary>
     public DateOnly? ActiveOperationalBusinessDate { get; set; }
 
+    public string TradeName { get; set; } = string.Empty;
+    public string LegalName { get; set; } = string.Empty;
+    public string TaxRegime { get; set; } = "Régimen Simplificado";
+    public string TaxId { get; set; } = string.Empty;
+    public string? LegalRepresentative { get; set; }
+    public string AddressLine { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public string Country { get; set; } = "Colombia";
+    public string? PostalCode { get; set; }
+    public string? Phone { get; set; }
+    public string? DianResolutionNumber { get; set; }
+    public int DianResolutionFrom { get; set; }
+    public int DianResolutionTo { get; set; }
+    public int DianNextConsecutive { get; set; }
+    public string? InvoiceNumberPrefix { get; set; }
+    public decimal ImpoconsumoPercent { get; set; } = 8m;
+
     public Tenant Tenant { get; set; } = null!;
 }

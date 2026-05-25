@@ -27,6 +27,10 @@ public sealed class SalesOrderLineDto
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>Null until the line is sent to the kitchen on a ticket.</summary>
+    public DateTime? SentToKitchenAtUtc { get; set; }
+
     public List<SalesOrderLineExcludedIngredientDto> ExcludedIngredients { get; set; } = [];
 }
 
@@ -34,6 +38,12 @@ public sealed class SalesOrderLineExcludedIngredientDto
 {
     public Guid IngredientId { get; set; }
     public string IngredientName { get; set; } = string.Empty;
+}
+
+public sealed class UpdatePendingLineQuantityDto
+{
+    [Range(0.0001, double.MaxValue)]
+    public decimal Quantity { get; set; } = 1;
 }
 
 public sealed class AddSalesOrderLineDto
@@ -50,9 +60,9 @@ public sealed class AddSalesOrderLineDto
     public List<Guid> ExcludedIngredientIds { get; set; } = [];
 }
 
+/// <summary>Legacy optional payload; confirmation uses pending (unsent) lines on the order.</summary>
 public sealed class ConfirmSalesOrderDto
 {
-    [MinLength(1)]
     public List<AddSalesOrderLineDto> Lines { get; set; } = [];
 }
 
@@ -76,4 +86,6 @@ public sealed class TableServiceSummaryDto
     public Guid? OpenOrderId { get; set; }
     public string? OpenOrderNumber { get; set; }
     public decimal? OpenOrderTotal { get; set; }
+
+    public int OpenOrderPendingKitchenLineCount { get; set; }
 }

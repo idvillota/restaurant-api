@@ -98,6 +98,7 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
     {
         var lineSpecs = orders
             .SelectMany(o => o.Lines.GroupBy(l => l.Id).Select(g => g.First()))
+            .Where(l => l.SentToKitchenAtUtc is not null)
             .Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet()))
             .ToList();
 

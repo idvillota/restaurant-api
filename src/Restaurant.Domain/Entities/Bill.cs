@@ -19,10 +19,17 @@ public class Bill : EntityBase, ITenantScoped
     public DateTime? PaidAtUtc { get; set; }
     public Guid? CashierShiftId { get; set; }
     public Guid? ProcessedByUserId { get; set; }
+    public int DianConsecutiveNumber { get; set; }
+    public string? ProcessedByDisplayName { get; set; }
+    public string? TableCodesSnapshot { get; set; }
+    public string? OrderNumbersSnapshot { get; set; }
+    public string? ReceiptPdfRelativePath { get; set; }
+    public string? ReceiptXmlRelativePath { get; set; }
 
     public Customer Customer { get; set; } = null!;
     public CashierShift? CashierShift { get; set; }
     public ICollection<BillSalesOrder> BillOrders { get; set; } = new List<BillSalesOrder>();
+    public ICollection<BillLine> Lines { get; set; } = new List<BillLine>();
     public Invoice? Invoice { get; set; }
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

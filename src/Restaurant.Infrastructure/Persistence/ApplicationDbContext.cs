@@ -41,6 +41,7 @@ public sealed class ApplicationDbContext : DbContext
         Set<SalesOrderLineExcludedIngredient>();
     public DbSet<TenantSettings> TenantSettings => Set<TenantSettings>();
     public DbSet<Bill> Bills => Set<Bill>();
+    public DbSet<BillLine> BillLines => Set<BillLine>();
     public DbSet<BillSalesOrder> BillSalesOrders => Set<BillSalesOrder>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -228,6 +229,19 @@ public sealed class ApplicationDbContext : DbContext
             e.HasKey(x => x.TenantId);
             e.HasOne(x => x.Tenant).WithOne().HasForeignKey<TenantSettings>(x => x.TenantId);
             e.Property(x => x.MaxDiscountPercent).HasPrecision(5, 2);
+            e.Property(x => x.ImpoconsumoPercent).HasPrecision(5, 2);
+            e.Property(x => x.TradeName).HasMaxLength(200);
+            e.Property(x => x.LegalName).HasMaxLength(200);
+            e.Property(x => x.TaxRegime).HasMaxLength(80);
+            e.Property(x => x.TaxId).HasMaxLength(40);
+            e.Property(x => x.LegalRepresentative).HasMaxLength(200);
+            e.Property(x => x.AddressLine).HasMaxLength(300);
+            e.Property(x => x.City).HasMaxLength(120);
+            e.Property(x => x.Country).HasMaxLength(80);
+            e.Property(x => x.PostalCode).HasMaxLength(20);
+            e.Property(x => x.Phone).HasMaxLength(40);
+            e.Property(x => x.DianResolutionNumber).HasMaxLength(80);
+            e.Property(x => x.InvoiceNumberPrefix).HasMaxLength(20);
         });
 
         modelBuilder.Entity<CashierShift>(e =>
@@ -263,6 +277,11 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId);
             e.HasOne(x => x.CashierShift).WithMany().HasForeignKey(x => x.CashierShiftId);
             e.Property(x => x.Number).HasMaxLength(40);
+            e.Property(x => x.ProcessedByDisplayName).HasMaxLength(200);
+            e.Property(x => x.TableCodesSnapshot).HasMaxLength(200);
+            e.Property(x => x.OrderNumbersSnapshot).HasMaxLength(500);
+            e.Property(x => x.ReceiptPdfRelativePath).HasMaxLength(500);
+            e.Property(x => x.ReceiptXmlRelativePath).HasMaxLength(500);
             e.Property(x => x.Subtotal).HasPrecision(18, 2);
             e.Property(x => x.DiscountAmount).HasPrecision(18, 2);
             e.Property(x => x.DiscountPercent).HasPrecision(5, 2);
@@ -270,6 +289,21 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
             e.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.DianConsecutiveNumber })
+                .IsUnique()
+                .HasFilter("\"DianConsecutiveNumber\" > 0");
+        });
+
+        modelBuilder.Entity<BillLine>(e =>
+        {
+            e.HasOne(x => x.Bill).WithMany(x => x.Lines).HasForeignKey(x => x.BillId);
+            e.Property(x => x.ProductName).HasMaxLength(200);
+            e.Property(x => x.ProductTypeName).HasMaxLength(120);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+            e.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            e.Property(x => x.LineTotal).HasPrecision(18, 2);
+            e.Property(x => x.ImpoconsumoAmount).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<BillSalesOrder>(e =>
@@ -371,6 +405,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Bill>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<BillLine>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<BillSalesOrder>().HasQueryFilter(e =>

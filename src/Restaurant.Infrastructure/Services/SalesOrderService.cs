@@ -65,6 +65,16 @@ public sealed class SalesOrderService : ISalesOrderService
             .Select(o => new { o.Id, o.DiningTableId, o.Number, o.Total })
             .ToListAsync(cancellationToken);
 
+        var orderIds = openOrders.Select(o => o.Id).ToList();
+        var pendingCountByOrder = orderIds.Count == 0
+            ? new Dictionary<Guid, int>()
+            : await _lines.Query()
+                .AsNoTracking()
+                .Where(l => orderIds.Contains(l.SalesOrderId) && l.SentToKitchenAtUtc == null)
+                .GroupBy(l => l.SalesOrderId)
+                .Select(g => new { OrderId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.OrderId, x => x.Count, cancellationToken);
+
         var orderByTable = openOrders
             .Where(o => o.DiningTableId.HasValue)
             .ToDictionary(o => o.DiningTableId!.Value);
@@ -73,6 +83,9 @@ public sealed class SalesOrderService : ISalesOrderService
             .Select(t =>
             {
                 orderByTable.TryGetValue(t.Id, out var order);
+                var pendingKitchen = order is not null && pendingCountByOrder.TryGetValue(order.Id, out var c)
+                    ? c
+                    : 0;
                 return new TableServiceSummaryDto
                 {
                     TableId = t.Id,
@@ -85,6 +98,7 @@ public sealed class SalesOrderService : ISalesOrderService
                     OpenOrderId = order?.Id,
                     OpenOrderNumber = order?.Number,
                     OpenOrderTotal = order?.Total,
+                    OpenOrderPendingKitchenLineCount = pendingKitchen,
                 };
             })
             .ToList();
@@ -157,10 +171,79 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order is null)
             return null;
 
-        if (order.Status != SalesOrderStatus.Open)
-            throw new InvalidOperationException("Only open orders can receive additional lines.");
+        if (order.Status is not (SalesOrderStatus.Draft or SalesOrderStatus.Open))
+            throw new InvalidOperationException("Only active table orders can receive lines.");
 
         await ApplyLineToOrderAsync(order, dto, cancellationToken);
+        RecalculateOrderTotals(order);
+        _orders.Update(order);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(orderId, cancellationToken);
+    }
+
+    public async Task<SalesOrderDto?> RemovePendingLineAsync(
+        Guid orderId,
+        Guid lineId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
+        var order = await OrderWithLinesQuery(tracked: true)
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+        if (order is null)
+            return null;
+
+        if (order.Status is not (SalesOrderStatus.Draft or SalesOrderStatus.Open))
+            throw new InvalidOperationException("Only active table orders can be modified.");
+
+        var line = DistinctLines(order.Lines).FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+            throw new InvalidOperationException("Line was not found on this order.");
+
+        if (line.SentToKitchenAtUtc is not null)
+            throw new InvalidOperationException("Lines already sent to the kitchen cannot be removed.");
+
+        order.Lines.Remove(line);
+        _lines.Remove(line);
+        RecalculateOrderTotals(order);
+        _orders.Update(order);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(orderId, cancellationToken);
+    }
+
+    public async Task<SalesOrderDto?> UpdatePendingLineQuantityAsync(
+        Guid orderId,
+        Guid lineId,
+        decimal quantity,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
+        if (quantity <= 0)
+            throw new InvalidOperationException("Quantity must be greater than zero.");
+
+        var order = await OrderWithLinesQuery(tracked: true)
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+        if (order is null)
+            return null;
+
+        if (order.Status is not (SalesOrderStatus.Draft or SalesOrderStatus.Open))
+            throw new InvalidOperationException("Only active table orders can be modified.");
+
+        var line = DistinctLines(order.Lines).FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+            throw new InvalidOperationException("Line was not found on this order.");
+
+        if (line.SentToKitchenAtUtc is not null)
+            throw new InvalidOperationException("Lines already sent to the kitchen cannot be changed.");
+
+        line.Quantity = quantity;
+        line.LineTotal = decimal.Round(quantity * line.UnitPrice, 2, MidpointRounding.AwayFromZero);
+        _lines.Update(line);
         RecalculateOrderTotals(order);
         _orders.Update(order);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -175,9 +258,6 @@ public sealed class SalesOrderService : ISalesOrderService
     {
         await EnsureSalonOperationsAllowedAsync(cancellationToken);
 
-        if (dto.Lines.Count == 0)
-            throw new InvalidOperationException("Add at least one item before creating the order.");
-
         var order = await OrderWithLinesQuery(tracked: true)
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
@@ -190,11 +270,35 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order.Status != SalesOrderStatus.Draft && order.Status != SalesOrderStatus.Open)
             throw new InvalidOperationException("Only active table orders can be sent to the kitchen.");
 
-        var stockCheck = await _inventory.CheckKitchenBatchAsync(orderId, dto.Lines, cancellationToken);
+        var pendingLines = DistinctLines(order.Lines)
+            .Where(l => l.SentToKitchenAtUtc is null)
+            .ToList();
+
+        if (pendingLines.Count == 0)
+            throw new InvalidOperationException("No hay productos pendientes de envío a cocina.");
+
+        var batchDtos = pendingLines
+            .Select(l => new AddSalesOrderLineDto
+            {
+                ProductId = l.ProductId,
+                Quantity = l.Quantity,
+                Notes = l.Notes,
+                ExcludedIngredientIds = l.ExcludedIngredients
+                    .Select(e => e.IngredientId)
+                    .OrderBy(id => id)
+                    .ToList(),
+            })
+            .ToList();
+
+        var stockCheck = await _inventory.CheckKitchenBatchAsync(orderId, batchDtos, cancellationToken);
         _inventory.EnsureAvailable(stockCheck);
 
-        foreach (var lineDto in dto.Lines)
-            await ApplyLineToOrderAsync(order, lineDto, cancellationToken);
+        var sentAt = DateTime.UtcNow;
+        foreach (var line in pendingLines)
+        {
+            line.SentToKitchenAtUtc = sentAt;
+            _lines.Update(line);
+        }
 
         if (order.Status == SalesOrderStatus.Draft)
             order.Status = SalesOrderStatus.Open;
@@ -202,7 +306,7 @@ public sealed class SalesOrderService : ISalesOrderService
         _orders.Update(order);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, dto.Lines, cancellationToken);
+        var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, batchDtos, cancellationToken);
         var ticketPath = await _kitchenTickets.GeneratePdfAsync(ticketModel, cancellationToken);
 
         var orderDto = await GetByIdAsync(orderId, cancellationToken);
@@ -240,7 +344,7 @@ public sealed class SalesOrderService : ISalesOrderService
 
         if (!HasCustomization(notes, excludedIds))
         {
-            var match = FindMergeableLine(order.Lines, product.Id, notes, excludedIds);
+            var match = FindMergeablePendingLine(order.Lines, product.Id, notes, excludedIds);
             if (match is not null)
             {
                 match.Quantity += dto.Quantity;
@@ -403,13 +507,13 @@ public sealed class SalesOrderService : ISalesOrderService
     private static IEnumerable<SalesOrderLine> DistinctLines(IEnumerable<SalesOrderLine> lines) =>
         lines.GroupBy(l => l.Id).Select(g => g.First());
 
-    private static SalesOrderLine? FindMergeableLine(
+    private static SalesOrderLine? FindMergeablePendingLine(
         IEnumerable<SalesOrderLine> lines,
         Guid productId,
         string? notes,
         IReadOnlyList<Guid> excludedIds)
     {
-        foreach (var line in DistinctLines(lines))
+        foreach (var line in DistinctLines(lines).Where(l => l.SentToKitchenAtUtc is null))
         {
             if (line.ProductId != productId)
                 continue;

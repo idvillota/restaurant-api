@@ -14,6 +14,17 @@ public interface ISalesOrderService
 
     Task<SalesOrderDto?> AddLineAsync(Guid orderId, AddSalesOrderLineDto dto, CancellationToken cancellationToken = default);
 
+    Task<SalesOrderDto?> RemovePendingLineAsync(
+        Guid orderId,
+        Guid lineId,
+        CancellationToken cancellationToken = default);
+
+    Task<SalesOrderDto?> UpdatePendingLineQuantityAsync(
+        Guid orderId,
+        Guid lineId,
+        decimal quantity,
+        CancellationToken cancellationToken = default);
+
     Task<ConfirmSalesOrderResultDto?> ConfirmOrderAsync(
         Guid orderId,
         ConfirmSalesOrderDto dto,

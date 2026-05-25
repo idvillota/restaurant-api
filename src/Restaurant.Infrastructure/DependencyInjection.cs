@@ -33,8 +33,10 @@ public static class DependencyInjection
         services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
         services.Configure<KitchenTicketOptions>(configuration.GetSection(KitchenTicketOptions.SectionName));
+        services.Configure<SalesReceiptOptions>(configuration.GetSection(SalesReceiptOptions.SectionName));
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IKitchenTicketService, KitchenTicketService>();
+        services.AddScoped<ISalesReceiptService, SalesReceiptService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductTypeService, ProductTypeService>();
         services.AddScoped<IProviderService, ProviderService>();

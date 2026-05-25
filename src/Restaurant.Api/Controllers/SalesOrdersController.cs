@@ -71,6 +71,48 @@ public sealed class SalesOrdersController : ControllerBase
         }
     }
 
+    [HttpDelete("{orderId:guid}/lines/{lineId:guid}")]
+    public async Task<ActionResult<SalesOrderDto>> RemovePendingLine(
+        Guid orderId,
+        Guid lineId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await _service.RemovePendingLineAsync(orderId, lineId, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{orderId:guid}/lines/{lineId:guid}/quantity")]
+    public async Task<ActionResult<SalesOrderDto>> UpdatePendingLineQuantity(
+        Guid orderId,
+        Guid lineId,
+        [FromBody] UpdatePendingLineQuantityDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var updated = await _service.UpdatePendingLineQuantityAsync(
+                orderId,
+                lineId,
+                dto.Quantity,
+                cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("{id:guid}/lines")]
     public async Task<ActionResult<SalesOrderDto>> AddLine(
         Guid id,
