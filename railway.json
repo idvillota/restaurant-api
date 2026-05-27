@@ -1,0 +1,9 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "buildCommand": "dotnet publish src/Restaurant.Api/Restaurant.Api.csproj -c Release -o out"
+  },
+  "deploy": {
+    "startCommand": "./out/Restaurant.Api"
+  }
+}
