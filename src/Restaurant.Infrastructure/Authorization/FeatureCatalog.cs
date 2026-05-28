@@ -26,6 +26,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000010-0016-4016-8016-000000000010"), FeatureCodes.OrganizationRoles, "Roles y permisos", "Administración", 160),
         new(Guid.Parse("f1000011-0017-4017-8017-000000000011"), FeatureCodes.CashierShifts, "Turnos de caja", "Servicio", 35),
         new(Guid.Parse("f1000012-0018-4018-8018-000000000012"), FeatureCodes.ReportsDailyClosure, "Cierre diario", "Administración", 165),
+        new(Guid.Parse("f1000013-0019-4019-8019-000000000013"), FeatureCodes.ReportsStrategicAi, "Informe IA", "Administración", 170),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =

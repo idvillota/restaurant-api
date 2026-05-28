@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Restaurant.Application.Authorization;
 using Restaurant.Domain.Entities;
 using Restaurant.Infrastructure.Authorization;
 
@@ -16,6 +17,7 @@ public static class PermissionBootstrap
         {
             await EnsureTenantRolesAsync(db, tenantId, cancellationToken);
             await EnsureDefaultRoleFeaturesAsync(db, tenantId, cancellationToken);
+            await EnsureAdministratorFeatureGrantsAsync(db, tenantId, cancellationToken);
         }
 
         logger.LogInformation("Permission catalog and role defaults ensured for {TenantCount} tenant(s).", tenantIds.Count);
@@ -117,6 +119,53 @@ public static class PermissionBootstrap
                         FeatureId = feature.Id,
                     },
                     cancellationToken);
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Grants any missing catalog features to Administrator and Owner (e.g. after adding new feature codes).</summary>
+    private static async Task EnsureAdministratorFeatureGrantsAsync(
+        ApplicationDbContext db,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var adminRoleNames = new[] { SystemRoles.Administrator, SystemRoles.Owner };
+        var roles = await db.Roles.IgnoreQueryFilters()
+            .Where(r => r.TenantId == tenantId && adminRoleNames.Contains(r.Name))
+            .ToListAsync(cancellationToken);
+
+        if (roles.Count == 0)
+            return;
+
+        var featuresByCode = await db.Features.IgnoreQueryFilters().ToDictionaryAsync(f => f.Code, cancellationToken);
+        var existingPairs = await db.RoleFeatures.IgnoreQueryFilters()
+            .Where(rf => rf.TenantId == tenantId)
+            .Select(rf => new { rf.RoleId, rf.FeatureId })
+            .ToListAsync(cancellationToken);
+        var existingSet = existingPairs.Select(p => (p.RoleId, p.FeatureId)).ToHashSet();
+
+        foreach (var role in roles)
+        {
+            foreach (var code in FeatureCodes.All)
+            {
+                if (!featuresByCode.TryGetValue(code, out var feature))
+                    continue;
+
+                if (existingSet.Contains((role.Id, feature.Id)))
+                    continue;
+
+                await db.RoleFeatures.AddAsync(
+                    new RoleFeature
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = tenantId,
+                        RoleId = role.Id,
+                        FeatureId = feature.Id,
+                    },
+                    cancellationToken);
+                existingSet.Add((role.Id, feature.Id));
             }
         }
 

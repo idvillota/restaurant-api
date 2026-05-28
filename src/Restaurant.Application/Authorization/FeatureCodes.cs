@@ -20,6 +20,7 @@ public static class FeatureCodes
     public const string OrganizationRoles = "organization.roles";
     public const string CashierShifts = "cashier.shifts";
     public const string ReportsDailyClosure = "reports.daily_closure";
+    public const string ReportsStrategicAi = "reports.strategic_ai";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -41,5 +42,6 @@ public static class FeatureCodes
         OrganizationRoles,
         CashierShifts,
         ReportsDailyClosure,
+        ReportsStrategicAi,
     ];
 }
