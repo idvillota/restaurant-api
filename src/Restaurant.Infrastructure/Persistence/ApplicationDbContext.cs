@@ -48,6 +48,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
     public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
     public DbSet<CashMovement> CashMovements => Set<CashMovement>();
+    public DbSet<StrategicAiReportCache> StrategicAiReportCaches => Set<StrategicAiReportCache>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -272,6 +273,12 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.BusinessDate });
         });
 
+        modelBuilder.Entity<StrategicAiReportCache>(e =>
+        {
+            e.Property(x => x.HtmlContent).HasColumnType("text");
+            e.HasIndex(x => new { x.TenantId, x.SalesStartDate, x.SalesEndDate, x.CacheDate }).IsUnique();
+        });
+
         modelBuilder.Entity<Bill>(e =>
         {
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId);
@@ -426,6 +433,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<CashMovement>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<StrategicAiReportCache>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 
