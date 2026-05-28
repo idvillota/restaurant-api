@@ -8,7 +8,7 @@ COPY src/Restaurant.Application/Restaurant.Application.csproj src/Restaurant.App
 COPY src/Restaurant.Domain/Restaurant.Domain.csproj src/Restaurant.Domain/
 COPY src/Restaurant.Infrastructure/Restaurant.Infrastructure.csproj src/Restaurant.Infrastructure/
 
-RUN dotnet restore RestaurantManagement.sln
+RUN dotnet restore src/Restaurant.Api/Restaurant.Api.csproj
 
 # Copy everything else and publish
 COPY . .
