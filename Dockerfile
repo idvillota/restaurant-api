@@ -22,3 +22,4 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:${PORT:-3000}
 EXPOSE ${PORT:-3000}
 
 ENTRYPOINT ["./Restaurant.Api"]
+
