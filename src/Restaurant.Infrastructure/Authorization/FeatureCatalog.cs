@@ -18,6 +18,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000008-0008-4008-8008-000000000008"), FeatureCodes.CatalogProductTypes, "Tipos de producto", "Menú", 80),
         new(Guid.Parse("f1000009-0009-4009-8009-000000000009"), FeatureCodes.CatalogIngredientCategories, "Categorías de ingrediente", "Menú", 90),
         new(Guid.Parse("f100000a-0010-4010-8010-00000000000a"), FeatureCodes.CatalogIngredients, "Ingredientes", "Menú", 100),
+        new(Guid.Parse("f1000014-0020-4020-8020-000000000014"), FeatureCodes.CatalogPublicMenuQr, "Código QR menú", "Menú", 105),
         new(Guid.Parse("f100000b-0011-4011-8011-00000000000b"), FeatureCodes.SettingsTenant, "Configuración", "Administración", 110),
         new(Guid.Parse("f100000c-0012-4012-8012-00000000000c"), FeatureCodes.ProcurementPurchases, "Compras", "Administración", 120),
         new(Guid.Parse("f100000d-0013-4013-8013-00000000000d"), FeatureCodes.ProcurementProviders, "Proveedores", "Administración", 130),
@@ -50,6 +51,7 @@ public static class FeatureCatalog
                 FeatureCodes.CatalogProductTypes,
                 FeatureCodes.CatalogIngredientCategories,
                 FeatureCodes.CatalogIngredients,
+                FeatureCodes.CatalogPublicMenuQr,
                 FeatureCodes.SettingsTenant,
                 FeatureCodes.ProcurementPurchases,
                 FeatureCodes.ProcurementProviders,
@@ -63,6 +65,7 @@ public static class FeatureCatalog
                 FeatureCodes.ServiceSalon,
                 FeatureCodes.ReservationsManage,
                 FeatureCodes.CustomersManage,
+                FeatureCodes.CatalogPublicMenuQr,
             ],
             [SystemRoles.Staff] =
             [
@@ -70,6 +73,7 @@ public static class FeatureCatalog
                 FeatureCodes.ServiceSalon,
                 FeatureCodes.ReservationsManage,
                 FeatureCodes.CustomersManage,
+                FeatureCodes.CatalogPublicMenuQr,
             ],
             [SystemRoles.Cashier] =
             [
@@ -78,6 +82,7 @@ public static class FeatureCatalog
                 FeatureCodes.PaymentsCheckout,
                 FeatureCodes.CashierShifts,
                 FeatureCodes.CustomersManage,
+                FeatureCodes.CatalogPublicMenuQr,
             ],
         };
 }

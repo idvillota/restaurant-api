@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
         services.AddScoped<IStrategicAiReportService, StrategicAiReportService>();
+        services.AddScoped<IPublicMenuService, PublicMenuService>();
 
         return services;
     }

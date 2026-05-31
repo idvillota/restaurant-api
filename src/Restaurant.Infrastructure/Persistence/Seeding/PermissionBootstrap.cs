@@ -17,6 +17,7 @@ public static class PermissionBootstrap
         {
             await EnsureTenantRolesAsync(db, tenantId, cancellationToken);
             await EnsureDefaultRoleFeaturesAsync(db, tenantId, cancellationToken);
+            await EnsureMissingDefaultFeatureGrantsAsync(db, tenantId, cancellationToken);
             await EnsureAdministratorFeatureGrantsAsync(db, tenantId, cancellationToken);
         }
 
@@ -119,6 +120,49 @@ public static class PermissionBootstrap
                         FeatureId = feature.Id,
                     },
                     cancellationToken);
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Adds default features that were introduced after a role was first configured.</summary>
+    private static async Task EnsureMissingDefaultFeatureGrantsAsync(
+        ApplicationDbContext db,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var featuresByCode = await db.Features.IgnoreQueryFilters().ToDictionaryAsync(f => f.Code, cancellationToken);
+        var roles = await db.Roles.IgnoreQueryFilters().Where(r => r.TenantId == tenantId).ToListAsync(cancellationToken);
+        var existingPairs = await db.RoleFeatures.IgnoreQueryFilters()
+            .Where(rf => rf.TenantId == tenantId)
+            .Select(rf => new { rf.RoleId, rf.FeatureId })
+            .ToListAsync(cancellationToken);
+        var existingSet = existingPairs.Select(p => (p.RoleId, p.FeatureId)).ToHashSet();
+
+        foreach (var role in roles)
+        {
+            if (!FeatureCatalog.DefaultFeaturesByRole.TryGetValue(role.Name, out var codes))
+                continue;
+
+            foreach (var code in codes)
+            {
+                if (!featuresByCode.TryGetValue(code, out var feature))
+                    continue;
+
+                if (existingSet.Contains((role.Id, feature.Id)))
+                    continue;
+
+                await db.RoleFeatures.AddAsync(
+                    new RoleFeature
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = tenantId,
+                        RoleId = role.Id,
+                        FeatureId = feature.Id,
+                    },
+                    cancellationToken);
+                existingSet.Add((role.Id, feature.Id));
             }
         }
 
