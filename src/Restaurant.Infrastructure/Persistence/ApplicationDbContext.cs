@@ -28,6 +28,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<ProductIngredient> ProductIngredients => Set<ProductIngredient>();
+    public DbSet<ProductBundleLine> ProductBundleLines => Set<ProductBundleLine>();
     public DbSet<Provider> Providers => Set<Provider>();
     public DbSet<Purchase> Purchases => Set<Purchase>();
     public DbSet<PurchaseLine> PurchaseLines => Set<PurchaseLine>();
@@ -48,6 +49,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<CashierShift> CashierShifts => Set<CashierShift>();
     public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
     public DbSet<CashMovement> CashMovements => Set<CashMovement>();
+    public DbSet<StrategicAiReportCache> StrategicAiReportCaches => Set<StrategicAiReportCache>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -144,6 +146,20 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Product).WithMany(x => x.ProductIngredients).HasForeignKey(x => x.ProductId);
             e.HasOne(x => x.Ingredient).WithMany(x => x.ProductIngredients).HasForeignKey(x => x.IngredientId);
             e.HasIndex(x => new { x.ProductId, x.IngredientId }).IsUnique();
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+        });
+
+        modelBuilder.Entity<ProductBundleLine>(e =>
+        {
+            e.HasOne(x => x.Product)
+                .WithMany(x => x.BundleComponents)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.ComponentProduct)
+                .WithMany()
+                .HasForeignKey(x => x.ComponentProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.ProductId, x.ComponentProductId }).IsUnique();
             e.Property(x => x.Quantity).HasPrecision(18, 4);
         });
 
@@ -272,6 +288,12 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.BusinessDate });
         });
 
+        modelBuilder.Entity<StrategicAiReportCache>(e =>
+        {
+            e.Property(x => x.HtmlContent).HasColumnType("text");
+            e.HasIndex(x => new { x.TenantId, x.SalesStartDate, x.SalesEndDate, x.CacheDate }).IsUnique();
+        });
+
         modelBuilder.Entity<Bill>(e =>
         {
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId);
@@ -371,6 +393,9 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<ProductIngredient>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
+        modelBuilder.Entity<ProductBundleLine>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
         modelBuilder.Entity<Provider>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
@@ -426,6 +451,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<CashMovement>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<StrategicAiReportCache>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 

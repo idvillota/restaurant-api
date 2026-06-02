@@ -17,5 +17,6 @@ public class Product : EntityBase, ITenantScoped
 
     public ProductType ProductType { get; set; } = null!;
     public ICollection<ProductIngredient> ProductIngredients { get; set; } = new List<ProductIngredient>();
+    public ICollection<ProductBundleLine> BundleComponents { get; set; } = new List<ProductBundleLine>();
     public ICollection<SalesOrderLine> SalesOrderLines { get; set; } = new List<SalesOrderLine>();
 }

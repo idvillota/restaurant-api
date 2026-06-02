@@ -150,6 +150,8 @@ public sealed class CheckoutTotalsDto
     public decimal MaxDiscountPercent { get; set; }
     public decimal TipAmount { get; set; }
     public decimal ImpoconsumoPercent { get; set; }
+    /// <summary>Tax base (net) when prices are tax-included.</summary>
+    public decimal ImpoconsumoBase { get; set; }
     public decimal ImpoconsumoAmount { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal TotalDue { get; set; }

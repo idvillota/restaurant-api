@@ -16,6 +16,7 @@ public sealed class ProductServiceTests
             fx.Repository<Product>(),
             fx.Repository<ProductType>(),
             fx.Repository<ProductIngredient>(),
+            fx.Repository<ProductBundleLine>(),
             fx.Repository<Ingredient>(),
             fx.TenantContext,
             images,
@@ -611,5 +612,106 @@ public sealed class ProductServiceTests
         Assert.Null(removed!.ImagePath);
         Assert.Null(removed.ImageUrl);
         Assert.False(images.FileExists(path));
+    }
+
+    [Fact]
+    public async Task CreateAsync_bundle_links_component_products_and_costs_roll_up()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        var promoTypeId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var burgerId = Guid.NewGuid();
+        var drinkId = Guid.NewGuid();
+        var bunIngredientId = Guid.NewGuid();
+        var drinkIngredientId = Guid.NewGuid();
+
+        fx.Db.ProductTypes.AddRange(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true },
+            new ProductType { Id = promoTypeId, TenantId = fx.TenantId, Name = "Promociones", SortOrder = 1, IsActive = true });
+        fx.Db.IngredientCategories.Add(
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", SortOrder = 0, IsActive = true });
+        fx.Db.Ingredients.AddRange(
+            new Ingredient
+            {
+                Id = bunIngredientId,
+                TenantId = fx.TenantId,
+                IngredientCategoryId = categoryId,
+                Name = "Bun",
+                Unit = IngredientUnit.Unit,
+                UnitCost = 2m,
+                IsActive = true,
+            },
+            new Ingredient
+            {
+                Id = drinkIngredientId,
+                TenantId = fx.TenantId,
+                IngredientCategoryId = categoryId,
+                Name = "Cola bottle",
+                Unit = IngredientUnit.Unit,
+                UnitCost = 1.5m,
+                IsActive = true,
+            });
+        fx.Db.Products.AddRange(
+            new Product
+            {
+                Id = burgerId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                CompositionType = EProductType.Prepared,
+                Name = "Burger",
+                UnitPrice = 10m,
+                IsActive = true,
+            },
+            new Product
+            {
+                Id = drinkId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                CompositionType = EProductType.Resale,
+                Name = "Cola",
+                UnitPrice = 3m,
+                IsActive = true,
+            });
+        fx.Db.ProductIngredients.AddRange(
+            new ProductIngredient
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                ProductId = burgerId,
+                IngredientId = bunIngredientId,
+                Quantity = 1m,
+            },
+            new ProductIngredient
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                ProductId = drinkId,
+                IngredientId = drinkIngredientId,
+                Quantity = 1m,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var created = await sut.CreateAsync(
+            new CreateProductDto
+            {
+                ProductTypeId = promoTypeId,
+                CompositionType = EProductType.Bundle,
+                Name = "Combo burger + cola",
+                UnitPrice = 11m,
+                BundleLines =
+                [
+                    new SetProductBundleLineDto { ComponentProductId = burgerId, Quantity = 1m },
+                    new SetProductBundleLineDto { ComponentProductId = drinkId, Quantity = 1m },
+                ],
+            });
+
+        Assert.Equal(EProductType.Bundle, created.CompositionType);
+        Assert.Equal(3.5m, created.CostPrice);
+
+        var bundle = await sut.GetBundleAsync(created.Id);
+        Assert.NotNull(bundle);
+        Assert.Equal(2, bundle!.Lines.Count);
     }
 }

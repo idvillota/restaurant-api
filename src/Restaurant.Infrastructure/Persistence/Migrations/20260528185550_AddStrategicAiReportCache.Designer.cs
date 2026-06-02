@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Restaurant.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Restaurant.Infrastructure.Persistence;
 namespace Restaurant.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260528185550_AddStrategicAiReportCache")]
+    partial class AddStrategicAiReportCache
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -768,44 +771,6 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProductTypeId");
 
                     b.ToTable("Products");
-                });
-
-            modelBuilder.Entity("Restaurant.Domain.Entities.ProductBundleLine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ComponentProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ComponentProductId");
-
-                    b.HasIndex("ProductId", "ComponentProductId")
-                        .IsUnique();
-
-                    b.ToTable("ProductBundleLines");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.ProductIngredient", b =>
@@ -1745,25 +1710,6 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductType");
                 });
 
-            modelBuilder.Entity("Restaurant.Domain.Entities.ProductBundleLine", b =>
-                {
-                    b.HasOne("Restaurant.Domain.Entities.Product", "ComponentProduct")
-                        .WithMany()
-                        .HasForeignKey("ComponentProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Restaurant.Domain.Entities.Product", "Product")
-                        .WithMany("BundleComponents")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ComponentProduct");
-
-                    b.Navigation("Product");
-                });
-
             modelBuilder.Entity("Restaurant.Domain.Entities.ProductIngredient", b =>
                 {
                     b.HasOne("Restaurant.Domain.Entities.Ingredient", "Ingredient")
@@ -2018,8 +1964,6 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Restaurant.Domain.Entities.Product", b =>
                 {
-                    b.Navigation("BundleComponents");
-
                     b.Navigation("ProductIngredients");
 
                     b.Navigation("SalesOrderLines");

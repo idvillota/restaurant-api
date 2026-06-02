@@ -34,6 +34,11 @@ public static class DependencyInjection
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
         services.Configure<KitchenTicketOptions>(configuration.GetSection(KitchenTicketOptions.SectionName));
         services.Configure<SalesReceiptOptions>(configuration.GetSection(SalesReceiptOptions.SectionName));
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.AddHttpClient(nameof(StrategicAiReportService), client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(3);
+        });
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IKitchenTicketService, KitchenTicketService>();
         services.AddScoped<ISalesReceiptService, SalesReceiptService>();
@@ -55,6 +60,8 @@ public static class DependencyInjection
         services.AddScoped<IDailyClosureService, DailyClosureService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
+        services.AddScoped<IStrategicAiReportService, StrategicAiReportService>();
+        services.AddScoped<IPublicMenuService, PublicMenuService>();
 
         return services;
     }

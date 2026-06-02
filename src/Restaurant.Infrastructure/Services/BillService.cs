@@ -276,6 +276,14 @@ public sealed class BillService : IBillService
             discountAmount,
             tip,
             settings.ImpoconsumoPercent);
+        var discountedGross = Math.Max(0, subtotal - discountAmount);
+        var impoconsumoBase =
+            settings.ImpoconsumoPercent > 0 && discountedGross > 0
+                ? decimal.Round(
+                    discountedGross / (1m + (settings.ImpoconsumoPercent / 100m)),
+                    2,
+                    MidpointRounding.AwayFromZero)
+                : discountedGross;
 
         return new CheckoutTotalsDto
         {
@@ -285,6 +293,7 @@ public sealed class BillService : IBillService
             MaxDiscountPercent = settings.MaxDiscountPercent,
             TipAmount = tip,
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
+            ImpoconsumoBase = impoconsumoBase,
             ImpoconsumoAmount = impoconsumo,
             TaxAmount = impoconsumo,
             TotalDue = totalDue,
@@ -381,34 +390,24 @@ public sealed class BillService : IBillService
             .Select(g => g.First())
             .ToList();
 
-        foreach (var line in distinctLines)
-        {
-            var recipe = await _db.ProductIngredients
-                .AsNoTracking()
-                .Where(pi => pi.ProductId == line.ProductId)
-                .ToListAsync(cancellationToken);
+        var requirements = new Dictionary<Guid, decimal>();
+        var specs = distinctLines
+            .Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet()))
+            .ToList();
 
-            if (recipe.Count == 0)
+        await ProductInventoryExpansion.AddIngredientDemandAsync(_db, requirements, specs, cancellationToken);
+
+        foreach (var (ingredientId, deduct) in requirements)
+        {
+            var ingredient = await _db.Ingredients.FirstOrDefaultAsync(
+                i => i.Id == ingredientId && i.IsActive,
+                cancellationToken);
+
+            if (ingredient is null)
                 continue;
 
-            var excluded = line.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet();
-
-            foreach (var row in recipe)
-            {
-                if (excluded.Contains(row.IngredientId))
-                    continue;
-
-                var ingredient = await _db.Ingredients.FirstOrDefaultAsync(
-                    i => i.Id == row.IngredientId && i.IsActive,
-                    cancellationToken);
-
-                if (ingredient is null)
-                    continue;
-
-                var deduct = row.Quantity * line.Quantity;
-                ingredient.StockQuantity = InventoryCosting.SubtractStock(ingredient.StockQuantity, deduct);
-                _db.Ingredients.Update(ingredient);
-            }
+            ingredient.StockQuantity = InventoryCosting.SubtractStock(ingredient.StockQuantity, deduct);
+            _db.Ingredients.Update(ingredient);
         }
     }
 

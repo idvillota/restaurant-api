@@ -64,7 +64,15 @@ public sealed class SalesReceiptService : ISalesReceiptService
 
         var amountTendered = payments.Sum(p => p.Amount);
         var changeDue = Math.Max(0, amountTendered - bill.Total);
-        var impoconsumoBase = Math.Max(0, bill.Subtotal - bill.DiscountAmount);
+        // Prices are tax-included; show the extracted base (without impoconsumo) on the receipt.
+        var discountedGross = Math.Max(0, bill.Subtotal - bill.DiscountAmount);
+        var impoconsumoBase =
+            settings.ImpoconsumoPercent > 0 && discountedGross > 0
+                ? decimal.Round(
+                    discountedGross / (1m + (settings.ImpoconsumoPercent / 100m)),
+                    2,
+                    MidpointRounding.AwayFromZero)
+                : discountedGross;
         var articleCount = (int)lines.Sum(l => l.Quantity);
 
         return new SalesReceiptModel
