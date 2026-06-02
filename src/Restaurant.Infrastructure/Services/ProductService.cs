@@ -15,6 +15,7 @@ public sealed class ProductService : IProductService
     private readonly IRepository<Product> _products;
     private readonly IRepository<ProductType> _productTypes;
     private readonly IRepository<ProductIngredient> _productIngredients;
+    private readonly IRepository<ProductBundleLine> _productBundleLines;
     private readonly IRepository<Ingredient> _ingredients;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IProductImageStorage _productImages;
@@ -25,6 +26,7 @@ public sealed class ProductService : IProductService
         IRepository<Product> products,
         IRepository<ProductType> productTypes,
         IRepository<ProductIngredient> productIngredients,
+        IRepository<ProductBundleLine> productBundleLines,
         IRepository<Ingredient> ingredients,
         ICurrentTenantContext tenantContext,
         IProductImageStorage productImages,
@@ -34,6 +36,7 @@ public sealed class ProductService : IProductService
         _products = products;
         _productTypes = productTypes;
         _productIngredients = productIngredients;
+        _productBundleLines = productBundleLines;
         _ingredients = ingredients;
         _tenantContext = tenantContext;
         _productImages = productImages;
@@ -96,6 +99,9 @@ public sealed class ProductService : IProductService
         if (dto.CompositionType == EProductType.Resale)
             await ApplyResaleRecipeFromDtoAsync(entity.Id, dto.CompositionType, dto.ResaleIngredientId, dto.ResaleQuantity, cancellationToken);
 
+        if (dto.CompositionType == EProductType.Bundle)
+            await ApplyBundleFromDtoAsync(entity.Id, dto.BundleLines, cancellationToken);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         entity = await _products.Query().AsNoTracking().Include(p => p.ProductType).FirstAsync(p => p.Id == entity.Id, cancellationToken);
@@ -130,12 +136,23 @@ public sealed class ProductService : IProductService
         entity.IsActive = dto.IsActive;
 
         if (compositionTypeChanged)
-            await ValidateExistingRecipeMatchesCompositionTypeAsync(id, entity.CompositionType, cancellationToken);
+        {
+            if (dto.CompositionType == EProductType.Bundle)
+                await ClearRecipeLinesAsync(id, cancellationToken);
+            else
+                await ClearBundleLinesAsync(id, cancellationToken);
+
+            if (dto.CompositionType != EProductType.Bundle)
+                await ValidateExistingRecipeMatchesCompositionTypeAsync(id, entity.CompositionType, cancellationToken);
+        }
 
         _products.Update(entity);
 
         if (dto.CompositionType == EProductType.Resale)
             await ApplyResaleRecipeFromDtoAsync(id, dto.CompositionType, dto.ResaleIngredientId, dto.ResaleQuantity, cancellationToken);
+
+        if (dto.CompositionType == EProductType.Bundle)
+            await ApplyBundleFromDtoAsync(id, dto.BundleLines, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -221,10 +238,48 @@ public sealed class ProductService : IProductService
         if (product is null)
             return null;
 
+        if (product.CompositionType == EProductType.Bundle)
+            throw new InvalidOperationException("Los combos usan productos incluidos, no una receta de ingredientes.");
+
         var items = dto.Lines ?? [];
         await ReplaceRecipeLinesAsync(productId, product.CompositionType, items, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return await GetRecipeAsync(productId, cancellationToken);
+    }
+
+    public async Task<ProductBundleDto?> GetBundleAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        var product = await _products.Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+        if (product is null)
+            return null;
+
+        var lines = await _productBundleLines.Query()
+            .AsNoTracking()
+            .Where(bl => bl.ProductId == productId)
+            .Include(bl => bl.ComponentProduct)
+            .OrderBy(bl => bl.SortOrder)
+            .ThenBy(bl => bl.ComponentProduct.Name)
+            .ToListAsync(cancellationToken);
+
+        var componentIds = lines.Select(l => l.ComponentProductId).Distinct().ToList();
+        var componentCosts = await GetCostPricesByProductIdsAsync(componentIds, cancellationToken);
+
+        return BuildBundleDto(product, lines, componentCosts);
+    }
+
+    public async Task<ProductBundleDto?> SetBundleAsync(Guid productId, SetProductBundleDto dto, CancellationToken cancellationToken = default)
+    {
+        var product = await _products.GetByIdAsync(productId, cancellationToken);
+        if (product is null)
+            return null;
+
+        if (product.CompositionType != EProductType.Bundle)
+            throw new InvalidOperationException("Solo los productos combo pueden tener componentes.");
+
+        var items = dto.Lines ?? [];
+        await ReplaceBundleLinesAsync(productId, items, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await GetBundleAsync(productId, cancellationToken);
     }
 
     private async Task ApplyResaleRecipeFromDtoAsync(
@@ -246,6 +301,121 @@ public sealed class ProductService : IProductService
         };
 
         await ReplaceRecipeLinesAsync(productId, compositionType, lines, cancellationToken);
+    }
+
+    private async Task ApplyBundleFromDtoAsync(
+        Guid productId,
+        IReadOnlyList<SetProductBundleLineDto>? bundleLines,
+        CancellationToken cancellationToken)
+    {
+        if (bundleLines is null || bundleLines.Count == 0)
+            throw new InvalidOperationException("Los combos requieren al menos un producto incluido.");
+
+        await ReplaceBundleLinesAsync(productId, bundleLines, cancellationToken);
+    }
+
+    private async Task ReplaceBundleLinesAsync(
+        Guid productId,
+        IReadOnlyList<SetProductBundleLineDto> items,
+        CancellationToken cancellationToken)
+    {
+        await ValidateBundleLinesAsync(productId, items, cancellationToken);
+
+        var existing = await _productBundleLines.Query()
+            .Where(bl => bl.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        var incoming = items
+            .Select((line, index) => new
+            {
+                line.ComponentProductId,
+                line.Quantity,
+                SortOrder = line.SortOrder > 0 ? line.SortOrder : index,
+            })
+            .ToDictionary(x => x.ComponentProductId);
+
+        foreach (var row in existing)
+        {
+            if (!incoming.TryGetValue(row.ComponentProductId, out var line))
+            {
+                _productBundleLines.Remove(row);
+                continue;
+            }
+
+            row.Quantity = line.Quantity;
+            row.SortOrder = line.SortOrder;
+            _productBundleLines.Update(row);
+            incoming.Remove(row.ComponentProductId);
+        }
+
+        foreach (var (componentProductId, line) in incoming)
+        {
+            await _productBundleLines.AddAsync(
+                new ProductBundleLine
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = ResolveTenantId(),
+                    ProductId = productId,
+                    ComponentProductId = componentProductId,
+                    Quantity = line.Quantity,
+                    SortOrder = line.SortOrder,
+                },
+                cancellationToken);
+        }
+    }
+
+    private async Task ValidateBundleLinesAsync(
+        Guid productId,
+        IReadOnlyList<SetProductBundleLineDto> items,
+        CancellationToken cancellationToken)
+    {
+        if (items.Count == 0)
+            throw new InvalidOperationException("Los combos requieren al menos un producto incluido.");
+
+        if (items.Select(i => i.ComponentProductId).Distinct().Count() != items.Count)
+            throw new InvalidOperationException("No se permiten productos duplicados en el combo.");
+
+        if (items.Any(i => i.ComponentProductId == productId))
+            throw new InvalidOperationException("Un combo no puede incluirse a sí mismo.");
+
+        if (items.Any(i => i.Quantity <= 0))
+            throw new InvalidOperationException("Cada cantidad de componente debe ser mayor que cero.");
+
+        var componentIds = items.Select(i => i.ComponentProductId).ToList();
+        var components = await _products.Query()
+            .AsNoTracking()
+            .Where(p => componentIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.IsActive, p.CompositionType, p.Name })
+            .ToListAsync(cancellationToken);
+
+        if (components.Count != componentIds.Count)
+            throw new InvalidOperationException("Uno o más productos incluidos no existen.");
+
+        if (components.Any(p => !p.IsActive))
+            throw new InvalidOperationException("Todos los productos incluidos deben estar activos.");
+
+        if (components.Any(p => p.CompositionType == EProductType.Bundle))
+            throw new InvalidOperationException("Un combo no puede incluir otro combo.");
+    }
+
+    private async Task ClearRecipeLinesAsync(Guid productId, CancellationToken cancellationToken)
+    {
+        var existing = await _productIngredients.Query()
+            .Where(pi => pi.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var row in existing)
+            _productIngredients.Remove(row);
+    }
+
+    private async Task ClearBundleLinesAsync(Guid productId, CancellationToken cancellationToken)
+    {
+        var existing = await _productBundleLines.Query()
+            .Where(bl => bl.ProductId == productId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var row in existing)
+            _productBundleLines.Remove(row);
     }
 
     private async Task ReplaceRecipeLinesAsync(
@@ -339,6 +509,8 @@ public sealed class ProductService : IProductService
                 break;
             case EProductType.Prepared:
                 break;
+            case EProductType.Bundle:
+                throw new InvalidOperationException("Los combos usan productos incluidos, no ingredientes.");
             default:
                 throw new InvalidOperationException("Unknown product composition type.");
         }
@@ -359,6 +531,39 @@ public sealed class ProductService : IProductService
             return;
 
         ValidateRecipeLines(compositionType, lines);
+    }
+
+    private static ProductBundleDto BuildBundleDto(
+        Product product,
+        List<ProductBundleLine> lines,
+        IReadOnlyDictionary<Guid, decimal> componentCosts)
+    {
+        var lineDtos = lines.Select(line =>
+        {
+            var componentCost = componentCosts.GetValueOrDefault(line.ComponentProductId);
+            return new ProductBundleLineDto
+            {
+                Id = line.Id,
+                ComponentProductId = line.ComponentProductId,
+                ComponentProductName = line.ComponentProduct.Name,
+                ComponentCompositionType = line.ComponentProduct.CompositionType,
+                ComponentUnitPrice = line.ComponentProduct.UnitPrice,
+                ComponentCostPrice = componentCost,
+                Quantity = line.Quantity,
+                LineCost = componentCost * line.Quantity,
+                SortOrder = line.SortOrder,
+            };
+        }).ToList();
+
+        return new ProductBundleDto
+        {
+            ProductId = product.Id,
+            CompositionType = product.CompositionType,
+            ProductName = product.Name,
+            UnitPrice = product.UnitPrice,
+            CostPrice = lineDtos.Sum(l => l.LineCost),
+            Lines = lineDtos,
+        };
     }
 
     private static ProductRecipeLineDto MapLine(ProductIngredient pi)
@@ -395,16 +600,54 @@ public sealed class ProductService : IProductService
         if (productIds.Count == 0)
             return new Dictionary<Guid, decimal>();
 
-        var rows = await (
+        var compositionByProduct = await _products.Query()
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.CompositionType })
+            .ToDictionaryAsync(p => p.Id, p => p.CompositionType, cancellationToken);
+
+        var recipeCosts = await (
             from pi in _productIngredients.Query().AsNoTracking()
             join ing in _ingredients.Query().AsNoTracking() on pi.IngredientId equals ing.Id
             where productIds.Contains(pi.ProductId)
             select new { pi.ProductId, pi.Quantity, ing.UnitCost }
         ).ToListAsync(cancellationToken);
 
-        return rows
+        var recipeCostByProduct = recipeCosts
             .GroupBy(r => r.ProductId)
             .ToDictionary(g => g.Key, g => g.Sum(r => ComputeLineCost(r.Quantity, r.UnitCost)));
+
+        var bundleLines = await _productBundleLines.Query()
+            .AsNoTracking()
+            .Where(bl => productIds.Contains(bl.ProductId))
+            .Select(bl => new { bl.ProductId, bl.ComponentProductId, bl.Quantity })
+            .ToListAsync(cancellationToken);
+
+        var componentIds = bundleLines.Select(bl => bl.ComponentProductId).Distinct().ToList();
+        var componentCosts = componentIds.Count == 0
+            ? new Dictionary<Guid, decimal>()
+            : await GetCostPricesByProductIdsAsync(componentIds, cancellationToken);
+
+        var bundleCostByProduct = bundleLines
+            .GroupBy(bl => bl.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(bl => componentCosts.GetValueOrDefault(bl.ComponentProductId) * bl.Quantity));
+
+        var result = new Dictionary<Guid, decimal>();
+        foreach (var productId in productIds)
+        {
+            if (!compositionByProduct.TryGetValue(productId, out var compositionType))
+                continue;
+
+            result[productId] = compositionType switch
+            {
+                EProductType.Bundle => bundleCostByProduct.GetValueOrDefault(productId),
+                _ => recipeCostByProduct.GetValueOrDefault(productId),
+            };
+        }
+
+        return result;
     }
 
     private ProductListItemDto MapProduct(Product product, decimal costPrice)

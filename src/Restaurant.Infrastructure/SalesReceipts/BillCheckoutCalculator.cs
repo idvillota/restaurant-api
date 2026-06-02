@@ -10,12 +10,19 @@ internal static class BillCheckoutCalculator
         decimal tipAmount,
         decimal impoconsumoPercent)
     {
-        var taxableBase = Math.Max(0, subtotal - discountAmount);
-        var impoconsumo = decimal.Round(
-            taxableBase * (impoconsumoPercent / 100m),
-            2,
-            MidpointRounding.AwayFromZero);
-        var totalDue = decimal.Round(taxableBase + impoconsumo + Math.Max(0, tipAmount), 2, MidpointRounding.AwayFromZero);
+        // IMPORTANT: Menu prices are tax-included. Subtotal and discounts are applied over the tax-included amount.
+        // We "extract" impoconsumo from the discounted gross, instead of adding it on top.
+        var discountedGross = Math.Max(0, subtotal - discountAmount);
+        if (discountedGross <= 0 || impoconsumoPercent <= 0)
+        {
+            var due = decimal.Round(discountedGross + Math.Max(0, tipAmount), 2, MidpointRounding.AwayFromZero);
+            return (0m, due);
+        }
+
+        var divisor = 1m + (impoconsumoPercent / 100m);
+        var baseAmount = decimal.Round(discountedGross / divisor, 2, MidpointRounding.AwayFromZero);
+        var impoconsumo = decimal.Round(discountedGross - baseAmount, 2, MidpointRounding.AwayFromZero);
+        var totalDue = decimal.Round(discountedGross + Math.Max(0, tipAmount), 2, MidpointRounding.AwayFromZero);
         return (impoconsumo, totalDue);
     }
 

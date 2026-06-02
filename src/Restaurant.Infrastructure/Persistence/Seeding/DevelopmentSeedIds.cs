@@ -106,6 +106,7 @@ internal static class DevelopmentSeedIds
         Guid.Parse("e1000008-0008-4008-8008-000000000008"),
         Guid.Parse("e1000009-0009-4009-8009-000000000009"),
         Guid.Parse("e1000010-0010-4010-8010-000000000010"),
+        Guid.Parse("e1000011-0011-4011-8011-000000000011"),
     ];
 
     public static readonly Guid[] ProductIds =
@@ -122,6 +123,7 @@ internal static class DevelopmentSeedIds
         Guid.Parse("f1000010-0010-4010-8010-000000000010"),
         Guid.Parse("f1000011-0011-4011-8011-000000000011"),
         Guid.Parse("f1000012-0012-4012-8012-000000000012"),
+        Guid.Parse("f1000013-0013-4013-8013-000000000013"),
     ];
 
     public static readonly Guid[] DiningTableIds =

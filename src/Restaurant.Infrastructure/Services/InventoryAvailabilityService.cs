@@ -4,6 +4,7 @@ using Restaurant.Application.Features.Inventory;
 using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -122,27 +123,11 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         if (specs.Count == 0)
             return;
 
-        var productIds = specs.Select(s => s.ProductId).Distinct().ToList();
-        var recipeByProduct = await _db.ProductIngredients
-            .AsNoTracking()
-            .Where(pi => productIds.Contains(pi.ProductId))
-            .GroupBy(pi => pi.ProductId)
-            .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken);
+        var expansionSpecs = specs
+            .Select(s => (s.ProductId, s.Quantity, s.Excluded))
+            .ToList();
 
-        foreach (var (productId, quantity, excluded) in specs)
-        {
-            if (!recipeByProduct.TryGetValue(productId, out var recipe) || recipe.Count == 0)
-                continue;
-
-            foreach (var row in recipe)
-            {
-                if (excluded.Contains(row.IngredientId))
-                    continue;
-
-                var needed = row.Quantity * quantity;
-                requirements[row.IngredientId] = requirements.GetValueOrDefault(row.IngredientId) + needed;
-            }
-        }
+        await ProductInventoryExpansion.AddIngredientDemandAsync(_db, requirements, expansionSpecs, cancellationToken);
     }
 
     private async Task<StockAvailabilityResultDto> BuildResultAsync(

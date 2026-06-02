@@ -127,4 +127,30 @@ public sealed class ProductsController : ControllerBase
             return Conflict(new { message = ex.Message });
         }
     }
+
+    [HttpGet("{id:guid}/bundle")]
+    public async Task<ActionResult<ProductBundleDto>> GetBundle(Guid id, CancellationToken cancellationToken = default)
+    {
+        var bundle = await _products.GetBundleAsync(id, cancellationToken);
+        return bundle is null ? NotFound() : Ok(bundle);
+    }
+
+    [HttpPut("{id:guid}/bundle")]
+    public async Task<ActionResult<ProductBundleDto>> SetBundle(
+        Guid id,
+        [FromBody] SetProductBundleDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+        try
+        {
+            var bundle = await _products.SetBundleAsync(id, dto, cancellationToken);
+            return bundle is null ? NotFound() : Ok(bundle);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 }

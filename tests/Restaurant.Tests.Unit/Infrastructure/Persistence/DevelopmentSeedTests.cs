@@ -16,7 +16,8 @@ public sealed class DevelopmentSeedTests
         Assert.Equal(10, DevelopmentSeedIds.IngredientCategoryIds.Length);
         Assert.Equal(12, DevelopmentSeedIds.IngredientIds.Length);
         Assert.Equal(10, DevelopmentSeedIds.ProviderIds.Length);
-        Assert.Equal(12, DevelopmentSeedIds.ProductIds.Length);
+        Assert.Equal(11, DevelopmentSeedIds.ProductTypeIds.Length);
+        Assert.Equal(13, DevelopmentSeedIds.ProductIds.Length);
     }
 
     [Fact]

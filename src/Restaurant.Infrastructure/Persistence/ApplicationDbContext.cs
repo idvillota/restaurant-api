@@ -28,6 +28,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<ProductIngredient> ProductIngredients => Set<ProductIngredient>();
+    public DbSet<ProductBundleLine> ProductBundleLines => Set<ProductBundleLine>();
     public DbSet<Provider> Providers => Set<Provider>();
     public DbSet<Purchase> Purchases => Set<Purchase>();
     public DbSet<PurchaseLine> PurchaseLines => Set<PurchaseLine>();
@@ -145,6 +146,20 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Product).WithMany(x => x.ProductIngredients).HasForeignKey(x => x.ProductId);
             e.HasOne(x => x.Ingredient).WithMany(x => x.ProductIngredients).HasForeignKey(x => x.IngredientId);
             e.HasIndex(x => new { x.ProductId, x.IngredientId }).IsUnique();
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+        });
+
+        modelBuilder.Entity<ProductBundleLine>(e =>
+        {
+            e.HasOne(x => x.Product)
+                .WithMany(x => x.BundleComponents)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.ComponentProduct)
+                .WithMany()
+                .HasForeignKey(x => x.ComponentProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.ProductId, x.ComponentProductId }).IsUnique();
             e.Property(x => x.Quantity).HasPrecision(18, 4);
         });
 
@@ -376,6 +391,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductIngredient>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<ProductBundleLine>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Provider>().HasQueryFilter(e =>

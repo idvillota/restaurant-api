@@ -27,6 +27,9 @@ public sealed class CreateProductDto
 
     [Range(0.0001, double.MaxValue)]
     public decimal ResaleQuantity { get; set; } = 1m;
+
+    /// <summary>Required when <see cref="CompositionType"/> is <see cref="EProductType.Bundle"/>.</summary>
+    public List<SetProductBundleLineDto>? BundleLines { get; set; }
 }
 
 public sealed class UpdateProductDto
@@ -55,4 +58,7 @@ public sealed class UpdateProductDto
 
     [Range(0.0001, double.MaxValue)]
     public decimal ResaleQuantity { get; set; } = 1m;
+
+    /// <summary>Required when <see cref="CompositionType"/> is <see cref="EProductType.Bundle"/>.</summary>
+    public List<SetProductBundleLineDto>? BundleLines { get; set; }
 }

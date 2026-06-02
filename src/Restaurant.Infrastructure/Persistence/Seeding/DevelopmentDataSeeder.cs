@@ -16,6 +16,7 @@ public static class DevelopmentDataSeeder
         Guid.Parse($"00000000-0000-400{family}-8000-{index:D12}");
 
     private const int RecipeGuidFamily = 2;
+    private const int BundleGuidFamily = 3;
     private const int PurchaseLineGuidFamily = 3;
     private const int SalesLineGuidFamily = 4;
     private const int ReservationTableGuidFamily = 5;
@@ -421,7 +422,7 @@ public static class DevelopmentDataSeeder
 
         var typeNames = new[]
         {
-            "Pizzas", "Pastas", "Ensaladas", "Hamburguesas", "Postres", "Refrescos", "Cerveza", "Vino", "Entradas", "Especiales",
+            "Pizzas", "Pastas", "Ensaladas", "Hamburguesas", "Postres", "Refrescos", "Cerveza", "Vino", "Entradas", "Especiales", "Promociones",
         };
 
         for (var i = 0; i < typeNames.Length; i++)
@@ -453,6 +454,7 @@ public static class DevelopmentDataSeeder
             ("Pizza pepperoni", DevelopmentSeedIds.ProductTypeIds[0], EProductType.Prepared, 36000m, "PIZ-002"),
             ("Pollo a la parrilla", DevelopmentSeedIds.ProductTypeIds[9], EProductType.Prepared, 42000m, "SPC-002"),
             ("Limonada de la casa", DevelopmentSeedIds.ProductTypeIds[5], EProductType.Prepared, 8000m, "DRK-003"),
+            ("Combo hamburguesa + cola", DevelopmentSeedIds.ProductTypeIds[10], EProductType.Bundle, 38000m, "PRO-001"),
         };
 
         for (var i = 0; i < products.Length; i++)
@@ -513,6 +515,29 @@ public static class DevelopmentDataSeeder
                 },
                 cancellationToken);
             recipeIndex++;
+        }
+
+        var bundleLines = new (Guid BundleProductId, Guid ComponentProductId, decimal Qty, int SortOrder)[]
+        {
+            (DevelopmentSeedIds.ProductIds[12], DevelopmentSeedIds.ProductIds[3], 1m, 0),
+            (DevelopmentSeedIds.ProductIds[12], DevelopmentSeedIds.ProductIds[5], 1m, 1),
+        };
+
+        var bundleIndex = 0;
+        foreach (var (bundleProductId, componentProductId, qty, sortOrder) in bundleLines)
+        {
+            await db.ProductBundleLines.AddAsync(
+                new ProductBundleLine
+                {
+                    Id = ChildId(BundleGuidFamily, bundleIndex + 1),
+                    TenantId = tenantId,
+                    ProductId = bundleProductId,
+                    ComponentProductId = componentProductId,
+                    Quantity = qty,
+                    SortOrder = sortOrder,
+                },
+                cancellationToken);
+            bundleIndex++;
         }
     }
 
