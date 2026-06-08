@@ -42,21 +42,21 @@ public sealed class RolePermissionService : IRolePermissionService
             .OrderBy(r => r.Name)
             .ToListAsync(cancellationToken);
 
-        var assignments = await _db.RoleFeatures
+        var assignmentRows = await _db.RoleFeatures
             .AsNoTracking()
-            .Include(rf => rf.Feature)
+            .Select(rf => new { rf.RoleId, Code = rf.Feature.Code })
             .ToListAsync(cancellationToken);
+
+        var codesByRole = assignmentRows
+            .GroupBy(a => a.RoleId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Code).OrderBy(c => c).ToList());
 
         var roleDtos = roles
             .Select(r => new RolePermissionRoleDto
             {
                 Id = r.Id,
                 Name = r.Name,
-                FeatureCodes = assignments
-                    .Where(a => a.RoleId == r.Id)
-                    .Select(a => a.Feature.Code)
-                    .OrderBy(c => c)
-                    .ToList(),
+                FeatureCodes = codesByRole.GetValueOrDefault(r.Id) ?? [],
             })
             .ToList();
 

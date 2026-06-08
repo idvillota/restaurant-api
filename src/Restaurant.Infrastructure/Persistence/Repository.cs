@@ -11,7 +11,7 @@ public sealed class Repository<TEntity> : IRepository<TEntity>
     public Repository(ApplicationDbContext db) => _db = db;
 
     public Task<TEntity?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        _db.Set<TEntity>().FindAsync([id], cancellationToken).AsTask();
+        _db.Set<TEntity>().FirstOrDefaultAsync(e => EF.Property<Guid>(e, "Id") == id, cancellationToken);
 
     public IQueryable<TEntity> Query() => _db.Set<TEntity>();
 

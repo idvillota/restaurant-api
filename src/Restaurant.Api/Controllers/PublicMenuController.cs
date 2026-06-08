@@ -13,6 +13,7 @@ public sealed class PublicMenuController : ControllerBase
 
     public PublicMenuController(IPublicMenuService publicMenu) => _publicMenu = publicMenu;
 
+    [AllowAnonymous]
     [HttpGet("{tenantSlug}")]
     public async Task<IActionResult> GetByTenantSlug(string tenantSlug, CancellationToken cancellationToken)
     {

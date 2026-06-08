@@ -20,7 +20,7 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         CancellationToken cancellationToken = default)
     {
         var requirements = new Dictionary<Guid, decimal>();
-        await AddDemandFromOpenOrdersAsync(requirements, cancellationToken);
+        await AddDemandFromOpenOrdersAsync(requirements, dto.SalesOrderId, cancellationToken);
         await AddDemandFromLineDtosAsync(requirements, dto.Lines, cancellationToken);
         return await BuildResultAsync(requirements, cancellationToken);
     }
@@ -46,8 +46,15 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         IReadOnlyList<Guid> salesOrderIds,
         CancellationToken cancellationToken = default)
     {
-        var requirements = new Dictionary<Guid, decimal>();
         var orders = await LoadOrdersWithLinesAsync(salesOrderIds, cancellationToken);
+        return await CheckOrdersForPaymentFromEntitiesAsync(orders, cancellationToken);
+    }
+
+    public async Task<StockAvailabilityResultDto> CheckOrdersForPaymentFromEntitiesAsync(
+        IReadOnlyList<SalesOrder> orders,
+        CancellationToken cancellationToken = default)
+    {
+        var requirements = new Dictionary<Guid, decimal>();
         await AddDemandFromOrderEntitiesAsync(requirements, orders, cancellationToken);
         return await BuildResultAsync(requirements, cancellationToken);
     }
@@ -68,17 +75,37 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
 
     private async Task AddDemandFromOpenOrdersAsync(
         Dictionary<Guid, decimal> requirements,
+        Guid? excludeSalesOrderId,
         CancellationToken cancellationToken)
     {
-        var orders = await _db.SalesOrders
+        var openOrderIds = await _db.SalesOrders
             .AsNoTracking()
-            .AsSplitQuery()
             .Where(o => o.Status == SalesOrderStatus.Open)
-            .Include(o => o.Lines)
-            .ThenInclude(l => l.ExcludedIngredients)
+            .Select(o => o.Id)
             .ToListAsync(cancellationToken);
 
-        await AddDemandFromOrderEntitiesAsync(requirements, orders, cancellationToken);
+        if (excludeSalesOrderId.HasValue)
+            openOrderIds.Remove(excludeSalesOrderId.Value);
+
+        if (openOrderIds.Count == 0)
+            return;
+
+        var lineSpecs = await _db.SalesOrderLines
+            .AsNoTracking()
+            .Where(l => openOrderIds.Contains(l.SalesOrderId) && l.SentToKitchenAtUtc != null)
+            .Select(l => new
+            {
+                l.ProductId,
+                l.Quantity,
+                ExcludedIngredientIds = l.ExcludedIngredients.Select(e => e.IngredientId).ToList(),
+            })
+            .ToListAsync(cancellationToken);
+
+        var specs = lineSpecs
+            .Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredientIds.ToHashSet()))
+            .ToList();
+
+        await AddDemandFromSpecsAsync(requirements, specs, cancellationToken);
     }
 
     private async Task<List<SalesOrder>> LoadOrdersWithLinesAsync(

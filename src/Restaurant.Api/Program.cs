@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Restaurant.Api.Middleware;
 using Restaurant.Application;
+using Restaurant.Api.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Infrastructure;
@@ -37,12 +38,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-});
+// Secured controllers use [RequireFeature]; public endpoints use [AllowAnonymous].
+builder.Services.AddFeatureAuthorization();
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -102,6 +99,8 @@ using (var scope = app.Services.CreateScope())
             tenantContext,
             app.Environment,
             productImages);
+
+        await DevelopmentHistoricalDataSeeder.SeedAsync(db, logger, tenantContext, CancellationToken.None);
     }
 }
 

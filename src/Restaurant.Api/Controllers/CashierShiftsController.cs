@@ -1,12 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Cashier;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[RequireFeature(FeatureCodes.CashierShifts)]
 [Route("api/cashier-shifts")]
 public sealed class CashierShiftsController : ControllerBase
 {

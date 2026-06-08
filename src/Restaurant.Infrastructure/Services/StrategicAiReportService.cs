@@ -9,6 +9,7 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Reports;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -158,34 +159,93 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         var startUtc = salesStartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var endExclusive = salesEndDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 
-        var rows = await _db.SalesOrderLines
+        // Single DB round-trip; aggregate product/daily/hourly buckets in memory.
+        var paidLineRows = await _db.SalesOrderLines
             .AsNoTracking()
             .Where(l =>
                 l.TenantId == tenantId
                 && l.CreatedAtUtc >= startUtc
-                && l.CreatedAtUtc < endExclusive)
-            .OrderBy(l => l.CreatedAtUtc)
-            .Select(l => new
-            {
-                ProductName = l.Product.Name,
+                && l.CreatedAtUtc < endExclusive
+                && l.SalesOrder.Status == SalesOrderStatus.Paid)
+            .Select(l => new PaidSalesLineRow(
+                l.Product.Name,
                 l.Quantity,
-                GrossRevenue = l.LineTotal,
-                l.CreatedAtUtc,
-                OrderStatus = l.SalesOrder.Status.ToString(),
-            })
+                l.LineTotal,
+                l.SalesOrderId,
+                l.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
+        var productTotals = paidLineRows
+            .GroupBy(l => l.ProductName)
+            .Select(g => new
+            {
+                ProductName = g.Key,
+                Quantity = g.Sum(l => l.Quantity),
+                Revenue = g.Sum(l => l.LineTotal),
+                OrderCount = g.Select(l => l.SalesOrderId).Distinct().Count(),
+            })
+            .OrderByDescending(x => x.Revenue)
+            .ToList();
+
+        var dailyTotals = paidLineRows
+            .GroupBy(l => DateOnly.FromDateTime(l.CreatedAtUtc))
+            .Select(g => new
+            {
+                Date = g.Key,
+                Quantity = g.Sum(l => l.Quantity),
+                Revenue = g.Sum(l => l.LineTotal),
+                OrderCount = g.Select(l => l.SalesOrderId).Distinct().Count(),
+            })
+            .OrderBy(x => x.Date)
+            .ToList();
+
+        var hourlyTotals = paidLineRows
+            .GroupBy(l => l.CreatedAtUtc.Hour)
+            .Select(g => new
+            {
+                Hour = g.Key,
+                Quantity = g.Sum(l => l.Quantity),
+                Revenue = g.Sum(l => l.LineTotal),
+            })
+            .OrderBy(x => x.Hour)
+            .ToList();
+
         var sb = new StringBuilder();
-        sb.AppendLine("Producto\tCantidad\tIngresoBruto\tFechaUtc\tEstadoPedido");
-        foreach (var row in rows)
+        sb.AppendLine("=== RESUMEN POR PRODUCTO (ventas pagadas) ===");
+        sb.AppendLine("Producto\tCantidad\tIngresoBruto\tPedidos");
+        foreach (var row in productTotals)
         {
             sb.AppendLine(string.Join(
                 '\t',
                 row.ProductName,
                 row.Quantity.ToString(),
-                row.GrossRevenue.ToString(),
-                row.CreatedAtUtc.ToString("O"),
-                row.OrderStatus));
+                row.Revenue.ToString(),
+                row.OrderCount.ToString()));
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("=== RESUMEN POR DÍA ===");
+        sb.AppendLine("Fecha\tCantidad\tIngresoBruto\tPedidos");
+        foreach (var row in dailyTotals)
+        {
+            sb.AppendLine(string.Join(
+                '\t',
+                row.Date.ToString("yyyy-MM-dd"),
+                row.Quantity.ToString(),
+                row.Revenue.ToString(),
+                row.OrderCount.ToString()));
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("=== DISTRIBUCIÓN POR HORA (UTC) ===");
+        sb.AppendLine("Hora\tCantidad\tIngresoBruto");
+        foreach (var row in hourlyTotals)
+        {
+            sb.AppendLine(string.Join(
+                '\t',
+                row.Hour.ToString("00"),
+                row.Quantity.ToString(),
+                row.Revenue.ToString()));
         }
 
         return sb.ToString();
@@ -364,4 +424,11 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
     {
         public string Text { get; set; } = string.Empty;
     }
+
+    private sealed record PaidSalesLineRow(
+        string ProductName,
+        decimal Quantity,
+        decimal LineTotal,
+        Guid SalesOrderId,
+        DateTime CreatedAtUtc);
 }

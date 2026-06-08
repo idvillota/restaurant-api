@@ -201,10 +201,14 @@ public sealed class ReservationService : IReservationService
             _reservationTables.Remove(link);
         }
 
-        foreach (var tableId in distinct.Where(id => !existingIds.Contains(id)))
+        var newTableIds = distinct.Where(id => !existingIds.Contains(id)).ToList();
+        if (newTableIds.Count == 0)
+            return;
+
+        var tablesById = await LoadTablesByIdsAsync(newTableIds, cancellationToken);
+        foreach (var tableId in newTableIds)
         {
-            var table = await _tables.GetByIdAsync(tableId, cancellationToken);
-            if (table is null || !table.IsActive)
+            if (!tablesById.TryGetValue(tableId, out var table) || !table.IsActive)
                 throw new InvalidOperationException("Table was not found or is inactive.");
             if (table.Status == ETableStatus.Busy)
                 throw new InvalidOperationException($"Table \"{table.Code}\" is busy and cannot be reserved.");
@@ -240,10 +244,10 @@ public sealed class ReservationService : IReservationService
             return;
 
         var target = ResolveTargetTableStatus(reservation.Status, previousStatus);
+        var tablesById = await LoadTablesByIdsAsync(links, cancellationToken);
         foreach (var tableId in links)
         {
-            var table = await _tables.GetByIdAsync(tableId, cancellationToken);
-            if (table is null)
+            if (!tablesById.TryGetValue(tableId, out var table))
                 continue;
 
             if (table.Status == target)
@@ -254,6 +258,13 @@ public sealed class ReservationService : IReservationService
             _tables.Update(table);
         }
     }
+
+    private async Task<Dictionary<Guid, DiningTable>> LoadTablesByIdsAsync(
+        IReadOnlyList<Guid> tableIds,
+        CancellationToken cancellationToken) =>
+        await _tables.Query()
+            .Where(t => tableIds.Contains(t.Id))
+            .ToDictionaryAsync(t => t.Id, cancellationToken);
 
     private async Task ReleaseLinkedTablesAsync(Guid reservationId, CancellationToken cancellationToken)
     {

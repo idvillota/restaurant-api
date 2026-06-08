@@ -43,14 +43,33 @@ public sealed class BillService : IBillService
         CancellationToken cancellationToken = default)
     {
         var search = tableSearch?.Trim();
-        var orders = await LoadOpenOrdersQuery()
+        var orderRows = await LoadOpenOrdersReadQuery()
             .Where(o =>
                 search == null ||
                 search.Length == 0 ||
                 (o.DiningTable != null && EF.Functions.ILike(o.DiningTable.Code, $"%{search}%")))
+            .Select(o => new
+            {
+                o.Id,
+                o.Number,
+                o.DiningTableId,
+                TableCode = o.DiningTable != null ? o.DiningTable.Code : "—",
+                Zone = o.DiningTable != null ? o.DiningTable.Zone : null,
+                Lines = o.Lines.Select(l => new
+                {
+                    l.Id,
+                    l.ProductId,
+                    ProductName = l.Product.Name,
+                    ProductTypeName = l.Product.ProductType != null ? l.Product.ProductType.Name : "Otros",
+                    l.Quantity,
+                    l.UnitPrice,
+                    l.LineTotal,
+                    l.Notes,
+                }).ToList(),
+            })
             .ToListAsync(cancellationToken);
 
-        return orders
+        return orderRows
             .GroupBy(o => o.DiningTableId)
             .Select(g =>
             {
@@ -58,9 +77,28 @@ public sealed class BillService : IBillService
                 return new PayableTableGroupDto
                 {
                     TableId = first.DiningTableId ?? Guid.Empty,
-                    TableCode = first.DiningTable?.Code ?? "—",
-                    Zone = first.DiningTable?.Zone,
-                    Orders = g.Select(MapPayableOrder).ToList(),
+                    TableCode = first.TableCode,
+                    Zone = first.Zone,
+                    Orders = g.Select(o => new PayableOrderDto
+                    {
+                        OrderId = o.Id,
+                        OrderNumber = o.Number,
+                        Total = o.Lines.Sum(l => l.LineTotal),
+                        Lines = o.Lines.Select(l => new PayableOrderLineDto
+                        {
+                            LineId = l.Id,
+                            OrderId = o.Id,
+                            OrderNumber = o.Number,
+                            TableCode = first.TableCode,
+                            ProductId = l.ProductId,
+                            ProductName = l.ProductName,
+                            ProductTypeName = l.ProductTypeName,
+                            Quantity = l.Quantity,
+                            UnitPrice = l.UnitPrice,
+                            LineTotal = l.LineTotal,
+                            Notes = l.Notes,
+                        }).ToList(),
+                    }).ToList(),
                 };
             })
             .OrderBy(t => t.TableCode)
@@ -79,9 +117,7 @@ public sealed class BillService : IBillService
         if (dto.Payments.Count == 0)
             throw new InvalidOperationException("Add at least one payment.");
 
-        var totals = await BuildCheckoutTotalsAsync(dto, cancellationToken);
-        var stockCheck = await _inventory.CheckOrdersForPaymentAsync(dto.SalesOrderIds, cancellationToken);
-        _inventory.EnsureAvailable(stockCheck);
+        var (totals, orders) = await LoadCheckoutContextAsync(dto, cancellationToken);
 
         var paymentSum = dto.Payments.Sum(p => p.Amount);
         var roundedPaymentSum = decimal.Round(paymentSum, 2, MidpointRounding.AwayFromZero);
@@ -92,13 +128,6 @@ public sealed class BillService : IBillService
         if (roundedPaymentSum > roundedTotalDue)
             throw new InvalidOperationException(
                 $"Payments ({paymentSum:N2}) exceed the total due ({totals.TotalDue:N2}). Adjust amounts or add a tip instead.");
-
-        var orders = await LoadOpenOrdersQuery()
-            .Where(o => dto.SalesOrderIds.Contains(o.Id))
-            .ToListAsync(cancellationToken);
-
-        if (orders.Count != dto.SalesOrderIds.Distinct().Count())
-            throw new InvalidOperationException("One or more orders are not open or were not found.");
 
         var settings = await GetOrCreateSettingsAsync(cancellationToken);
         var (shiftId, processedByUserId) = await _cashierShifts.RequireOpenShiftAsync(cancellationToken);
@@ -249,6 +278,14 @@ public sealed class BillService : IBillService
         CheckoutPreviewDto dto,
         CancellationToken cancellationToken)
     {
+        var (totals, _) = await LoadCheckoutContextAsync(dto, cancellationToken);
+        return totals;
+    }
+
+    private async Task<(CheckoutTotalsDto Totals, List<SalesOrder> Orders)> LoadCheckoutContextAsync(
+        CheckoutPreviewDto dto,
+        CancellationToken cancellationToken)
+    {
         if (dto.SalesOrderIds.Count == 0)
             throw new InvalidOperationException("Select at least one order.");
 
@@ -260,7 +297,7 @@ public sealed class BillService : IBillService
         if (orders.Count != dto.SalesOrderIds.Distinct().Count())
             throw new InvalidOperationException("One or more orders are not open or were not found.");
 
-        var stockCheck = await _inventory.CheckOrdersForPaymentAsync(dto.SalesOrderIds, cancellationToken);
+        var stockCheck = await _inventory.CheckOrdersForPaymentFromEntitiesAsync(orders, cancellationToken);
         _inventory.EnsureAvailable(stockCheck);
 
         var lines = orders.SelectMany(MapOrderLines).ToList();
@@ -285,7 +322,7 @@ public sealed class BillService : IBillService
                     MidpointRounding.AwayFromZero)
                 : discountedGross;
 
-        return new CheckoutTotalsDto
+        var totals = new CheckoutTotalsDto
         {
             Subtotal = subtotal,
             DiscountAmount = discountAmount,
@@ -300,6 +337,8 @@ public sealed class BillService : IBillService
             Lines = lines,
             CategoryTotals = BillCheckoutCalculator.BuildCategoryTotals(lines),
         };
+
+        return (totals, orders);
     }
 
     private async Task<int> AllocateDianConsecutiveAsync(
@@ -397,13 +436,17 @@ public sealed class BillService : IBillService
 
         await ProductInventoryExpansion.AddIngredientDemandAsync(_db, requirements, specs, cancellationToken);
 
+        if (requirements.Count == 0)
+            return;
+
+        var ingredientIds = requirements.Keys.ToList();
+        var ingredients = await _db.Ingredients
+            .Where(i => ingredientIds.Contains(i.Id) && i.IsActive)
+            .ToDictionaryAsync(i => i.Id, cancellationToken);
+
         foreach (var (ingredientId, deduct) in requirements)
         {
-            var ingredient = await _db.Ingredients.FirstOrDefaultAsync(
-                i => i.Id == ingredientId && i.IsActive,
-                cancellationToken);
-
-            if (ingredient is null)
+            if (!ingredients.TryGetValue(ingredientId, out var ingredient))
                 continue;
 
             ingredient.StockQuantity = InventoryCosting.SubtractStock(ingredient.StockQuantity, deduct);
@@ -495,6 +538,16 @@ public sealed class BillService : IBillService
         return settings;
     }
 
+    private IQueryable<SalesOrder> LoadOpenOrdersReadQuery() =>
+        _db.SalesOrders
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(o => o.DiningTable)
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.Product)
+            .ThenInclude(p => p.ProductType)
+            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any());
+
     private IQueryable<SalesOrder> LoadOpenOrdersQuery() =>
         _db.SalesOrders
             .AsSplitQuery()
@@ -552,8 +605,24 @@ public sealed class BillService : IBillService
 
     private async Task<string> GenerateBillNumberAsync(CancellationToken cancellationToken)
     {
-        var count = await _db.Bills.CountAsync(cancellationToken);
-        return $"BILL-{count + 1:D4}";
+        var tenantId = ResolveTenantId();
+        var dayPrefix = $"BILL-{DateTime.UtcNow:yyyyMMdd}-";
+        var latestNumber = await _db.Bills
+            .AsNoTracking()
+            .Where(b => b.TenantId == tenantId && b.Number.StartsWith(dayPrefix))
+            .OrderByDescending(b => b.Number)
+            .Select(b => b.Number)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var next = 1;
+        if (latestNumber is not null
+            && latestNumber.Length > dayPrefix.Length
+            && int.TryParse(latestNumber[dayPrefix.Length..], out var parsed))
+        {
+            next = parsed + 1;
+        }
+
+        return $"{dayPrefix}{next:D4}";
     }
 
     private Guid ResolveTenantId()

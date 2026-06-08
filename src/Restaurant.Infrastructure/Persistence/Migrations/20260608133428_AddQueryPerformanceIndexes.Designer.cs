@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Restaurant.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Restaurant.Infrastructure.Persistence;
 namespace Restaurant.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260608133428_AddQueryPerformanceIndexes")]
+    partial class AddQueryPerformanceIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -119,8 +122,6 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "Number")
                         .IsUnique();
-
-                    b.HasIndex("TenantId", "PaidAtUtc");
 
                     b.ToTable("Bills");
                 });
@@ -1229,8 +1230,6 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("DiningTableId");
-
-                    b.HasIndex("TenantId", "ClosedAtUtc");
 
                     b.HasIndex("TenantId", "Status");
 

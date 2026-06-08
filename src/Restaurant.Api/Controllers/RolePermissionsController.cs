@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Organization.RolePermissions;
-using Restaurant.Infrastructure.Authorization;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[RequireFeature(FeatureCodes.OrganizationRoles)]
 [Route("api/role-permissions")]
 public sealed class RolePermissionsController : ControllerBase
 {
@@ -16,12 +16,10 @@ public sealed class RolePermissionsController : ControllerBase
     public RolePermissionsController(IRolePermissionService service) => _service = service;
 
     [HttpGet]
-    [Authorize(Roles = $"{SystemRoles.Administrator},{SystemRoles.Owner},{SystemRoles.Manager}")]
     public async Task<ActionResult<RolePermissionMatrixDto>> GetMatrix(CancellationToken cancellationToken) =>
         Ok(await _service.GetMatrixAsync(cancellationToken));
 
     [HttpPut("{roleId:guid}")]
-    [Authorize(Roles = $"{SystemRoles.Administrator},{SystemRoles.Owner}")]
     public async Task<IActionResult> UpdateRole(
         Guid roleId,
         [FromBody] UpdateRolePermissionsDto dto,
