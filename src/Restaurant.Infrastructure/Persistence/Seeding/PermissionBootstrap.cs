@@ -18,6 +18,7 @@ public static class PermissionBootstrap
             await EnsureTenantRolesAsync(db, tenantId, cancellationToken);
             await EnsureDefaultRoleFeaturesAsync(db, tenantId, cancellationToken);
             await EnsureMissingDefaultFeatureGrantsAsync(db, tenantId, cancellationToken);
+            await MigrateLegacyOperationalReportGrantsAsync(db, tenantId, cancellationToken);
             await EnsureAdministratorFeatureGrantsAsync(db, tenantId, cancellationToken);
         }
 
@@ -163,6 +164,67 @@ public static class PermissionBootstrap
                     },
                     cancellationToken);
                 existingSet.Add((role.Id, feature.Id));
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Roles that had the legacy <c>reports.operational</c> grant receive the three granular report features.
+    /// </summary>
+    private static async Task MigrateLegacyOperationalReportGrantsAsync(
+        ApplicationDbContext db,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        const string legacyCode = "reports.operational";
+        var featuresByCode = await db.Features.IgnoreQueryFilters().ToDictionaryAsync(f => f.Code, cancellationToken);
+        if (!featuresByCode.TryGetValue(legacyCode, out var legacyFeature))
+            return;
+
+        var newCodes = new[]
+        {
+            FeatureCodes.ReportsSales,
+            FeatureCodes.ReportsIngredients,
+            FeatureCodes.ReportsPurchases,
+        };
+
+        var roleIdsWithLegacy = await db.RoleFeatures.IgnoreQueryFilters()
+            .Where(rf => rf.TenantId == tenantId && rf.FeatureId == legacyFeature.Id)
+            .Select(rf => rf.RoleId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (roleIdsWithLegacy.Count == 0)
+            return;
+
+        var existingPairs = await db.RoleFeatures.IgnoreQueryFilters()
+            .Where(rf => rf.TenantId == tenantId)
+            .Select(rf => new { rf.RoleId, rf.FeatureId })
+            .ToListAsync(cancellationToken);
+        var existingSet = existingPairs.Select(p => (p.RoleId, p.FeatureId)).ToHashSet();
+
+        foreach (var roleId in roleIdsWithLegacy)
+        {
+            foreach (var code in newCodes)
+            {
+                if (!featuresByCode.TryGetValue(code, out var feature))
+                    continue;
+
+                if (existingSet.Contains((roleId, feature.Id)))
+                    continue;
+
+                await db.RoleFeatures.AddAsync(
+                    new RoleFeature
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = tenantId,
+                        RoleId = roleId,
+                        FeatureId = feature.Id,
+                    },
+                    cancellationToken);
+                existingSet.Add((roleId, feature.Id));
             }
         }
 
