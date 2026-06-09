@@ -14,6 +14,8 @@ public sealed class SalesReportDto
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
     public string? ProductName { get; set; }
+    public int TotalCount { get; set; }
+    public bool IsTruncated { get; set; }
     public IReadOnlyList<SalesReportRowDto> Rows { get; set; } = [];
 }
 
@@ -30,6 +32,8 @@ public sealed class IngredientsReportDto
 {
     public string TenantName { get; set; } = string.Empty;
     public string? NameFilter { get; set; }
+    public int TotalCount { get; set; }
+    public bool IsTruncated { get; set; }
     public IReadOnlyList<IngredientsReportRowDto> Rows { get; set; } = [];
 }
 
@@ -51,6 +55,8 @@ public sealed class PurchasesReportDto
     public DateOnly EndDate { get; set; }
     public string? IngredientName { get; set; }
     public string? ProviderName { get; set; }
+    public int TotalCount { get; set; }
+    public bool IsTruncated { get; set; }
     public IReadOnlyList<PurchasesReportRowDto> Rows { get; set; } = [];
 }
 

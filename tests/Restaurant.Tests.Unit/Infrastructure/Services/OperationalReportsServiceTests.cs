@@ -65,6 +65,8 @@ public sealed class OperationalReportsServiceTests
         Assert.Equal("Bistró Demo", allProducts.TenantName);
         Assert.Contains(allProducts.Rows, r => r.ProductName == "Pizza margarita" && r.Quantity == 2m);
         Assert.All(oneProduct.Rows, r => Assert.Equal("Pizza margarita", r.ProductName));
+        Assert.Equal(allProducts.Rows.Count, allProducts.TotalCount);
+        Assert.False(allProducts.IsTruncated);
     }
 
     [Fact]
@@ -81,6 +83,8 @@ public sealed class OperationalReportsServiceTests
         Assert.NotEmpty(report.Rows);
         Assert.Contains(report.Rows, r => r.IngredientName == "Tomates");
         Assert.Contains(report.Rows, r => r.IngredientName == "Tomates" && r.ReorderLevel == 5000m);
+        Assert.Equal(report.Rows.Count, report.TotalCount);
+        Assert.False(report.IsTruncated);
     }
 
     [Fact]
@@ -102,6 +106,8 @@ public sealed class OperationalReportsServiceTests
             Assert.False(string.IsNullOrWhiteSpace(r.ProviderName));
             Assert.False(string.IsNullOrWhiteSpace(r.IngredientName));
         });
+        Assert.Equal(report.Rows.Count, report.TotalCount);
+        Assert.False(report.IsTruncated);
     }
 
     [Fact]

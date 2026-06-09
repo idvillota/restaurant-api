@@ -50,6 +50,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
         if (productId.HasValue)
             query = query.Where(l => l.ProductId == productId.Value);
 
+        var totalCount = await query.CountAsync(cancellationToken);
         var rows = await query
             .OrderByDescending(l => l.CreatedAtUtc)
             .Select(l => new SalesReportRowDto
@@ -68,6 +69,8 @@ public sealed class OperationalReportsService : IOperationalReportsService
             StartDate = startDate,
             EndDate = endDate,
             ProductName = productName,
+            TotalCount = totalCount,
+            IsTruncated = totalCount > rows.Count,
             Rows = rows,
         };
     }
@@ -87,6 +90,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
         if (!string.IsNullOrWhiteSpace(trimmed))
             query = query.Where(i => EF.Functions.ILike(i.Name, $"%{trimmed}%"));
 
+        var totalCount = await query.CountAsync(cancellationToken);
         var rows = await query
             .OrderBy(i => i.Name)
             .Select(i => new IngredientsReportRowDto
@@ -104,6 +108,8 @@ public sealed class OperationalReportsService : IOperationalReportsService
         {
             TenantName = tenantName,
             NameFilter = trimmed,
+            TotalCount = totalCount,
+            IsTruncated = totalCount > rows.Count,
             Rows = rows,
         };
     }
@@ -150,6 +156,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
         if (providerId.HasValue)
             query = query.Where(l => l.Purchase.ProviderId == providerId.Value);
 
+        var totalCount = await query.CountAsync(cancellationToken);
         var rows = await query
             .OrderByDescending(l => l.Purchase.PurchasedAtUtc)
             .ThenBy(l => l.Ingredient.Name)
@@ -173,6 +180,8 @@ public sealed class OperationalReportsService : IOperationalReportsService
             EndDate = endDate,
             IngredientName = ingredientName,
             ProviderName = providerName,
+            TotalCount = totalCount,
+            IsTruncated = totalCount > rows.Count,
             Rows = rows,
         };
     }
