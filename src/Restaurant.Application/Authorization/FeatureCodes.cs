@@ -22,6 +22,10 @@ public static class FeatureCodes
     public const string CashierShifts = "cashier.shifts";
     public const string ReportsDailyClosure = "reports.daily_closure";
     public const string ReportsStrategicAi = "reports.strategic_ai";
+    public const string ReportsSales = "reports.sales";
+    public const string ReportsIngredients = "reports.ingredients";
+    public const string ReportsPurchases = "reports.purchases";
+    public const string ReportsSalesByDate = "reports.sales_by_date";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -45,5 +49,9 @@ public static class FeatureCodes
         CashierShifts,
         ReportsDailyClosure,
         ReportsStrategicAi,
+        ReportsSales,
+        ReportsIngredients,
+        ReportsPurchases,
+        ReportsSalesByDate,
     ];
 }

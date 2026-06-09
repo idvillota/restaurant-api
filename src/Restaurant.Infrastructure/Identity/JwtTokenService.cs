@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 
 namespace Restaurant.Infrastructure.Identity;
@@ -16,7 +17,7 @@ public sealed class JwtTokenService : IJwtTokenService
         _settings = settings.Value;
     }
 
-    public const string PermissionClaimType = "permission";
+    public const string PermissionClaimType = PermissionClaims.Type;
 
     public string CreateAccessToken(
         Guid userId,

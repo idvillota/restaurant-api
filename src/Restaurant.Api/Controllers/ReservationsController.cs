@@ -1,5 +1,6 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Reservations;
@@ -7,7 +8,7 @@ using Restaurant.Application.Features.Reservations;
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[RequireFeature(FeatureCodes.ReservationsManage)]
 [Route("api/[controller]")]
 public sealed class ReservationsController : ControllerBase
 {

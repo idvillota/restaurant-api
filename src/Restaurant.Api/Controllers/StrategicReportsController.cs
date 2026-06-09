@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Reports;
-using Restaurant.Infrastructure.Authorization;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = $"{SystemRoles.Administrator},{SystemRoles.Owner}")]
+[RequireFeature(FeatureCodes.ReportsStrategicAi)]
 [Route("api/strategic-reports")]
 public sealed class StrategicReportsController : ControllerBase
 {

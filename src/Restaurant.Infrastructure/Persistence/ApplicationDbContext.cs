@@ -179,6 +179,8 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
             e.HasIndex(x => new { x.TenantId, x.BillNumber }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.PurchasedAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.PaymentDateUtc });
         });
 
         modelBuilder.Entity<PurchaseLine>(e =>
@@ -219,6 +221,8 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
             e.HasIndex(x => new { x.TenantId, x.DiningTableId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.ClosedAtUtc });
         });
 
         modelBuilder.Entity<SalesOrderLine>(e =>
@@ -229,6 +233,8 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
             e.Property(x => x.Quantity).HasPrecision(18, 4);
             e.Property(x => x.Notes).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
+            e.HasIndex(x => new { x.SalesOrderId, x.SentToKitchenAtUtc });
         });
 
         modelBuilder.Entity<SalesOrderLineExcludedIngredient>(e =>
@@ -314,6 +320,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.DianConsecutiveNumber })
                 .IsUnique()
                 .HasFilter("\"DianConsecutiveNumber\" > 0");
+            e.HasIndex(x => new { x.TenantId, x.PaidAtUtc });
         });
 
         modelBuilder.Entity<BillLine>(e =>
@@ -326,6 +333,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
             e.Property(x => x.ImpoconsumoAmount).HasPrecision(18, 2);
+            e.HasIndex(x => x.BillId);
         });
 
         modelBuilder.Entity<BillSalesOrder>(e =>
@@ -348,6 +356,11 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => x.BillId).IsUnique();
         });
 
+        modelBuilder.Entity<Customer>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.TaxId });
+        });
+
         modelBuilder.Entity<Payment>(e =>
         {
             e.HasOne(x => x.Bill).WithMany(x => x.Payments).HasForeignKey(x => x.BillId);
@@ -355,6 +368,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Invoice).WithMany(x => x.Payments).HasForeignKey(x => x.InvoiceId);
             e.HasOne(x => x.CashierShift).WithMany(x => x.Payments).HasForeignKey(x => x.CashierShiftId);
             e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.CashierShiftId, x.Status });
         });
 
         ApplyTenantFilters(modelBuilder);

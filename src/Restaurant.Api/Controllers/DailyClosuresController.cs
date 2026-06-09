@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Cashier;
-using Restaurant.Infrastructure.Authorization;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[RequireFeature(FeatureCodes.ReportsDailyClosure)]
 [Route("api/daily-closures")]
 public sealed class DailyClosuresController : ControllerBase
 {
@@ -26,7 +26,6 @@ public sealed class DailyClosuresController : ControllerBase
         OkResult(_service.GetDailyReportAsync(businessDate, cancellationToken));
 
     [HttpPost("{businessDate}/close")]
-    [Authorize(Roles = $"{SystemRoles.Administrator},{SystemRoles.Owner},{SystemRoles.Manager}")]
     public async Task<ActionResult<DailyClosureReportDto>> Close(
         DateOnly businessDate,
         [FromBody] CloseDailyClosureDto dto,

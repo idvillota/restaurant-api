@@ -164,6 +164,7 @@ public sealed class CashierShiftService : ICashierShiftService
 
         var shifts = await query
             .OrderByDescending(s => s.OpenedAtUtc)
+            .Take(businessDate is null ? 180 : 500)
             .ToListAsync(cancellationToken);
 
         return shifts.Select(s => MapSummary(s)).ToList();
