@@ -95,6 +95,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
                 UnitCost = i.UnitCost,
                 Unit = i.Unit.ToString(),
                 StockQuantity = i.StockQuantity,
+                ReorderLevel = i.ReorderLevel,
             })
             .Take(MaxRows)
             .ToListAsync(cancellationToken);

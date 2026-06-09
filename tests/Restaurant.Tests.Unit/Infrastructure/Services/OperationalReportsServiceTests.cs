@@ -80,6 +80,7 @@ public sealed class OperationalReportsServiceTests
 
         Assert.NotEmpty(report.Rows);
         Assert.Contains(report.Rows, r => r.IngredientName == "Tomates");
+        Assert.Contains(report.Rows, r => r.IngredientName == "Tomates" && r.ReorderLevel == 5000m);
     }
 
     [Fact]

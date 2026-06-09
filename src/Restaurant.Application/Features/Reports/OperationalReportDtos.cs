@@ -23,6 +23,7 @@ public sealed class IngredientsReportRowDto
     public decimal? UnitCost { get; set; }
     public string Unit { get; set; } = string.Empty;
     public decimal? StockQuantity { get; set; }
+    public decimal? ReorderLevel { get; set; }
 }
 
 public sealed class IngredientsReportDto
