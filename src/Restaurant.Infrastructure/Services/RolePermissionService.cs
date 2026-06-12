@@ -88,18 +88,16 @@ public sealed class RolePermissionService : IRolePermissionService
         var existing = await _db.RoleFeatures.Where(rf => rf.RoleId == roleId).ToListAsync(cancellationToken);
         _db.RoleFeatures.RemoveRange(existing);
 
-        foreach (var feature in features)
+        var tenantId = _tenantContext.TenantId!.Value;
+        var roleFeatures = features.Select(feature => new RoleFeature
         {
-            await _db.RoleFeatures.AddAsync(
-                new RoleFeature
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = _tenantContext.TenantId!.Value,
-                    RoleId = roleId,
-                    FeatureId = feature.Id,
-                },
-                cancellationToken);
-        }
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            RoleId = roleId,
+            FeatureId = feature.Id,
+        }).ToList();
+
+        await _db.RoleFeatures.AddRangeAsync(roleFeatures, cancellationToken);
 
         await _db.SaveChangesAsync(cancellationToken);
     }

@@ -196,55 +196,37 @@ public sealed class OperationalReportsService : IOperationalReportsService
         var tenantName = await GetTenantNameAsync(tenantId, cancellationToken);
         var (startUtc, endExclusive) = ToUtcRange(startDate, endDate);
 
-        var salesFacts = await _db.SalesOrderLines
+        var salesByDate = await _db.SalesOrderLines
             .AsNoTracking()
             .Where(l =>
                 l.TenantId == tenantId
                 && l.CreatedAtUtc >= startUtc
                 && l.CreatedAtUtc < endExclusive
                 && l.SalesOrder.Status == SalesOrderStatus.Paid)
-            .Select(l => new
+            .GroupBy(l => DateOnly.FromDateTime(l.CreatedAtUtc))
+            .Select(g => new DailySummarySalesBucket
             {
-                Date = DateOnly.FromDateTime(l.CreatedAtUtc),
-                l.SalesOrderId,
-                l.LineTotal,
-                l.Quantity,
+                Date = g.Key,
+                TotalSales = g.Sum(x => x.LineTotal),
+                SalesOrderCount = g.Select(x => x.SalesOrderId).Distinct().Count(),
+                ItemsSold = g.Sum(x => x.Quantity),
             })
-            .ToListAsync(cancellationToken);
+            .ToDictionaryAsync(x => x.Date, cancellationToken);
 
-        var salesByDate = salesFacts
-            .GroupBy(x => x.Date)
-            .ToDictionary(
-                g => g.Key,
-                g => new
-                {
-                    TotalSales = g.Sum(x => x.LineTotal),
-                    SalesOrderCount = g.Select(x => x.SalesOrderId).Distinct().Count(),
-                    ItemsSold = g.Sum(x => x.Quantity),
-                });
-
-        var purchaseFacts = await _db.Purchases
+        var purchasesByDate = await _db.Purchases
             .AsNoTracking()
             .Where(p =>
                 p.TenantId == tenantId
                 && p.PurchasedAtUtc >= startUtc
                 && p.PurchasedAtUtc < endExclusive)
-            .Select(p => new
+            .GroupBy(p => DateOnly.FromDateTime(p.PurchasedAtUtc))
+            .Select(g => new DailySummaryPurchasesBucket
             {
-                Date = DateOnly.FromDateTime(p.PurchasedAtUtc),
-                p.Total,
+                Date = g.Key,
+                TotalPurchases = g.Sum(x => x.Total),
+                PurchaseCount = g.Count(),
             })
-            .ToListAsync(cancellationToken);
-
-        var purchasesByDate = purchaseFacts
-            .GroupBy(x => x.Date)
-            .ToDictionary(
-                g => g.Key,
-                g => new
-                {
-                    TotalPurchases = g.Sum(x => x.Total),
-                    PurchaseCount = g.Count(),
-                });
+            .ToDictionaryAsync(x => x.Date, cancellationToken);
 
         var dates = salesByDate.Keys.Union(purchasesByDate.Keys).OrderDescending().ToList();
         var rows = dates.Select(date =>
@@ -276,6 +258,21 @@ public sealed class OperationalReportsService : IOperationalReportsService
             GrandNetResult = rows.Sum(r => r.NetResult),
             Rows = rows,
         };
+    }
+
+    private sealed class DailySummarySalesBucket
+    {
+        public DateOnly Date { get; init; }
+        public decimal TotalSales { get; init; }
+        public int SalesOrderCount { get; init; }
+        public decimal ItemsSold { get; init; }
+    }
+
+    private sealed class DailySummaryPurchasesBucket
+    {
+        public DateOnly Date { get; init; }
+        public decimal TotalPurchases { get; init; }
+        public int PurchaseCount { get; init; }
     }
 
     private async Task<string> GetTenantNameAsync(Guid tenantId, CancellationToken cancellationToken)

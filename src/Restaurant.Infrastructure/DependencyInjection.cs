@@ -24,7 +24,8 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Connection string 'ConnectionStrings:DefaultConnection' is not configured.");
 
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseNpgsql(connectionString));
+            options.UseNpgsql(connectionString, npgsql =>
+                npgsql.EnableRetryOnFailure(maxRetryCount: 3)));
 
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
