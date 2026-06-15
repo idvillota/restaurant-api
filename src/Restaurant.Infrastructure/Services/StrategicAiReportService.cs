@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
+// Regex removed: HTML cleaning removed, responses are plain text
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,20 +24,20 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenant;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly GeminiOptions _gemini;
+    private readonly AzureOpenAiOptions _azure;
     private readonly ILogger<StrategicAiReportService> _logger;
 
     public StrategicAiReportService(
         ApplicationDbContext db,
         ICurrentTenantContext tenant,
         IHttpClientFactory httpClientFactory,
-        IOptions<GeminiOptions> gemini,
+        IOptions<AzureOpenAiOptions> azure,
         ILogger<StrategicAiReportService> logger)
     {
         _db = db;
         _tenant = tenant;
         _httpClientFactory = httpClientFactory;
-        _gemini = gemini.Value;
+        _azure = azure.Value;
         _logger = logger;
     }
 
@@ -258,59 +258,66 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         DateOnly salesEndDate,
         CancellationToken cancellationToken)
     {
-        // Existing Gemini-based implementation is preserved as a fallback in case Azure isn't configured.
-        // For the primary path, AzureStrategicAiReportService will be used when configured.
+        // Use Azure OpenAI via named HttpClient 'AzureOpenAiClient'.
+        var azureEndpoint = _azure.Endpoint?.Trim();
         var prompt = BuildMasterPrompt(inventoryContext, salesContext, salesStartDate, salesEndDate);
 
-        var apiKey = ResolveApiKey();
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException(
-                "GEMINI_API_KEY no está configurada. Defínala en Gemini:ApiKey o como variable de entorno.");
+        if (string.IsNullOrWhiteSpace(azureEndpoint) || string.IsNullOrWhiteSpace(_azure.DeploymentName))
+            throw new InvalidOperationException("Azure OpenAI no está configurado. Defina AzureOpenAi:Endpoint y AzureOpenAi:DeploymentName en la configuración.");
 
-        var model = string.IsNullOrWhiteSpace(_gemini.Model) ? "gemini-2.5-flash" : _gemini.Model.Trim();
-        var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("x-goog-api-key", apiKey);
-
-        var payload = new GeminiRequest
+        if (prompt.Length > _azure.MaxPromptChars)
         {
-            Contents = [new GeminiContent { Parts = [new GeminiPart { Text = prompt }] }],
+            _logger.LogWarning("Prompt demasiado largo ({Length} chars). Se aplicará truncado seguro.", prompt.Length);
+            var maxPerContext = Math.Max(16_000, _azure.MaxPromptChars / 3);
+            inventoryContext = inventoryContext.Length > maxPerContext
+                ? inventoryContext.Substring(0, maxPerContext)
+                : inventoryContext;
+            salesContext = salesContext.Length > maxPerContext
+                ? salesContext.Substring(0, maxPerContext)
+                : salesContext;
+            prompt = BuildMasterPrompt(inventoryContext, salesContext, salesStartDate, salesEndDate);
+        }
+
+        var deployment = _azure.DeploymentName.Trim();
+        var payload = new
+        {
+            messages = new[]
+            {
+                new { role = "system", content = "Actúa como un analista de datos. Responde únicamente con TEXTO PLANO en español. No uses HTML ni Markdown." },
+                new { role = "user", content = prompt }
+            },
+            max_tokens = 8000,
+            temperature = 0.2f
         };
 
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(payload, JsonOptions),
-            Encoding.UTF8,
-            "application/json");
+        var client = _httpClientFactory.CreateClient("AzureOpenAiClient");
+        var azureUrl = $"/openai/deployments/{deployment}/chat/completions?api-version=2023-05-15";
 
-        var client = _httpClientFactory.CreateClient(nameof(StrategicAiReportService));
+        using var request = new HttpRequestMessage(HttpMethod.Post, azureUrl)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
+
         using var response = await client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogWarning("Gemini API error {Status}: {Body}", response.StatusCode, body);
-            throw new InvalidOperationException("El servicio de IA rechazó la solicitud. Revise la clave API y el modelo configurado.");
+            _logger.LogWarning("Azure OpenAI error {Status}: {Body}", response.StatusCode, body);
+            throw new InvalidOperationException("El servicio de IA (Azure OpenAI) rechazó la solicitud. Revise la configuración y el modelo configurado.");
         }
 
         using var doc = JsonDocument.Parse(body);
-        var html = doc.RootElement
-            .GetProperty("candidates")[0]
+        var content = doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
             .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
             .GetString() ?? string.Empty;
 
-        return CleanHtml(html);
+        return content.Trim();
     }
 
-    private string ResolveApiKey()
-    {
-        if (!string.IsNullOrWhiteSpace(_gemini.ApiKey))
-            return _gemini.ApiKey.Trim();
 
-        return Environment.GetEnvironmentVariable("GEMINI_API_KEY") ?? string.Empty;
-    }
 
     private static string BuildMasterPrompt(
         string inventoryContext,
@@ -342,7 +349,7 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
             ESTRUCTURA OBLIGATORIA DEL DOCUMENTO (Nivel de Auditoría V3.5):
             1. ENCABEZADO EJECUTIVO (MEMORANDO V3.5) 
                 - Título Principal destacado: "REPORTE DE INTELIGENCIA OPERATIVA V3.5 - {salesStartDate:yyyy-MM-dd} a {salesEndDate:yyyy-MM-dd}" 
-                - Cuadro de metadatos corporativos: PARA: Liderazgo Ejecutivo | DE: Gemini AI Engine V3.5 | TEMA: Diagnóstico Operacional Avanzado. 
+                - Cuadro de metadatos corporativos: PARA: Liderazgo Ejecutivo | DE: Azure OpenAI Engine V3.5 | TEMA: Diagnóstico Operacional Avanzado.
                 - Mencionar explícitamente el rango de fechas de ventas analizadas. 
 
             2. SECCIÓN 1: DESGLOSE DEL MARGEN DE BENEFICIO Y DE LOS COGS 
@@ -362,13 +369,7 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
             """;
     }
 
-    private static string CleanHtml(string html)
-    {
-        html = Regex.Replace(html, @"^```html\s*", "", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        html = Regex.Replace(html, @"^```\s*", "", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        html = Regex.Replace(html, @"```\s*$", "", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        return html.Trim();
-    }
+    // HTML-cleaning removed; responses are plain text.
 
     private async Task UpsertCacheAsync(
         Guid tenantId,
@@ -413,20 +414,7 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    private sealed class GeminiRequest
-    {
-        public GeminiContent[] Contents { get; set; } = [];
-    }
-
-    private sealed class GeminiContent
-    {
-        public GeminiPart[] Parts { get; set; } = [];
-    }
-
-    private sealed class GeminiPart
-    {
-        public string Text { get; set; } = string.Empty;
-    }
+    // Gemini-related types removed. Azure OpenAI is used exclusively.
 
     private sealed record PaidSalesLineRow(
         string ProductName,

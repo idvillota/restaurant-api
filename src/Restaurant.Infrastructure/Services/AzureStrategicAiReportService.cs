@@ -285,7 +285,8 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         {
             messages = new[]
             {
-                new { role = "system", content = "Actúa como un Desarrollador Frontend Senior experto en UI/UX y Dashboards Corporativos de Alta Gama. Responde únicamente con HTML válido (<!DOCTYPE html>...)</html> en español." },
+                // Request plain text only (no HTML, no Markdown)
+                new { role = "system", content = "Actúa como un analista de datos. Responde únicamente con TEXTO PLANO en español. No uses HTML, etiquetas, ni Markdown. Entrega la respuesta como texto limpio y estructurado." },
                 new { role = "user", content = prompt }
             },
             max_tokens = 8000,
@@ -293,13 +294,56 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         };
 
         var client = _httpClientFactory.CreateClient("AzureOpenAiClient");
-        var url = $"/openai/deployments/{deployment}/chat/completions?api-version=2023-05-15";
+        var azureUrlRelative = $"/openai/deployments/{deployment}/chat/completions?api-version=2023-05-15";
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        // If the configured BaseAddress already contains the OpenAI path (e.g. "/openai/v1" or "/openai"),
+        // avoid duplicating the segment when building the request URL.
+        string requestUri;
+        if (client.BaseAddress is null)
+        {
+            requestUri = azureUrlRelative;
+        }
+        else
+        {
+            var basePath = client.BaseAddress.AbsolutePath.TrimEnd('/').ToLowerInvariant();
+            if (basePath.Contains("/openai") || basePath.Contains("/openai/v1"))
+                requestUri = $"deployments/{deployment}/chat/completions?api-version=2023-05-15";
+            else
+                requestUri = azureUrlRelative;
+
+            // Build absolute URI for logging and request
+            requestUri = new Uri(client.BaseAddress, requestUri).ToString();
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
         {
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
 
+        // Log request metadata (not API key) to help debugging
+        try
+        {
+            _logger.LogInformation("Azure OpenAI request -> {FullUrl} (deployment={Deployment})", requestUri, deployment);
+
+            // Check whether the named HttpClient has the api-key header configured
+            if (client.DefaultRequestHeaders.Contains("api-key"))
+            {
+                var hdr = client.DefaultRequestHeaders.GetValues("api-key").FirstOrDefault() ?? string.Empty;
+                var masked = hdr.Length > 8 ? hdr.Substring(0, 4) + new string('*', hdr.Length - 8) + hdr.Substring(hdr.Length - 4) : "***masked***";
+                _logger.LogDebug("AzureOpenAiClient has api-key configured (masked)={ApiKeyMasked}", masked);
+            }
+            else
+            {
+                _logger.LogWarning("AzureOpenAiClient does not have an 'api-key' header configured.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error while logging Azure OpenAI request metadata");
+        }
+
+        // The HttpClient `AzureOpenAiClient` is configured with the BaseAddress and
+        // should include the required `api-key` header. Send the request as-is.
         using var response = await client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
@@ -316,7 +360,8 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
             .GetProperty("content")
             .GetString() ?? string.Empty;
 
-        return CleanHtml(content);
+        // Return plain trimmed text (no HTML processing)
+        return content.Trim();
     }
 
     private static string BuildMasterPrompt(
@@ -326,56 +371,15 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         DateOnly salesEndDate)
     {
         return $"""
-            Actúa como un Desarrollador Frontend Senior experto en UI/UX y Dashboards Corporativos de Alta Gama. Tu objetivo es generar un único archivo autónomo de PURE HTML y CSS integrado en una etiqueta <style> basado estrictamente en los datos del restaurante que te proveeré abajo.
-
-            REQUISITOS DE DISEÑO INTERFAZ V3.5:
-            - Alta gama, profesional, ultra limpio, responsivo y moderno.
-            - Paleta de colores ejecutiva V3.5: Fondo de página #f8f9fa. Acentos en verde esmeralda (#198754), ámbar (#ffc107) para advertencias y rojo carmesí (#dc3545) para alertas críticas.
-            - Fuentes tipográficas del sistema claras (Segoe UI, system-ui). No utilices formato Markdown en tu respuesta, responde ÚNICAMENTE con el código estructurado HTML/CSS válido.
-            - Todo el contenido visible del informe debe estar en español.
-
-            PERÍODO DE ANÁLISIS DE VENTAS (inclusive):
-            - Fecha inicio: {salesStartDate:yyyy-MM-dd}
-            - Fecha fin: {salesEndDate:yyyy-MM-dd}
-            Usa exclusivamente las líneas de ventas dentro de este rango para métricas, tablas y conclusiones de ventas.
-
-            DATOS EN VIVO DEL SISTEMA:
-            --- INVENTARIO ACTUAL ---
-            {inventoryContext}
-
-            --- HISTORIAL DE VENTAS (RANGO INDICADO) ---
-            {salesContext}
-
-            ESTRUCTURA OBLIGATORIA DEL DOCUMENTO (Nivel de Auditoría V3.5):
-            1. ENCABEZADO EJECUTIVO (MEMORANDO V3.5) 
-                - Título Principal destacado: "REPORTE DE INTELIGENCIA OPERATIVA V3.5 - {salesStartDate:yyyy-MM-dd} a {salesEndDate:yyyy-MM-dd}" 
-                - Cuadro de metadatos corporativos: PARA: Liderazgo Ejecutivo | DE: Gemini AI Engine V3.5 | TEMA: Diagnóstico Operacional Avanzado. 
-                - Mencionar explícitamente el rango de fechas de ventas analizadas. 
-
-            2. SECCIÓN 1: DESGLOSE DEL MARGEN DE BENEFICIO Y DE LOS COGS 
-                - Tabla HTML perfectamente estilizada que calcula los márgenes en las ventas e ingredientes del período. 
-                - Clasifica los productos usando Badges CSS de color según su estado de Ingeniería de Menú. 
-
-            3. SECCIÓN 2: CADENA DE SUMINISTRO Y CLASIFICACIÓN DEL INVENTARIO 
-                - Tarjetas independientes para cada ingrediente crítico (Stock <= NivelReorden) indicando el stock actual, stock mínimo y una "Acción Comercial Inmediata". 
-
-            4. SECCIÓN 3: INGENIERÍA DEL MENÚ INMEDIATO Y AJUSTES DE PRECIOS 
-                - Cajas de acción detallando pasos estratégicos para defender el margen objetivo del 68%. 
-
-            5. PRÓXIMOS PASOS 
-                - Sección de cierre con tareas accionables inmediatas.
-
-            IMPORTANTE: No agregues texto explicativo fuera del HTML. No uses marcas Markdown (```html). Tu respuesta debe iniciar directamente con <!DOCTYPE html> y terminar con </html>.
+            Eres un analista de datos de un restaurante.
+            Analiza los datos de la base de datos
+            Responde SOLO con una lista conteniendo:
+            
+            1. Dame un listado de ingredientes del inventoryContext
             """;
     }
 
-    private static string CleanHtml(string html)
-    {
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"^```html\s*", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"^```\s*", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
-        html = System.Text.RegularExpressions.Regex.Replace(html, @"```\s*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
-        return html.Trim();
-    }
+    // Responses are plain text; HTML-cleaning functions removed.
 
     private async Task UpsertCacheAsync(
         Guid tenantId,

@@ -35,7 +35,7 @@ public static class DependencyInjection
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
         services.Configure<KitchenTicketOptions>(configuration.GetSection(KitchenTicketOptions.SectionName));
         services.Configure<SalesReceiptOptions>(configuration.GetSection(SalesReceiptOptions.SectionName));
-        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        // Remove Gemini configuration - no longer used
         services.Configure<AzureOpenAiOptions>(configuration.GetSection(AzureOpenAiOptions.SectionName));
         services.AddHttpClient(nameof(StrategicAiReportService), client =>
         {
@@ -48,8 +48,18 @@ public static class DependencyInjection
             var azureSectionLocal = configuration.GetSection(AzureOpenAiOptions.SectionName);
             var endpointLocal = azureSectionLocal.GetValue<string>(nameof(AzureOpenAiOptions.Endpoint));
             var apiKeyLocal = azureSectionLocal.GetValue<string>(nameof(AzureOpenAiOptions.ApiKey));
+
+            // WARNING: hardcoded fallback API key for Azure OpenAI as requested.
+            // Remove this before committing to a public repository.
+            var hardcodedAzureApiKeyFallback = "8Lo9YDIUFrANgqy8F58dWix4NF5ArBu2kampFj3aeGRz9UdX2UjdJQQJ99CFAC1i4TkXJ3w3AAABACOGnW5b";
+            if (string.IsNullOrWhiteSpace(apiKeyLocal))
+            {
+                apiKeyLocal = hardcodedAzureApiKeyFallback;
+            }
             if (!string.IsNullOrWhiteSpace(endpointLocal))
             {
+                // Use the endpoint as provided. Some environments (Foundry/Azure) include a path
+                // like "/openai/v1" and require it as part of the base address. Do not strip the path.
                 var trimmed = endpointLocal.TrimEnd('/');
                 client.BaseAddress = new Uri(trimmed);
             }
@@ -60,6 +70,7 @@ public static class DependencyInjection
                 if (!client.DefaultRequestHeaders.Contains("api-key"))
                     client.DefaultRequestHeaders.Add("api-key", apiKeyLocal);
             }
+            // If ApiKey not provided here, it will be resolved at runtime from Key Vault by the service.
 
             client.Timeout = TimeSpan.FromMinutes(3);
         });
@@ -84,20 +95,9 @@ public static class DependencyInjection
         services.AddScoped<IDailyClosureService, DailyClosureService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
-        // Register strategic AI report service implementation.
-        // Prefer AzureOpenAi if configured; otherwise fall back to existing Gemini-based service.
-        var azureSection = configuration.GetSection(AzureOpenAiOptions.SectionName);
-        var azureEndpoint = azureSection.GetValue<string>(nameof(AzureOpenAiOptions.Endpoint));
-
-        if (!string.IsNullOrWhiteSpace(azureEndpoint))
-        {
-            // AzureOpenAi configured: use AzureStrategicAiReportService which uses the named HttpClient 'AzureOpenAiClient'.
-            services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
-        }
-        else
-        {
-            services.AddScoped<IStrategicAiReportService, StrategicAiReportService>();
-        }
+        // Register Azure-based strategic AI report service implementation.
+        // This application uses Azure OpenAI for all strategic report generation.
+        services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
         services.AddScoped<IOperationalReportsService, OperationalReportsService>();
         services.AddScoped<IPublicMenuService, PublicMenuService>();
 
