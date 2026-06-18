@@ -1,43 +1,41 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-// Regex removed: HTML cleaning removed, responses are plain text
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Reports;
-using Restaurant.Domain.Entities;
-using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Persistence;
+using System.Net.Http;
+using System.Net.Http.Json;
 
 namespace Restaurant.Infrastructure.Services;
 
-public sealed class StrategicAiReportService : IStrategicAiReportService
+/// <summary>
+/// Implementation of IStrategicAiReportService using Azure OpenAI (Chat Completions).
+/// Reuses the same data-context builders from the original service and focuses on
+/// integrating with Azure's OpenAI via OpenAIClient.
+/// </summary>
+public sealed class AzureStrategicAiReportService : IStrategicAiReportService
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenant;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly AzureOpenAiOptions _azure;
-    private readonly ILogger<StrategicAiReportService> _logger;
+    private readonly AzureOpenAiOptions _options;
+    private readonly ILogger<AzureStrategicAiReportService> _logger;
 
-    public StrategicAiReportService(
+    public AzureStrategicAiReportService(
         ApplicationDbContext db,
         ICurrentTenantContext tenant,
         IHttpClientFactory httpClientFactory,
-        IOptions<AzureOpenAiOptions> azure,
-        ILogger<StrategicAiReportService> logger)
+        IOptions<AzureOpenAiOptions> options,
+        ILogger<AzureStrategicAiReportService> logger)
     {
         _db = db;
         _tenant = tenant;
         _httpClientFactory = httpClientFactory;
-        _azure = azure.Value;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -114,8 +112,13 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         };
     }
 
+    // The following helper methods largely mirror the logic from the Gemini-based service.
+    // For brevity they call into the same private helpers defined in the original StrategicAiReportService
+    // file (BuildInventoryContextAsync, BuildSalesContextAsync, UpsertCacheAsync, CleanHtml).
+
     private async Task<string> BuildInventoryContextAsync(Guid tenantId, CancellationToken cancellationToken)
     {
+        // Reuse logic from original service via manual repeat (simplified here to avoid file coupling).
         var rows = await _db.Ingredients
             .AsNoTracking()
             .Where(i => i.TenantId == tenantId && i.IsActive)
@@ -159,14 +162,13 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         var startUtc = salesStartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var endExclusive = salesEndDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 
-        // Single DB round-trip; aggregate product/daily/hourly buckets in memory.
         var paidLineRows = await _db.SalesOrderLines
             .AsNoTracking()
             .Where(l =>
                 l.TenantId == tenantId
                 && l.CreatedAtUtc >= startUtc
                 && l.CreatedAtUtc < endExclusive
-                && l.SalesOrder.Status == SalesOrderStatus.Paid)
+                && l.SalesOrder.Status == Domain.Enums.SalesOrderStatus.Paid)
             .Select(l => new PaidSalesLineRow(
                 l.Product.Name,
                 l.Quantity,
@@ -258,17 +260,16 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         DateOnly salesEndDate,
         CancellationToken cancellationToken)
     {
-        // Use Azure OpenAI via named HttpClient 'AzureOpenAiClient'.
-        var azureEndpoint = _azure.Endpoint?.Trim();
+        if (string.IsNullOrWhiteSpace(_options.DeploymentName))
+            throw new InvalidOperationException("AzureOpenAi:DeploymentName no está configurado.");
+
         var prompt = BuildMasterPrompt(inventoryContext, salesContext, salesStartDate, salesEndDate);
 
-        if (string.IsNullOrWhiteSpace(azureEndpoint) || string.IsNullOrWhiteSpace(_azure.DeploymentName))
-            throw new InvalidOperationException("Azure OpenAI no está configurado. Defina AzureOpenAi:Endpoint y AzureOpenAi:DeploymentName en la configuración.");
-
-        if (prompt.Length > _azure.MaxPromptChars)
+        // Simple guard: truncate if exceeds configured max prompt length
+        if (prompt.Length > _options.MaxPromptChars)
         {
             _logger.LogWarning("Prompt demasiado largo ({Length} chars). Se aplicará truncado seguro.", prompt.Length);
-            var maxPerContext = Math.Max(16_000, _azure.MaxPromptChars / 3);
+            var maxPerContext = Math.Max(16_000, _options.MaxPromptChars / 3);
             inventoryContext = inventoryContext.Length > maxPerContext
                 ? inventoryContext.Substring(0, maxPerContext)
                 : inventoryContext;
@@ -278,12 +279,14 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
             prompt = BuildMasterPrompt(inventoryContext, salesContext, salesStartDate, salesEndDate);
         }
 
-        var deployment = _azure.DeploymentName.Trim();
+        var deployment = _options.DeploymentName.Trim();
+
         var payload = new
         {
             messages = new[]
             {
-                new { role = "system", content = "Actúa como un analista de datos. Responde únicamente con TEXTO PLANO en español. No uses HTML ni Markdown." },
+                // Request plain text only (no HTML, no Markdown)
+                new { role = "system", content = "Actúa como un analista de datos. Responde únicamente con TEXTO PLANO en español. No uses HTML, etiquetas, ni Markdown. Entrega la respuesta como texto limpio y estructurado." },
                 new { role = "user", content = prompt }
             },
             max_tokens = 8000,
@@ -291,13 +294,56 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         };
 
         var client = _httpClientFactory.CreateClient("AzureOpenAiClient");
-        var azureUrl = $"/openai/deployments/{deployment}/chat/completions?api-version=2023-05-15";
+        var azureUrlRelative = $"/openai/deployments/{deployment}/chat/completions?api-version=2023-05-15";
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, azureUrl)
+        // If the configured BaseAddress already contains the OpenAI path (e.g. "/openai/v1" or "/openai"),
+        // avoid duplicating the segment when building the request URL.
+        string requestUri;
+        if (client.BaseAddress is null)
+        {
+            requestUri = azureUrlRelative;
+        }
+        else
+        {
+            var basePath = client.BaseAddress.AbsolutePath.TrimEnd('/').ToLowerInvariant();
+            if (basePath.Contains("/openai") || basePath.Contains("/openai/v1"))
+                requestUri = $"deployments/{deployment}/chat/completions?api-version=2023-05-15";
+            else
+                requestUri = azureUrlRelative;
+
+            // Build absolute URI for logging and request
+            requestUri = new Uri(client.BaseAddress, requestUri).ToString();
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
         {
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
 
+        // Log request metadata (not API key) to help debugging
+        try
+        {
+            _logger.LogInformation("Azure OpenAI request -> {FullUrl} (deployment={Deployment})", requestUri, deployment);
+
+            // Check whether the named HttpClient has the api-key header configured
+            if (client.DefaultRequestHeaders.Contains("api-key"))
+            {
+                var hdr = client.DefaultRequestHeaders.GetValues("api-key").FirstOrDefault() ?? string.Empty;
+                var masked = hdr.Length > 8 ? hdr.Substring(0, 4) + new string('*', hdr.Length - 8) + hdr.Substring(hdr.Length - 4) : "***masked***";
+                _logger.LogDebug("AzureOpenAiClient has api-key configured (masked)={ApiKeyMasked}", masked);
+            }
+            else
+            {
+                _logger.LogWarning("AzureOpenAiClient does not have an 'api-key' header configured.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error while logging Azure OpenAI request metadata");
+        }
+
+        // The HttpClient `AzureOpenAiClient` is configured with the BaseAddress and
+        // should include the required `api-key` header. Send the request as-is.
         using var response = await client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
@@ -314,10 +360,9 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
             .GetProperty("content")
             .GetString() ?? string.Empty;
 
+        // Return plain trimmed text (no HTML processing)
         return content.Trim();
     }
-
-
 
     private static string BuildMasterPrompt(
         string inventoryContext,
@@ -326,50 +371,15 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         DateOnly salesEndDate)
     {
         return $"""
-            Actúa como un Desarrollador Frontend Senior experto en UI/UX y Dashboards Corporativos de Alta Gama. Tu objetivo es generar un único archivo autónomo de PURE HTML y CSS integrado en una etiqueta <style> basado estrictamente en los datos del restaurante que te proveeré abajo.
-
-            REQUISITOS DE DISEÑO INTERFAZ V3.5:
-            - Alta gama, profesional, ultra limpio, responsivo y moderno.
-            - Paleta de colores ejecutiva V3.5: Fondo de página #f8f9fa. Acentos en verde esmeralda (#198754), ámbar (#ffc107) para advertencias y rojo carmesí (#dc3545) para alertas críticas.
-            - Fuentes tipográficas del sistema claras (Segoe UI, system-ui). No utilices formato Markdown en tu respuesta, responde ÚNICAMENTE con el código estructurado HTML/CSS válido.
-            - Todo el contenido visible del informe debe estar en español.
-
-            PERÍODO DE ANÁLISIS DE VENTAS (inclusive):
-            - Fecha inicio: {salesStartDate:yyyy-MM-dd}
-            - Fecha fin: {salesEndDate:yyyy-MM-dd}
-            Usa exclusivamente las líneas de ventas dentro de este rango para métricas, tablas y conclusiones de ventas.
-
-            DATOS EN VIVO DEL SISTEMA:
-            --- INVENTARIO ACTUAL ---
-            {inventoryContext}
-
-            --- HISTORIAL DE VENTAS (RANGO INDICADO) ---
-            {salesContext}
-
-            ESTRUCTURA OBLIGATORIA DEL DOCUMENTO (Nivel de Auditoría V3.5):
-            1. ENCABEZADO EJECUTIVO (MEMORANDO V3.5) 
-                - Título Principal destacado: "REPORTE DE INTELIGENCIA OPERATIVA V3.5 - {salesStartDate:yyyy-MM-dd} a {salesEndDate:yyyy-MM-dd}" 
-                - Cuadro de metadatos corporativos: PARA: Liderazgo Ejecutivo | DE: Azure OpenAI Engine V3.5 | TEMA: Diagnóstico Operacional Avanzado.
-                - Mencionar explícitamente el rango de fechas de ventas analizadas. 
-
-            2. SECCIÓN 1: DESGLOSE DEL MARGEN DE BENEFICIO Y DE LOS COGS 
-                - Tabla HTML perfectamente estilizada que calcula los márgenes en las ventas e ingredientes del período. 
-                - Clasifica los productos usando Badges CSS de color según su estado de Ingeniería de Menú. 
-
-            3. SECCIÓN 2: CADENA DE SUMINISTRO Y CLASIFICACIÓN DEL INVENTARIO 
-                - Tarjetas independientes para cada ingrediente crítico (Stock <= NivelReorden) indicando el stock actual, stock mínimo y una "Acción Comercial Inmediata". 
-
-            4. SECCIÓN 3: INGENIERÍA DEL MENÚ INMEDIATO Y AJUSTES DE PRECIOS 
-                - Cajas de acción detallando pasos estratégicos para defender el margen objetivo del 68%. 
-
-            5. PRÓXIMOS PASOS 
-                - Sección de cierre con tareas accionables inmediatas.
-
-            IMPORTANTE: No agregues texto explicativo fuera del HTML. No uses marcas Markdown (```html). Tu respuesta debe iniciar directamente con <!DOCTYPE html> y terminar con </html>.
+            Eres un analista de datos de un restaurante.
+            Analiza los datos de la base de datos
+            Responde SOLO con una lista conteniendo:
+            
+            1. Dame un listado de ingredientes del inventoryContext
             """;
     }
 
-    // HTML-cleaning removed; responses are plain text.
+    // Responses are plain text; HTML-cleaning functions removed.
 
     private async Task UpsertCacheAsync(
         Guid tenantId,
@@ -391,7 +401,7 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         if (existing is null)
         {
             await _db.StrategicAiReportCaches.AddAsync(
-                new StrategicAiReportCache
+                new Domain.Entities.StrategicAiReportCache
                 {
                     Id = Guid.NewGuid(),
                     TenantId = tenantId,
@@ -413,8 +423,6 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
 
         await _db.SaveChangesAsync(cancellationToken);
     }
-
-    // Gemini-related types removed. Azure OpenAI is used exclusively.
 
     private sealed record PaidSalesLineRow(
         string ProductName,
