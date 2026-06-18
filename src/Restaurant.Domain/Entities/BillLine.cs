@@ -13,6 +13,8 @@ public class BillLine : EntityBase, ITenantScoped
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
+    /// <summary>Recipe-based unit cost at payment time (snapshot).</summary>
+    public decimal? UnitCostPrice { get; set; }
     public decimal ImpoconsumoAmount { get; set; }
     public string? Notes { get; set; }
 

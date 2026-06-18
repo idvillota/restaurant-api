@@ -231,6 +231,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Product).WithMany(x => x.SalesOrderLines).HasForeignKey(x => x.ProductId);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
+            e.Property(x => x.UnitCostPrice).HasPrecision(18, 2);
             e.Property(x => x.Quantity).HasPrecision(18, 4);
             e.Property(x => x.Notes).HasMaxLength(500);
             e.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
@@ -296,8 +297,9 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<StrategicAiReportCache>(e =>
         {
+            e.Property(x => x.ReportType).HasMaxLength(64);
             e.Property(x => x.HtmlContent).HasColumnType("text");
-            e.HasIndex(x => new { x.TenantId, x.SalesStartDate, x.SalesEndDate, x.CacheDate }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.ReportType, x.SalesStartDate, x.SalesEndDate, x.ForecastDays, x.CacheDate }).IsUnique();
         });
 
         modelBuilder.Entity<Bill>(e =>
@@ -332,6 +334,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Quantity).HasPrecision(18, 4);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
+            e.Property(x => x.UnitCostPrice).HasPrecision(18, 2);
             e.Property(x => x.ImpoconsumoAmount).HasPrecision(18, 2);
             e.HasIndex(x => x.BillId);
         });

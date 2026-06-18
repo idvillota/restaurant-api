@@ -64,8 +64,10 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
                 .FirstOrDefaultAsync(
                     c =>
                         c.TenantId == tenantId
+                        && c.ReportType == StrategicReportTypes.LegacyAi
                         && c.SalesStartDate == salesStartDate
                         && c.SalesEndDate == salesEndDate
+                        && c.ForecastDays == null
                         && c.CacheDate == cacheDate,
                     cancellationToken);
 
@@ -393,8 +395,10 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         var existing = await _db.StrategicAiReportCaches.FirstOrDefaultAsync(
             c =>
                 c.TenantId == tenantId
+                && c.ReportType == StrategicReportTypes.LegacyAi
                 && c.SalesStartDate == salesStartDate
                 && c.SalesEndDate == salesEndDate
+                && c.ForecastDays == null
                 && c.CacheDate == cacheDate,
             cancellationToken);
 
@@ -405,8 +409,10 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
                 {
                     Id = Guid.NewGuid(),
                     TenantId = tenantId,
+                    ReportType = StrategicReportTypes.LegacyAi,
                     SalesStartDate = salesStartDate,
                     SalesEndDate = salesEndDate,
+                    ForecastDays = null,
                     CacheDate = cacheDate,
                     HtmlContent = html,
                     GeneratedAtUtc = generatedAtUtc,

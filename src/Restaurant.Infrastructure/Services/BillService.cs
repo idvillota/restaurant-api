@@ -170,8 +170,11 @@ public sealed class BillService : IBillService
 
         await _db.Bills.AddAsync(bill, cancellationToken);
 
+        var lineUnitCosts = await SalesOrderLineCostSnapshot.ApplyToOrdersAsync(_db, orders, cancellationToken);
+
         foreach (var line in totals.Lines)
         {
+            decimal? unitCostPrice = lineUnitCosts.TryGetValue(line.LineId, out var cost) ? cost : null;
             await _db.BillLines.AddAsync(
                 new BillLine
                 {
@@ -184,6 +187,7 @@ public sealed class BillService : IBillService
                     Quantity = line.Quantity,
                     UnitPrice = line.UnitPrice,
                     LineTotal = line.LineTotal,
+                    UnitCostPrice = unitCostPrice,
                     ImpoconsumoAmount = BillCheckoutCalculator.AllocateLineImpoconsumo(
                         line.LineTotal,
                         totals.Subtotal,

@@ -99,6 +99,8 @@ public static class DependencyInjection
         // Register Azure-based strategic AI report service implementation.
         // This application uses Azure OpenAI for all strategic report generation.
         services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
+        services.AddScoped<IStrategicAnalyticsService, StrategicAnalyticsService>();
+        services.AddScoped<IStrategicAiInsightService, StrategicAiInsightService>();
         services.AddScoped<IOperationalReportsService, OperationalReportsService>();
         services.AddScoped<IPublicMenuService, PublicMenuService>();
 
