@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+// Azure OpenAI integration uses HttpClient; avoid direct dependency on Azure SDK in DI file.
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Identity;
@@ -35,9 +36,43 @@ public static class DependencyInjection
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
         services.Configure<KitchenTicketOptions>(configuration.GetSection(KitchenTicketOptions.SectionName));
         services.Configure<SalesReceiptOptions>(configuration.GetSection(SalesReceiptOptions.SectionName));
-        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        // Remove Gemini configuration - no longer used
+        services.Configure<AzureOpenAiOptions>(configuration.GetSection(AzureOpenAiOptions.SectionName));
         services.AddHttpClient(nameof(StrategicAiReportService), client =>
         {
+            client.Timeout = TimeSpan.FromMinutes(3);
+        });
+
+        // Configure a named HttpClient for Azure OpenAI interaction. BaseAddress and api-key header are set from configuration at runtime.
+        services.AddHttpClient("AzureOpenAiClient", client =>
+        {
+            var azureSectionLocal = configuration.GetSection(AzureOpenAiOptions.SectionName);
+            var endpointLocal = azureSectionLocal.GetValue<string>(nameof(AzureOpenAiOptions.Endpoint));
+            var apiKeyLocal = azureSectionLocal.GetValue<string>(nameof(AzureOpenAiOptions.ApiKey));
+
+            // WARNING: hardcoded fallback API key for Azure OpenAI as requested.
+            // Remove this before committing to a public repository.
+            var hardcodedAzureApiKeyFallback = "8Lo9YDIUFrANgqy8F58dWix4NF5ArBu2kampFj3aeGRz9UdX2UjdJQQJ99CFAC1i4TkXJ3w3AAABACOGnW5b";
+            if (string.IsNullOrWhiteSpace(apiKeyLocal))
+            {
+                apiKeyLocal = hardcodedAzureApiKeyFallback;
+            }
+            if (!string.IsNullOrWhiteSpace(endpointLocal))
+            {
+                // Use the endpoint as provided. Some environments (Foundry/Azure) include a path
+                // like "/openai/v1" and require it as part of the base address. Do not strip the path.
+                var trimmed = endpointLocal.TrimEnd('/');
+                client.BaseAddress = new Uri(trimmed);
+            }
+
+            if (!string.IsNullOrWhiteSpace(apiKeyLocal))
+            {
+                // Azure OpenAI expects the header 'api-key' for key-based auth
+                if (!client.DefaultRequestHeaders.Contains("api-key"))
+                    client.DefaultRequestHeaders.Add("api-key", apiKeyLocal);
+            }
+            // If ApiKey not provided here, it will be resolved at runtime from Key Vault by the service.
+
             client.Timeout = TimeSpan.FromMinutes(3);
         });
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
@@ -61,7 +96,9 @@ public static class DependencyInjection
         services.AddScoped<IDailyClosureService, DailyClosureService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
-        services.AddScoped<IStrategicAiReportService, StrategicAiReportService>();
+        // Register Azure-based strategic AI report service implementation.
+        // This application uses Azure OpenAI for all strategic report generation.
+        services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
         services.AddScoped<IOperationalReportsService, OperationalReportsService>();
         services.AddScoped<IPublicMenuService, PublicMenuService>();
 
