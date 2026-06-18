@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -76,6 +77,16 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>(tags: ["db", "ready"]);
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -116,7 +127,9 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsDevelopment())
 {
+    app.UseForwardedHeaders();
     app.UseHttpsRedirection();
+    app.UseHsts();
 }
 
 app.UseCors();
@@ -145,4 +158,5 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
 app.Run();

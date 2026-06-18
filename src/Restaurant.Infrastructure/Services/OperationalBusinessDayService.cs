@@ -65,13 +65,21 @@ public sealed class OperationalBusinessDayService : IOperationalBusinessDayServi
         DateOnly startDate,
         CancellationToken cancellationToken)
     {
+        var endExclusive = startDate.AddDays(MaxSkipClosedDays);
+        var closedDates = (await _db.DailyClosures.AsNoTracking()
+            .Where(c =>
+                c.TenantId == tenantId
+                && c.BusinessDate >= startDate
+                && c.BusinessDate < endExclusive
+                && c.Status == DailyClosureStatus.Closed)
+            .Select(c => c.BusinessDate)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
+
         var date = startDate;
         for (var i = 0; i < MaxSkipClosedDays; i++)
         {
-            var closure = await _db.DailyClosures.AsNoTracking()
-                .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.BusinessDate == date, cancellationToken);
-
-            if (closure?.Status != DailyClosureStatus.Closed)
+            if (!closedDates.Contains(date))
                 return date;
 
             date = date.AddDays(1);

@@ -199,9 +199,11 @@ public sealed class DailyClosureService : IDailyClosureService
             .OrderBy(m => m.OccurredAtUtc)
             .ToListAsync(cancellationToken);
 
+        var paymentsByShift = paymentRows.ToLookup(p => p.ShiftId);
+
         var shiftRollups = shifts.Select(shift =>
         {
-            var shiftPayments = paymentRows.Where(p => p.ShiftId == shift.Id).ToList();
+            var shiftPayments = paymentsByShift[shift.Id].ToList();
             return new DailyShiftRollupDto
             {
                 ShiftId = shift.Id,
