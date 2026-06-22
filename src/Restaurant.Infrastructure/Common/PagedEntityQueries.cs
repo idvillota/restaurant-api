@@ -85,6 +85,93 @@ internal static class PagedEntityQueries
         return ApplyIngredientCategorySort(query, q);
     }
 
+    public static IQueryable<IngredientMovementType> ShapeIngredientMovementTypes(
+        IQueryable<IngredientMovementType> query,
+        ListQuery q)
+    {
+        if (!q.IncludeInactive)
+            query = query.Where(t => t.IsActive);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(t =>
+                EF.Functions.ILike(t.Name, EfTextSearch.LikePattern(search)) ||
+                (t.Description != null && EF.Functions.ILike(t.Description, EfTextSearch.LikePattern(search))));
+        }
+
+        if (q.FilterValue("name") is { } nameFilter)
+            query = query.Where(t => EF.Functions.ILike(t.Name, EfTextSearch.LikePattern(nameFilter)));
+
+        if (q.FilterValue("description") is { } descFilter)
+            query = query.Where(t => t.Description != null && EF.Functions.ILike(t.Description, EfTextSearch.LikePattern(descFilter)));
+
+        if (q.FilterValue("sortOrder") is { } sortRaw &&
+            ListQueryHelpers.TryParseInt(sortRaw, out var sortOrder))
+            query = query.Where(t => t.SortOrder == sortOrder);
+
+        if (q.FilterValue("isInput") is { } isInputRaw &&
+            ListQueryHelpers.TryParseBool(isInputRaw, out var isInput))
+            query = query.Where(t => t.IsInput == isInput);
+
+        if (q.FilterValue("isActive") is { } activeRaw &&
+            ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
+            query = query.Where(t => t.IsActive == isActive);
+
+        return ApplyIngredientMovementTypeSort(query, q);
+    }
+
+    public static IQueryable<IngredientMovementDocument> ShapeIngredientMovementDocuments(
+        IQueryable<IngredientMovementDocument> query,
+        ListQuery q)
+    {
+        query = query
+            .Include(d => d.MovementType)
+            .Include(d => d.CreatedByUser)
+            .Include(d => d.Lines)
+            .ThenInclude(l => l.Ingredient);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(d =>
+                EF.Functions.ILike(d.DocumentNumber, EfTextSearch.LikePattern(search)) ||
+                EF.Functions.ILike(d.MovementType.Name, EfTextSearch.LikePattern(search)) ||
+                (d.Notes != null && EF.Functions.ILike(d.Notes, EfTextSearch.LikePattern(search))) ||
+                EF.Functions.ILike(d.CreatedByUser.Email, EfTextSearch.LikePattern(search)) ||
+                d.Lines.Any(l => EF.Functions.ILike(l.Ingredient.Name, EfTextSearch.LikePattern(search))));
+        }
+
+        if (q.FilterValue("documentNumber") is { } documentNumber)
+            query = query.Where(d => EF.Functions.ILike(d.DocumentNumber, EfTextSearch.LikePattern(documentNumber)));
+
+        if (q.FilterValue("movementTypeName") is { } movementTypeName)
+            query = query.Where(d => EF.Functions.ILike(d.MovementType.Name, EfTextSearch.LikePattern(movementTypeName)));
+
+        if (q.FilterValue("ingredientMovementTypeId") is { } movementTypeIdRaw &&
+            ListQueryHelpers.TryParseGuid(movementTypeIdRaw, out var movementTypeId))
+            query = query.Where(d => d.IngredientMovementTypeId == movementTypeId);
+
+        if (q.FilterValue("isInput") is { } isInputRaw &&
+            ListQueryHelpers.TryParseBool(isInputRaw, out var isInput))
+            query = query.Where(d => d.MovementType.IsInput == isInput);
+
+        if (q.FilterValue("lineCount") is { } lineCountRaw &&
+            ListQueryHelpers.TryParseInt(lineCountRaw, out var lineCount))
+            query = query.Where(d => d.Lines.Count == lineCount);
+
+        if (q.FilterValue("notes") is { } notesFilter)
+            query = query.Where(d => d.Notes != null && EF.Functions.ILike(d.Notes, EfTextSearch.LikePattern(notesFilter)));
+
+        if (q.FilterValue("createdByUserEmail") is { } emailFilter)
+            query = query.Where(d => EF.Functions.ILike(d.CreatedByUser.Email, EfTextSearch.LikePattern(emailFilter)));
+
+        if (q.FilterValue("ingredientName") is { } ingredientName)
+            query = query.Where(d => d.Lines.Any(l => EF.Functions.ILike(l.Ingredient.Name, EfTextSearch.LikePattern(ingredientName))));
+
+        return ApplyIngredientMovementDocumentSort(query, q);
+    }
+
     public static IQueryable<Product> ShapeProducts(IQueryable<Product> query, ListQuery q)
     {
         query = query.Include(p => p.ProductType);
@@ -508,6 +595,50 @@ internal static class PagedEntityQueries
             "startatutc" => desc ? query.OrderByDescending(r => r.StartAtUtc) : query.OrderBy(r => r.StartAtUtc),
             "status" => desc ? query.OrderByDescending(r => r.Status) : query.OrderBy(r => r.Status),
             _ => desc ? query.OrderByDescending(r => r.ContactName) : query.OrderBy(r => r.ContactName),
+        };
+    }
+
+    private static IQueryable<IngredientMovementType> ApplyIngredientMovementTypeSort(
+        IQueryable<IngredientMovementType> query,
+        ListQuery q)
+    {
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "name") switch
+        {
+            "description" => desc ? query.OrderByDescending(t => t.Description) : query.OrderBy(t => t.Description),
+            "sortorder" => desc ? query.OrderByDescending(t => t.SortOrder) : query.OrderBy(t => t.SortOrder),
+            "isinput" => desc ? query.OrderByDescending(t => t.IsInput) : query.OrderBy(t => t.IsInput),
+            "isactive" => desc ? query.OrderByDescending(t => t.IsActive) : query.OrderBy(t => t.IsActive),
+            _ => desc ? query.OrderByDescending(t => t.Name) : query.OrderBy(t => t.Name),
+        };
+    }
+
+    private static IQueryable<IngredientMovementDocument> ApplyIngredientMovementDocumentSort(
+        IQueryable<IngredientMovementDocument> query,
+        ListQuery q)
+    {
+        var desc = q.IsDescending;
+        return (q.SortBy?.ToLowerInvariant() ?? "occurredatutc") switch
+        {
+            "documentnumber" => desc
+                ? query.OrderByDescending(d => d.DocumentNumber).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.DocumentNumber).ThenByDescending(d => d.OccurredAtUtc),
+            "movementtypename" => desc
+                ? query.OrderByDescending(d => d.MovementType.Name).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.MovementType.Name).ThenByDescending(d => d.OccurredAtUtc),
+            "isinput" => desc
+                ? query.OrderByDescending(d => d.MovementType.IsInput).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.MovementType.IsInput).ThenByDescending(d => d.OccurredAtUtc),
+            "linecount" => desc
+                ? query.OrderByDescending(d => d.Lines.Count).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.Lines.Count).ThenByDescending(d => d.OccurredAtUtc),
+            "notes" => desc
+                ? query.OrderByDescending(d => d.Notes).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.Notes).ThenByDescending(d => d.OccurredAtUtc),
+            "createdbyuseremail" => desc
+                ? query.OrderByDescending(d => d.CreatedByUser.Email).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.CreatedByUser.Email).ThenByDescending(d => d.OccurredAtUtc),
+            _ => desc ? query.OrderByDescending(d => d.OccurredAtUtc) : query.OrderBy(d => d.OccurredAtUtc),
         };
     }
 }

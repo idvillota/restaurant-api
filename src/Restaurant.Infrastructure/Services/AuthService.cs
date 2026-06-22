@@ -5,12 +5,15 @@ using Restaurant.Application.Features.Auth;
 using Restaurant.Domain.Entities;
 using Restaurant.Application.Authorization;
 using Restaurant.Infrastructure.Authorization;
+using Restaurant.Infrastructure.Persistence;
+using Restaurant.Infrastructure.Persistence.Seeding;
 
 namespace Restaurant.Infrastructure.Services;
 
 public sealed class AuthService : IAuthService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ApplicationDbContext _db;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IRolePermissionService _rolePermissions;
@@ -18,12 +21,14 @@ public sealed class AuthService : IAuthService
 
     public AuthService(
         IUnitOfWork unitOfWork,
+        ApplicationDbContext db,
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
         IRolePermissionService rolePermissions,
         ICurrentTenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
+        _db = db;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
         _rolePermissions = rolePermissions;
@@ -89,6 +94,9 @@ public sealed class AuthService : IAuthService
         await rolesRepo.AddRangeAsync(roles, cancellationToken);
         await tenantUsers.AddAsync(tenantUser, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await IngredientMovementTypeBootstrap.EnsureForTenantAsync(_db, tenant.Id, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         _tenantContext.TenantId = tenant.Id;
 

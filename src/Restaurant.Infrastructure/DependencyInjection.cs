@@ -87,6 +87,8 @@ public static class DependencyInjection
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IIngredientCategoryService, IngredientCategoryService>();
         services.AddScoped<IIngredientService, IngredientService>();
+        services.AddScoped<IIngredientMovementTypeService, IngredientMovementTypeService>();
+        services.AddScoped<IIngredientMovementDocumentService, IngredientMovementDocumentService>();
         services.AddScoped<IPurchaseService, PurchaseService>();
         services.AddScoped<ISalesOrderService, SalesOrderService>();
         services.AddScoped<IBillService, BillService>();
