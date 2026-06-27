@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Auth;
+using Restaurant.Domain.Common;
 using Restaurant.Domain.Entities;
 using Restaurant.Application.Authorization;
 using Restaurant.Infrastructure.Authorization;
@@ -125,6 +126,8 @@ public sealed class AuthService : IAuthService
             Email = user.Email,
             Roles = new[] { SystemRoles.Administrator },
             Permissions = permissions,
+            BrandTheme = UserPreferences.NormalizeBrandTheme(tenantUser.BrandTheme),
+            ColorScheme = UserPreferences.NormalizeColorScheme(tenantUser.ColorScheme),
         };
     }
 
@@ -185,6 +188,8 @@ public sealed class AuthService : IAuthService
             Email = user.Email,
             Roles = roles,
             Permissions = permissions,
+            BrandTheme = UserPreferences.NormalizeBrandTheme(membership.BrandTheme),
+            ColorScheme = UserPreferences.NormalizeColorScheme(membership.ColorScheme),
         };
     }
 

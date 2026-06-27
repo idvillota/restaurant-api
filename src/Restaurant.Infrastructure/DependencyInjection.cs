@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        services.AddScoped<IUserPreferencesService, UserPreferencesService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));

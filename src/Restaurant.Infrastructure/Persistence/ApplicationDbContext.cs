@@ -76,6 +76,8 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Tenant).WithMany(x => x.TenantUsers).HasForeignKey(x => x.TenantId);
             e.HasOne(x => x.User).WithMany(x => x.TenantUsers).HasForeignKey(x => x.UserId);
             e.HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+            e.Property(x => x.BrandTheme).HasMaxLength(32);
+            e.Property(x => x.ColorScheme).HasMaxLength(16);
         });
 
         modelBuilder.Entity<Role>(e =>
