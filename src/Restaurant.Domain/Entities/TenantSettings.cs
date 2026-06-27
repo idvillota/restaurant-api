@@ -29,5 +29,8 @@ public class TenantSettings : ITenantScoped
     public string? InvoiceNumberPrefix { get; set; }
     public decimal ImpoconsumoPercent { get; set; } = 8m;
 
+    /// <summary>JSON layout for tenant dashboard panels (react-grid-layout).</summary>
+    public string? DashboardLayoutJson { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }

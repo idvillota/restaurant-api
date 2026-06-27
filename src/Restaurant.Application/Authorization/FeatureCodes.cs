@@ -3,6 +3,7 @@ namespace Restaurant.Application.Authorization;
 public static class FeatureCodes
 {
     public const string DashboardView = "dashboard.view";
+    public const string DashboardConfigure = "dashboard.configure";
     public const string ServiceSalon = "service.salon";
     public const string PaymentsCheckout = "payments.checkout";
     public const string ReservationsManage = "reservations.manage";
@@ -32,6 +33,7 @@ public static class FeatureCodes
     public static IReadOnlyList<string> All { get; } =
     [
         DashboardView,
+        DashboardConfigure,
         ServiceSalon,
         PaymentsCheckout,
         ReservationsManage,

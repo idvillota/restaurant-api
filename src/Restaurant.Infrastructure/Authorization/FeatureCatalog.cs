@@ -9,6 +9,7 @@ public static class FeatureCatalog
     public static readonly FeatureDefinition[] All =
     [
         new(Guid.Parse("f1000001-0001-4001-8001-000000000001"), FeatureCodes.DashboardView, "Panel", "General", 10),
+        new(Guid.Parse("f1000021-0027-4027-8027-000000000021"), FeatureCodes.DashboardConfigure, "Configurar panel", "Administración", 11),
         new(Guid.Parse("f1000002-0002-4002-8002-000000000002"), FeatureCodes.ServiceSalon, "Salón", "Servicio", 20),
         new(Guid.Parse("f1000003-0003-4003-8003-000000000003"), FeatureCodes.PaymentsCheckout, "Pagos", "Servicio", 30),
         new(Guid.Parse("f1000004-0004-4004-8004-000000000004"), FeatureCodes.ReservationsManage, "Reservas", "Servicio", 40),

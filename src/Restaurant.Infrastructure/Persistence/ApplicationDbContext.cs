@@ -308,6 +308,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Phone).HasMaxLength(40);
             e.Property(x => x.DianResolutionNumber).HasMaxLength(80);
             e.Property(x => x.InvoiceNumberPrefix).HasMaxLength(20);
+            e.Property(x => x.DashboardLayoutJson);
         });
 
         modelBuilder.Entity<CashierShift>(e =>
