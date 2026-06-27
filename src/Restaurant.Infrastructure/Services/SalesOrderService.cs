@@ -5,6 +5,8 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Infrastructure.Common;
+using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -21,6 +23,7 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IInventoryAvailabilityService _inventory;
     private readonly IKitchenTicketService _kitchenTickets;
     private readonly IOperationalBusinessDayService _operationalDay;
+    private readonly ApplicationDbContext _db;
 
     public SalesOrderService(
         IRepository<SalesOrder> orders,
@@ -33,7 +36,8 @@ public sealed class SalesOrderService : ISalesOrderService
         IMapper mapper,
         IInventoryAvailabilityService inventory,
         IKitchenTicketService kitchenTickets,
-        IOperationalBusinessDayService operationalDay)
+        IOperationalBusinessDayService operationalDay,
+        ApplicationDbContext db)
     {
         _orders = orders;
         _lines = lines;
@@ -46,6 +50,7 @@ public sealed class SalesOrderService : ISalesOrderService
         _inventory = inventory;
         _kitchenTickets = kitchenTickets;
         _operationalDay = operationalDay;
+        _db = db;
     }
 
     public async Task<IReadOnlyList<TableServiceSummaryDto>> ListTableSummariesAsync(
@@ -388,6 +393,8 @@ public sealed class SalesOrderService : ISalesOrderService
     {
         var order = await _orders.Query()
             .Include(o => o.DiningTable)
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.ExcludedIngredients)
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
         if (order is null)
@@ -396,8 +403,10 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order.Status != SalesOrderStatus.Open)
             throw new InvalidOperationException("Only open orders can be completed.");
 
-        if (!await _lines.Query().AnyAsync(l => l.SalesOrderId == orderId, cancellationToken))
+        if (!order.Lines.Any())
             throw new InvalidOperationException("Add at least one item before completing the order.");
+
+        await SalesOrderLineCostSnapshot.ApplyToOrdersAsync(_db, [order], cancellationToken);
 
         order.Status = SalesOrderStatus.Paid;
         order.ClosedAtUtc = DateTime.UtcNow;

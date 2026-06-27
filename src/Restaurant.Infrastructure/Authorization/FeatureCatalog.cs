@@ -9,6 +9,7 @@ public static class FeatureCatalog
     public static readonly FeatureDefinition[] All =
     [
         new(Guid.Parse("f1000001-0001-4001-8001-000000000001"), FeatureCodes.DashboardView, "Panel", "General", 10),
+        new(Guid.Parse("f1000021-0027-4027-8027-000000000021"), FeatureCodes.DashboardConfigure, "Configurar panel", "Administración", 11),
         new(Guid.Parse("f1000002-0002-4002-8002-000000000002"), FeatureCodes.ServiceSalon, "Salón", "Servicio", 20),
         new(Guid.Parse("f1000003-0003-4003-8003-000000000003"), FeatureCodes.PaymentsCheckout, "Pagos", "Servicio", 30),
         new(Guid.Parse("f1000004-0004-4004-8004-000000000004"), FeatureCodes.ReservationsManage, "Reservas", "Servicio", 40),
@@ -18,6 +19,8 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000008-0008-4008-8008-000000000008"), FeatureCodes.CatalogProductTypes, "Tipos de producto", "Menú", 80),
         new(Guid.Parse("f1000009-0009-4009-8009-000000000009"), FeatureCodes.CatalogIngredientCategories, "Categorías de ingrediente", "Menú", 90),
         new(Guid.Parse("f100000a-0010-4010-8010-00000000000a"), FeatureCodes.CatalogIngredients, "Ingredientes", "Menú", 100),
+        new(Guid.Parse("f1000019-0025-4025-8025-000000000019"), FeatureCodes.InventoryIngredientMovementTypes, "Tipos de movimiento", "Inventario", 102),
+        new(Guid.Parse("f1000020-0026-4026-8026-000000000020"), FeatureCodes.InventoryIngredientMovements, "Movimientos de inventario", "Inventario", 103),
         new(Guid.Parse("f1000014-0020-4020-8020-000000000014"), FeatureCodes.CatalogPublicMenuQr, "Código QR menú", "Menú", 105),
         new(Guid.Parse("f100000b-0011-4011-8011-00000000000b"), FeatureCodes.SettingsTenant, "Configuración", "Administración", 110),
         new(Guid.Parse("f100000c-0012-4012-8012-00000000000c"), FeatureCodes.ProcurementPurchases, "Compras", "Administración", 120),
@@ -55,6 +58,8 @@ public static class FeatureCatalog
                 FeatureCodes.CatalogProductTypes,
                 FeatureCodes.CatalogIngredientCategories,
                 FeatureCodes.CatalogIngredients,
+                FeatureCodes.InventoryIngredientMovementTypes,
+                FeatureCodes.InventoryIngredientMovements,
                 FeatureCodes.CatalogPublicMenuQr,
                 FeatureCodes.SettingsTenant,
                 FeatureCodes.ProcurementPurchases,

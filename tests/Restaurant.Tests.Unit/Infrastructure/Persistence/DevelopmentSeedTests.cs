@@ -14,6 +14,7 @@ public sealed class DevelopmentSeedTests
     {
         _ = DevelopmentSeedIds.TenantId;
         Assert.Equal(10, DevelopmentSeedIds.IngredientCategoryIds.Length);
+        Assert.Equal(5, DevelopmentSeedIds.IngredientMovementTypeIds.Length);
         Assert.Equal(12, DevelopmentSeedIds.IngredientIds.Length);
         Assert.Equal(10, DevelopmentSeedIds.ProviderIds.Length);
         Assert.Equal(11, DevelopmentSeedIds.ProductTypeIds.Length);
@@ -34,6 +35,10 @@ public sealed class DevelopmentSeedTests
         Assert.Equal("COP", tenant.CurrencyCode);
 
         Assert.Equal(12, await fx.Db.Ingredients.IgnoreQueryFilters().CountAsync());
+        Assert.Equal(5, await fx.Db.IngredientMovementTypes.IgnoreQueryFilters().CountAsync());
+        var baja = await fx.Db.IngredientMovementTypes.IgnoreQueryFilters()
+            .SingleAsync(t => t.Name == "Salida por baja");
+        Assert.False(baja.IsInput);
         var tomates = await fx.Db.Ingredients.IgnoreQueryFilters()
             .SingleAsync(i => i.Name == "Tomates");
         Assert.Equal(IngredientUnit.Gram, tomates.Unit);

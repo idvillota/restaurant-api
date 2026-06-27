@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        services.AddScoped<IUserPreferencesService, UserPreferencesService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
@@ -87,10 +88,13 @@ public static class DependencyInjection
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<IIngredientCategoryService, IngredientCategoryService>();
         services.AddScoped<IIngredientService, IngredientService>();
+        services.AddScoped<IIngredientMovementTypeService, IngredientMovementTypeService>();
+        services.AddScoped<IIngredientMovementDocumentService, IngredientMovementDocumentService>();
         services.AddScoped<IPurchaseService, PurchaseService>();
         services.AddScoped<ISalesOrderService, SalesOrderService>();
         services.AddScoped<IBillService, BillService>();
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
+        services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IOperationalBusinessDayService, OperationalBusinessDayService>();
         services.AddScoped<ICashierShiftService, CashierShiftService>();
         services.AddScoped<IDailyClosureService, DailyClosureService>();
@@ -99,6 +103,8 @@ public static class DependencyInjection
         // Register Azure-based strategic AI report service implementation.
         // This application uses Azure OpenAI for all strategic report generation.
         services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
+        services.AddScoped<IStrategicAnalyticsService, StrategicAnalyticsService>();
+        services.AddScoped<IStrategicAiInsightService, StrategicAiInsightService>();
         services.AddScoped<IOperationalReportsService, OperationalReportsService>();
         services.AddScoped<IPublicMenuService, PublicMenuService>();
 

@@ -26,6 +26,8 @@ public sealed class SalesOrderLineDto
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
+    /// <summary>Recipe-based unit cost captured when the line is paid. Null for legacy sales.</summary>
+    public decimal? UnitCostPrice { get; set; }
     public string? Notes { get; set; }
 
     /// <summary>Null until the line is sent to the kitchen on a ticket.</summary>

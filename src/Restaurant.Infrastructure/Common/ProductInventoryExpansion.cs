@@ -82,7 +82,7 @@ internal static class ProductInventoryExpansion
         }
     }
 
-    private static async Task<Dictionary<Guid, ProductCompositionSnapshot>> LoadCompositionSnapshotsAsync(
+    internal static async Task<Dictionary<Guid, ProductCompositionSnapshot>> LoadCompositionSnapshotsAsync(
         ApplicationDbContext db,
         IReadOnlyList<Guid> rootProductIds,
         CancellationToken cancellationToken)

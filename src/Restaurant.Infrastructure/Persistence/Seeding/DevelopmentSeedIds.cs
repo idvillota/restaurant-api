@@ -50,6 +50,15 @@ internal static class DevelopmentSeedIds
     public static readonly Guid WaitressTenantUserId = Guid.Parse("a100000f-0015-4015-8015-00000000000f");
     public static readonly Guid CashierTenantUserId = Guid.Parse("a1000010-0016-4016-8016-000000000010");
 
+    public static readonly Guid[] IngredientMovementTypeIds =
+    [
+        Guid.Parse("a2000001-0001-4001-8001-000000000001"),
+        Guid.Parse("a2000002-0002-4002-8002-000000000002"),
+        Guid.Parse("a2000003-0003-4003-8003-000000000003"),
+        Guid.Parse("a2000004-0004-4004-8004-000000000004"),
+        Guid.Parse("a2000005-0005-4005-8005-000000000005"),
+    ];
+
     public static readonly Guid[] IngredientCategoryIds =
     [
         Guid.Parse("b1000001-0001-4001-8001-000000000001"),

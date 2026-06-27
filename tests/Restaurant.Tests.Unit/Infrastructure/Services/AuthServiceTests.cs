@@ -47,7 +47,7 @@ public sealed class AuthServiceTests
 
         var tenantContext = new Restaurant.Infrastructure.Common.CurrentTenantContext();
         IRolePermissionService rolePermissions = new RolePermissionService(fx.Db, tenantContext);
-        return new AuthService(fx.UnitOfWork, new BcryptPasswordHasher(), jwt.Object, rolePermissions, tenantContext);
+        return new AuthService(fx.UnitOfWork, fx.Db, new BcryptPasswordHasher(), jwt.Object, rolePermissions, tenantContext);
     }
 
     [Fact]
