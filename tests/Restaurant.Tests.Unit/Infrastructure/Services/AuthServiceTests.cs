@@ -47,7 +47,18 @@ public sealed class AuthServiceTests
 
         var tenantContext = new Restaurant.Infrastructure.Common.CurrentTenantContext();
         IRolePermissionService rolePermissions = new RolePermissionService(fx.Db, tenantContext);
-        return new AuthService(fx.UnitOfWork, fx.Db, new BcryptPasswordHasher(), jwt.Object, rolePermissions, tenantContext);
+        var kitchenPrinters = new Mock<IKitchenPrinterService>();
+        kitchenPrinters
+            .Setup(s => s.EnsureDefaultStationAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        return new AuthService(
+            fx.UnitOfWork,
+            fx.Db,
+            new BcryptPasswordHasher(),
+            jwt.Object,
+            rolePermissions,
+            tenantContext,
+            kitchenPrinters.Object);
     }
 
     [Fact]

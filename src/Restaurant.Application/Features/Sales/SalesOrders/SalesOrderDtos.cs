@@ -68,12 +68,19 @@ public sealed class ConfirmSalesOrderDto
     public List<AddSalesOrderLineDto> Lines { get; set; } = [];
 }
 
+public sealed class KitchenTicketFileDto
+{
+    public string PrinterStationCode { get; set; } = string.Empty;
+    public string PrinterStationName { get; set; } = string.Empty;
+    public string RelativePath { get; set; } = string.Empty;
+}
+
 public sealed class ConfirmSalesOrderResultDto
 {
     public SalesOrderDto Order { get; set; } = null!;
 
-    /// <summary>Relative path under the kitchen tickets root (orders/files-without-print).</summary>
-    public string? KitchenTicketRelativePath { get; set; }
+    /// <summary>Relative paths under the kitchen tickets root (orders/files-without-print).</summary>
+    public List<KitchenTicketFileDto> KitchenTickets { get; set; } = [];
 }
 
 public sealed class TableServiceSummaryDto

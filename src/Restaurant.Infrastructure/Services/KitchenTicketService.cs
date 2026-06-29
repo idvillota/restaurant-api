@@ -132,6 +132,9 @@ public sealed class KitchenTicketService : IKitchenTicketService
         return new KitchenTicketModel
         {
             TableCode = order.DiningTable?.Code ?? "—",
+            TableZone = string.IsNullOrWhiteSpace(order.DiningTable?.Zone)
+                ? null
+                : order.DiningTable!.Zone!.Trim(),
             OrderNumber = order.Number,
             SentBy = sentBy,
             SentAtUtc = DateTime.UtcNow,
@@ -139,7 +142,11 @@ public sealed class KitchenTicketService : IKitchenTicketService
         };
     }
 
-    public Task<string?> GeneratePdfAsync(KitchenTicketModel model, CancellationToken cancellationToken = default)
+    public Task<string?> GeneratePdfAsync(
+        KitchenTicketModel model,
+        Guid orderId,
+        string printerStationCode,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -150,9 +157,8 @@ public sealed class KitchenTicketService : IKitchenTicketService
         var tenantRoot = Path.Combine(_absoluteRoot, tenantFolder);
         Directory.CreateDirectory(tenantRoot);
 
-        var safeTable = SanitizeFileToken(model.TableCode);
-        var fileName =
-            $"kitchen_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{safeTable}_{Guid.NewGuid():N}.pdf";
+        var stationCode = SanitizeStationCode(printerStationCode);
+        var fileName = $"{orderId:N}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{stationCode}.pdf";
         var absolutePath = Path.Combine(tenantRoot, fileName);
 
         var pdfBytes = QuestPdfKitchenTicketDocument.BuildPdf(model);
@@ -281,6 +287,18 @@ public sealed class KitchenTicketService : IKitchenTicketService
         if (string.IsNullOrWhiteSpace(notes))
             return null;
         return notes.Trim();
+    }
+
+    private static string SanitizeStationCode(string value)
+    {
+        var trimmed = value.Trim().ToUpperInvariant();
+        if (trimmed.Length == 0)
+            return "DEFAULT";
+
+        var chars = trimmed
+            .Where(c => char.IsLetterOrDigit(c))
+            .ToArray();
+        return chars.Length == 0 ? "DEFAULT" : new string(chars);
     }
 
     private static string SanitizeFileToken(string value)

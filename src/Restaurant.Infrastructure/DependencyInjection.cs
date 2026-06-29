@@ -77,6 +77,7 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromMinutes(3);
         });
         services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
+        services.AddScoped<IKitchenPrinterService, KitchenPrinterService>();
         services.AddScoped<IKitchenTicketService, KitchenTicketService>();
         services.AddScoped<ISalesReceiptService, SalesReceiptService>();
         services.AddScoped<IProductService, ProductService>();

@@ -48,6 +48,7 @@ public static class FeatureCatalog
             [SystemRoles.Manager] =
             [
                 FeatureCodes.DashboardView,
+                FeatureCodes.DashboardConfigure,
                 FeatureCodes.ServiceSalon,
                 FeatureCodes.PaymentsCheckout,
                 FeatureCodes.CashierShifts,
