@@ -11,5 +11,9 @@ public interface IKitchenTicketService
         IReadOnlyList<AddSalesOrderLineDto> batchLines,
         CancellationToken cancellationToken = default);
 
-    Task<string?> GeneratePdfAsync(KitchenTicketModel model, CancellationToken cancellationToken = default);
+    Task<string?> GeneratePdfAsync(
+        KitchenTicketModel model,
+        Guid orderId,
+        string printerStationCode,
+        CancellationToken cancellationToken = default);
 }

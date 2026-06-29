@@ -24,6 +24,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
+    public DbSet<PrinterStation> PrinterStations => Set<PrinterStation>();
+    public DbSet<ProductTypePrinterMapping> ProductTypePrinterMappings => Set<ProductTypePrinterMapping>();
     public DbSet<IngredientCategory> IngredientCategories => Set<IngredientCategory>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
@@ -118,6 +120,20 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<ProductType>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<PrinterStation>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Code).HasMaxLength(32);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductTypePrinterMapping>(e =>
+        {
+            e.HasOne(x => x.ProductType).WithMany().HasForeignKey(x => x.ProductTypeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.PrinterStation).WithMany(x => x.ProductTypeMappings).HasForeignKey(x => x.PrinterStationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.ProductTypeId }).IsUnique();
         });
 
         modelBuilder.Entity<IngredientCategory>(e =>
@@ -442,6 +458,12 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductType>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<PrinterStation>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<ProductTypePrinterMapping>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Product>().HasQueryFilter(e =>

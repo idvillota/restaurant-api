@@ -97,6 +97,7 @@ using (var scope = app.Services.CreateScope())
     var permissionLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     await PermissionBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
     await IngredientMovementTypeBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
+    await KitchenPrinterBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
 
     if (app.Environment.IsDevelopment())
     {

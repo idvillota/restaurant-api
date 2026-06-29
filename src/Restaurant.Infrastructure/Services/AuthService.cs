@@ -19,6 +19,7 @@ public sealed class AuthService : IAuthService
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IRolePermissionService _rolePermissions;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IKitchenPrinterService _kitchenPrinters;
 
     public AuthService(
         IUnitOfWork unitOfWork,
@@ -26,7 +27,8 @@ public sealed class AuthService : IAuthService
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
         IRolePermissionService rolePermissions,
-        ICurrentTenantContext tenantContext)
+        ICurrentTenantContext tenantContext,
+        IKitchenPrinterService kitchenPrinters)
     {
         _unitOfWork = unitOfWork;
         _db = db;
@@ -34,6 +36,7 @@ public sealed class AuthService : IAuthService
         _jwtTokenService = jwtTokenService;
         _rolePermissions = rolePermissions;
         _tenantContext = tenantContext;
+        _kitchenPrinters = kitchenPrinters;
     }
 
     public async Task<AuthResponseDto> RegisterTenantAsync(RegisterTenantDto dto, CancellationToken cancellationToken = default)
@@ -97,6 +100,7 @@ public sealed class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         await IngredientMovementTypeBootstrap.EnsureForTenantAsync(_db, tenant.Id, cancellationToken);
+        await _kitchenPrinters.EnsureDefaultStationAsync(tenant.Id, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
 
         _tenantContext.TenantId = tenant.Id;
