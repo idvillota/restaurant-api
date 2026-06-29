@@ -24,9 +24,14 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
+    public DbSet<PrinterStation> PrinterStations => Set<PrinterStation>();
+    public DbSet<ProductTypePrinterMapping> ProductTypePrinterMappings => Set<ProductTypePrinterMapping>();
     public DbSet<IngredientCategory> IngredientCategories => Set<IngredientCategory>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
+    public DbSet<IngredientMovementType> IngredientMovementTypes => Set<IngredientMovementType>();
+    public DbSet<IngredientMovementDocument> IngredientMovementDocuments => Set<IngredientMovementDocument>();
+    public DbSet<IngredientMovement> IngredientMovements => Set<IngredientMovement>();
     public DbSet<ProductIngredient> ProductIngredients => Set<ProductIngredient>();
     public DbSet<ProductBundleLine> ProductBundleLines => Set<ProductBundleLine>();
     public DbSet<Provider> Providers => Set<Provider>();
@@ -73,6 +78,8 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Tenant).WithMany(x => x.TenantUsers).HasForeignKey(x => x.TenantId);
             e.HasOne(x => x.User).WithMany(x => x.TenantUsers).HasForeignKey(x => x.UserId);
             e.HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+            e.Property(x => x.BrandTheme).HasMaxLength(32);
+            e.Property(x => x.ColorScheme).HasMaxLength(16);
         });
 
         modelBuilder.Entity<Role>(e =>
@@ -115,6 +122,20 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Name).HasMaxLength(200);
         });
 
+        modelBuilder.Entity<PrinterStation>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Code).HasMaxLength(32);
+            e.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductTypePrinterMapping>(e =>
+        {
+            e.HasOne(x => x.ProductType).WithMany().HasForeignKey(x => x.ProductTypeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.PrinterStation).WithMany(x => x.ProductTypeMappings).HasForeignKey(x => x.PrinterStationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.TenantId, x.ProductTypeId }).IsUnique();
+        });
+
         modelBuilder.Entity<IngredientCategory>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(200);
@@ -139,6 +160,46 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.UnitCost).HasPrecision(18, 4);
             e.Property(x => x.StockQuantity).HasPrecision(18, 4);
             e.Property(x => x.ReorderLevel).HasPrecision(18, 4);
+        });
+
+        modelBuilder.Entity<IngredientMovementType>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.HasIndex(x => new { x.TenantId, x.Name });
+        });
+
+        modelBuilder.Entity<IngredientMovementDocument>(e =>
+        {
+            e.HasOne(x => x.MovementType)
+                .WithMany(x => x.Documents)
+                .HasForeignKey(x => x.IngredientMovementTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.DocumentNumber).HasMaxLength(100);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.HasIndex(x => new { x.TenantId, x.OccurredAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.DocumentNumber });
+        });
+
+        modelBuilder.Entity<IngredientMovement>(e =>
+        {
+            e.HasOne(x => x.Document)
+                .WithMany(x => x.Lines)
+                .HasForeignKey(x => x.IngredientMovementDocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Ingredient)
+                .WithMany()
+                .HasForeignKey(x => x.IngredientId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+            e.Property(x => x.StockQuantitySnapshot).HasPrecision(18, 4);
+            e.Property(x => x.UnitCostSnapshot).HasPrecision(18, 4);
+            e.HasIndex(x => new { x.TenantId, x.IngredientId });
+            e.HasIndex(x => new { x.IngredientMovementDocumentId, x.IngredientId }).IsUnique();
         });
 
         modelBuilder.Entity<ProductIngredient>(e =>
@@ -179,6 +240,8 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
             e.HasIndex(x => new { x.TenantId, x.BillNumber }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.PurchasedAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.PaymentDateUtc });
         });
 
         modelBuilder.Entity<PurchaseLine>(e =>
@@ -219,6 +282,8 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
             e.HasIndex(x => new { x.TenantId, x.DiningTableId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.Status });
+            e.HasIndex(x => new { x.TenantId, x.ClosedAtUtc });
         });
 
         modelBuilder.Entity<SalesOrderLine>(e =>
@@ -227,8 +292,11 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Product).WithMany(x => x.SalesOrderLines).HasForeignKey(x => x.ProductId);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
+            e.Property(x => x.UnitCostPrice).HasPrecision(18, 2);
             e.Property(x => x.Quantity).HasPrecision(18, 4);
             e.Property(x => x.Notes).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
+            e.HasIndex(x => new { x.SalesOrderId, x.SentToKitchenAtUtc });
         });
 
         modelBuilder.Entity<SalesOrderLineExcludedIngredient>(e =>
@@ -258,6 +326,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Phone).HasMaxLength(40);
             e.Property(x => x.DianResolutionNumber).HasMaxLength(80);
             e.Property(x => x.InvoiceNumberPrefix).HasMaxLength(20);
+            e.Property(x => x.DashboardLayoutJson);
         });
 
         modelBuilder.Entity<CashierShift>(e =>
@@ -290,8 +359,9 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<StrategicAiReportCache>(e =>
         {
+            e.Property(x => x.ReportType).HasMaxLength(64);
             e.Property(x => x.HtmlContent).HasColumnType("text");
-            e.HasIndex(x => new { x.TenantId, x.SalesStartDate, x.SalesEndDate, x.CacheDate }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.ReportType, x.SalesStartDate, x.SalesEndDate, x.ForecastDays, x.CacheDate }).IsUnique();
         });
 
         modelBuilder.Entity<Bill>(e =>
@@ -314,6 +384,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.DianConsecutiveNumber })
                 .IsUnique()
                 .HasFilter("\"DianConsecutiveNumber\" > 0");
+            e.HasIndex(x => new { x.TenantId, x.PaidAtUtc });
         });
 
         modelBuilder.Entity<BillLine>(e =>
@@ -325,7 +396,9 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Quantity).HasPrecision(18, 4);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
+            e.Property(x => x.UnitCostPrice).HasPrecision(18, 2);
             e.Property(x => x.ImpoconsumoAmount).HasPrecision(18, 2);
+            e.HasIndex(x => x.BillId);
         });
 
         modelBuilder.Entity<BillSalesOrder>(e =>
@@ -348,6 +421,11 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => x.BillId).IsUnique();
         });
 
+        modelBuilder.Entity<Customer>(e =>
+        {
+            e.HasIndex(x => new { x.TenantId, x.TaxId });
+        });
+
         modelBuilder.Entity<Payment>(e =>
         {
             e.HasOne(x => x.Bill).WithMany(x => x.Payments).HasForeignKey(x => x.BillId);
@@ -355,6 +433,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.Invoice).WithMany(x => x.Payments).HasForeignKey(x => x.InvoiceId);
             e.HasOne(x => x.CashierShift).WithMany(x => x.Payments).HasForeignKey(x => x.CashierShiftId);
             e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.CashierShiftId, x.Status });
         });
 
         ApplyTenantFilters(modelBuilder);
@@ -381,6 +460,12 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<ProductType>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
+        modelBuilder.Entity<PrinterStation>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<ProductTypePrinterMapping>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
         modelBuilder.Entity<Product>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
@@ -388,6 +473,15 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Ingredient>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<IngredientMovementType>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<IngredientMovementDocument>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<IngredientMovement>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductIngredient>().HasQueryFilter(e =>

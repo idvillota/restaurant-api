@@ -1,12 +1,12 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Cashier;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/cashier-shifts")]
 public sealed class CashierShiftsController : ControllerBase
 {
@@ -15,10 +15,12 @@ public sealed class CashierShiftsController : ControllerBase
     public CashierShiftsController(ICashierShiftService service) => _service = service;
 
     [HttpGet("context")]
+    [RequireOperationalCashierContextRead]
     public Task<ActionResult<BusinessDayContextDto>> GetContext(CancellationToken cancellationToken) =>
         OkResult(_service.GetBusinessDayContextAsync(cancellationToken));
 
     [HttpGet("my-open")]
+    [RequireOperationalCashierContextRead]
     public async Task<ActionResult<CashierShiftSummaryDto>> GetMyOpen(CancellationToken cancellationToken)
     {
         var shift = await _service.GetMyOpenShiftAsync(cancellationToken);
@@ -26,16 +28,19 @@ public sealed class CashierShiftsController : ControllerBase
     }
 
     [HttpGet]
+    [RequireFeature(FeatureCodes.CashierShifts)]
     public Task<ActionResult<IReadOnlyList<CashierShiftSummaryDto>>> List(
         [FromQuery] DateOnly? businessDate,
         CancellationToken cancellationToken) =>
         OkResult(_service.ListShiftsAsync(businessDate, cancellationToken));
 
     [HttpGet("{id:guid}")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
     public Task<ActionResult<CashierShiftReportDto>> GetReport(Guid id, CancellationToken cancellationToken) =>
         OkResult(_service.GetShiftReportAsync(id, cancellationToken));
 
     [HttpPost("open")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
     public async Task<ActionResult<CashierShiftSummaryDto>> Open(
         [FromBody] OpenCashierShiftDto dto,
         CancellationToken cancellationToken)
@@ -55,6 +60,7 @@ public sealed class CashierShiftsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/close")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
     public async Task<ActionResult<CashierShiftReportDto>> Close(
         Guid id,
         [FromBody] CloseCashierShiftDto dto,
@@ -75,6 +81,7 @@ public sealed class CashierShiftsController : ControllerBase
     }
 
     [HttpPost("cash-movements")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
     public async Task<ActionResult<CashMovementDto>> RecordMovement(
         [FromBody] CreateCashMovementDto dto,
         CancellationToken cancellationToken)

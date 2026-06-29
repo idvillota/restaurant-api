@@ -9,6 +9,7 @@ public static class FeatureCatalog
     public static readonly FeatureDefinition[] All =
     [
         new(Guid.Parse("f1000001-0001-4001-8001-000000000001"), FeatureCodes.DashboardView, "Panel", "General", 10),
+        new(Guid.Parse("f1000021-0027-4027-8027-000000000021"), FeatureCodes.DashboardConfigure, "Configurar panel", "Administración", 11),
         new(Guid.Parse("f1000002-0002-4002-8002-000000000002"), FeatureCodes.ServiceSalon, "Salón", "Servicio", 20),
         new(Guid.Parse("f1000003-0003-4003-8003-000000000003"), FeatureCodes.PaymentsCheckout, "Pagos", "Servicio", 30),
         new(Guid.Parse("f1000004-0004-4004-8004-000000000004"), FeatureCodes.ReservationsManage, "Reservas", "Servicio", 40),
@@ -18,6 +19,8 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000008-0008-4008-8008-000000000008"), FeatureCodes.CatalogProductTypes, "Tipos de producto", "Menú", 80),
         new(Guid.Parse("f1000009-0009-4009-8009-000000000009"), FeatureCodes.CatalogIngredientCategories, "Categorías de ingrediente", "Menú", 90),
         new(Guid.Parse("f100000a-0010-4010-8010-00000000000a"), FeatureCodes.CatalogIngredients, "Ingredientes", "Menú", 100),
+        new(Guid.Parse("f1000019-0025-4025-8025-000000000019"), FeatureCodes.InventoryIngredientMovementTypes, "Tipos de movimiento", "Inventario", 102),
+        new(Guid.Parse("f1000020-0026-4026-8026-000000000020"), FeatureCodes.InventoryIngredientMovements, "Movimientos de inventario", "Inventario", 103),
         new(Guid.Parse("f1000014-0020-4020-8020-000000000014"), FeatureCodes.CatalogPublicMenuQr, "Código QR menú", "Menú", 105),
         new(Guid.Parse("f100000b-0011-4011-8011-00000000000b"), FeatureCodes.SettingsTenant, "Configuración", "Administración", 110),
         new(Guid.Parse("f100000c-0012-4012-8012-00000000000c"), FeatureCodes.ProcurementPurchases, "Compras", "Administración", 120),
@@ -26,8 +29,12 @@ public static class FeatureCatalog
         new(Guid.Parse("f100000f-0015-4015-8015-00000000000f"), FeatureCodes.OrganizationTeam, "Invitar equipo", "Administración", 150),
         new(Guid.Parse("f1000010-0016-4016-8016-000000000010"), FeatureCodes.OrganizationRoles, "Roles y permisos", "Administración", 160),
         new(Guid.Parse("f1000011-0017-4017-8017-000000000011"), FeatureCodes.CashierShifts, "Turnos de caja", "Servicio", 35),
-        new(Guid.Parse("f1000012-0018-4018-8018-000000000012"), FeatureCodes.ReportsDailyClosure, "Cierre diario", "Administración", 165),
-        new(Guid.Parse("f1000013-0019-4019-8019-000000000013"), FeatureCodes.ReportsStrategicAi, "Informe IA", "Administración", 170),
+        new(Guid.Parse("f1000012-0018-4018-8018-000000000012"), FeatureCodes.ReportsDailyClosure, "Cierre diario", "Reportes", 165),
+        new(Guid.Parse("f1000013-0019-4019-8019-000000000013"), FeatureCodes.ReportsStrategicAi, "Informe IA", "Reportes", 170),
+        new(Guid.Parse("f1000015-0021-4021-8021-000000000015"), FeatureCodes.ReportsSales, "Reporte de ventas", "Reportes", 175),
+        new(Guid.Parse("f1000016-0022-4022-8022-000000000016"), FeatureCodes.ReportsIngredients, "Reporte de ingredientes", "Reportes", 176),
+        new(Guid.Parse("f1000017-0023-4023-8023-000000000017"), FeatureCodes.ReportsPurchases, "Reporte de compras", "Reportes", 177),
+        new(Guid.Parse("f1000018-0024-4024-8024-000000000018"), FeatureCodes.ReportsSalesByDate, "Ventas por fecha", "Reportes", 178),
     ];
 
     public static IReadOnlyDictionary<string, Guid> IdsByCode { get; } =
@@ -41,6 +48,7 @@ public static class FeatureCatalog
             [SystemRoles.Manager] =
             [
                 FeatureCodes.DashboardView,
+                FeatureCodes.DashboardConfigure,
                 FeatureCodes.ServiceSalon,
                 FeatureCodes.PaymentsCheckout,
                 FeatureCodes.CashierShifts,
@@ -51,6 +59,8 @@ public static class FeatureCatalog
                 FeatureCodes.CatalogProductTypes,
                 FeatureCodes.CatalogIngredientCategories,
                 FeatureCodes.CatalogIngredients,
+                FeatureCodes.InventoryIngredientMovementTypes,
+                FeatureCodes.InventoryIngredientMovements,
                 FeatureCodes.CatalogPublicMenuQr,
                 FeatureCodes.SettingsTenant,
                 FeatureCodes.ProcurementPurchases,
@@ -58,6 +68,10 @@ public static class FeatureCatalog
                 FeatureCodes.OrganizationEmployees,
                 FeatureCodes.OrganizationTeam,
                 FeatureCodes.ReportsDailyClosure,
+                FeatureCodes.ReportsSales,
+                FeatureCodes.ReportsIngredients,
+                FeatureCodes.ReportsPurchases,
+                FeatureCodes.ReportsSalesByDate,
             ],
             [SystemRoles.Waitress] =
             [
@@ -83,6 +97,8 @@ public static class FeatureCatalog
                 FeatureCodes.CashierShifts,
                 FeatureCodes.CustomersManage,
                 FeatureCodes.CatalogPublicMenuQr,
+                FeatureCodes.ReportsSales,
+                FeatureCodes.ReportsSalesByDate,
             ],
         };
 }

@@ -5,6 +5,8 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Infrastructure.Common;
+using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -20,7 +22,9 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IMapper _mapper;
     private readonly IInventoryAvailabilityService _inventory;
     private readonly IKitchenTicketService _kitchenTickets;
+    private readonly IKitchenPrinterService _kitchenPrinters;
     private readonly IOperationalBusinessDayService _operationalDay;
+    private readonly ApplicationDbContext _db;
 
     public SalesOrderService(
         IRepository<SalesOrder> orders,
@@ -33,7 +37,9 @@ public sealed class SalesOrderService : ISalesOrderService
         IMapper mapper,
         IInventoryAvailabilityService inventory,
         IKitchenTicketService kitchenTickets,
-        IOperationalBusinessDayService operationalDay)
+        IKitchenPrinterService kitchenPrinters,
+        IOperationalBusinessDayService operationalDay,
+        ApplicationDbContext db)
     {
         _orders = orders;
         _lines = lines;
@@ -45,7 +51,9 @@ public sealed class SalesOrderService : ISalesOrderService
         _mapper = mapper;
         _inventory = inventory;
         _kitchenTickets = kitchenTickets;
+        _kitchenPrinters = kitchenPrinters;
         _operationalDay = operationalDay;
+        _db = db;
     }
 
     public async Task<IReadOnlyList<TableServiceSummaryDto>> ListTableSummariesAsync(
@@ -306,8 +314,32 @@ public sealed class SalesOrderService : ISalesOrderService
         _orders.Update(order);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, batchDtos, cancellationToken);
-        var ticketPath = await _kitchenTickets.GeneratePdfAsync(ticketModel, cancellationToken);
+        var groups = await _kitchenPrinters.GroupBatchByStationAsync(batchDtos, cancellationToken);
+        var kitchenTickets = new List<KitchenTicketFileDto>();
+
+        foreach (var (stationCode, group) in groups.OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, group.Lines, cancellationToken);
+            ticketModel.PrinterStationCode = stationCode;
+            ticketModel.PrinterStationName = group.StationName;
+
+            var ticketPath = await _kitchenTickets.GeneratePdfAsync(
+                ticketModel,
+                order.Id,
+                stationCode,
+                cancellationToken);
+
+            if (ticketPath is not null)
+            {
+                kitchenTickets.Add(
+                    new KitchenTicketFileDto
+                    {
+                        PrinterStationCode = stationCode,
+                        PrinterStationName = group.StationName,
+                        RelativePath = ticketPath,
+                    });
+            }
+        }
 
         var orderDto = await GetByIdAsync(orderId, cancellationToken);
         if (orderDto is null)
@@ -316,7 +348,7 @@ public sealed class SalesOrderService : ISalesOrderService
         return new ConfirmSalesOrderResultDto
         {
             Order = orderDto,
-            KitchenTicketRelativePath = ticketPath,
+            KitchenTickets = kitchenTickets,
         };
     }
 
@@ -388,6 +420,8 @@ public sealed class SalesOrderService : ISalesOrderService
     {
         var order = await _orders.Query()
             .Include(o => o.DiningTable)
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.ExcludedIngredients)
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
         if (order is null)
@@ -396,8 +430,10 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order.Status != SalesOrderStatus.Open)
             throw new InvalidOperationException("Only open orders can be completed.");
 
-        if (!await _lines.Query().AnyAsync(l => l.SalesOrderId == orderId, cancellationToken))
+        if (!order.Lines.Any())
             throw new InvalidOperationException("Add at least one item before completing the order.");
+
+        await SalesOrderLineCostSnapshot.ApplyToOrdersAsync(_db, [order], cancellationToken);
 
         order.Status = SalesOrderStatus.Paid;
         order.ClosedAtUtc = DateTime.UtcNow;

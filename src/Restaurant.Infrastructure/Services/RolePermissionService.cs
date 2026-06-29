@@ -42,21 +42,21 @@ public sealed class RolePermissionService : IRolePermissionService
             .OrderBy(r => r.Name)
             .ToListAsync(cancellationToken);
 
-        var assignments = await _db.RoleFeatures
+        var assignmentRows = await _db.RoleFeatures
             .AsNoTracking()
-            .Include(rf => rf.Feature)
+            .Select(rf => new { rf.RoleId, Code = rf.Feature.Code })
             .ToListAsync(cancellationToken);
+
+        var codesByRole = assignmentRows
+            .GroupBy(a => a.RoleId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Code).OrderBy(c => c).ToList());
 
         var roleDtos = roles
             .Select(r => new RolePermissionRoleDto
             {
                 Id = r.Id,
                 Name = r.Name,
-                FeatureCodes = assignments
-                    .Where(a => a.RoleId == r.Id)
-                    .Select(a => a.Feature.Code)
-                    .OrderBy(c => c)
-                    .ToList(),
+                FeatureCodes = codesByRole.GetValueOrDefault(r.Id) ?? [],
             })
             .ToList();
 
@@ -88,18 +88,16 @@ public sealed class RolePermissionService : IRolePermissionService
         var existing = await _db.RoleFeatures.Where(rf => rf.RoleId == roleId).ToListAsync(cancellationToken);
         _db.RoleFeatures.RemoveRange(existing);
 
-        foreach (var feature in features)
+        var tenantId = _tenantContext.TenantId!.Value;
+        var roleFeatures = features.Select(feature => new RoleFeature
         {
-            await _db.RoleFeatures.AddAsync(
-                new RoleFeature
-                {
-                    Id = Guid.NewGuid(),
-                    TenantId = _tenantContext.TenantId!.Value,
-                    RoleId = roleId,
-                    FeatureId = feature.Id,
-                },
-                cancellationToken);
-        }
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            RoleId = roleId,
+            FeatureId = feature.Id,
+        }).ToList();
+
+        await _db.RoleFeatures.AddRangeAsync(roleFeatures, cancellationToken);
 
         await _db.SaveChangesAsync(cancellationToken);
     }

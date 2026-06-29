@@ -26,7 +26,17 @@ internal static class QuestPdfKitchenTicketDocument
                     {
                         column.Spacing(4);
 
-                        column.Item().Text($"Mesa: {ticket.TableCode}").Bold().FontSize(10);
+                        column.Item().AlignCenter().Text($"MESA {ticket.TableCode}").Bold().FontSize(14);
+                        if (!string.IsNullOrWhiteSpace(ticket.TableZone))
+                        {
+                            column.Item().AlignCenter().Text(ticket.TableZone).FontSize(9);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(ticket.PrinterStationName))
+                        {
+                            column.Item().Text($"Estación: {ticket.PrinterStationName}").Bold().FontSize(9);
+                        }
+
                         column.Item().Text($"Mesero/a: {ticket.SentBy}");
                         column.Item().Text($"Pedido: {ticket.OrderNumber}").FontSize(8);
                         column.Item()

@@ -1,5 +1,6 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog;
@@ -8,7 +9,6 @@ using Restaurant.Application.Features.Catalog.Products;
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("api/[controller]")]
 public sealed class ProductsController : ControllerBase
 {
@@ -17,12 +17,14 @@ public sealed class ProductsController : ControllerBase
     public ProductsController(IProductService products) => _products = products;
 
     [HttpGet]
+    [RequireSalonCatalogProductsRead]
     public async Task<ActionResult<PagedResult<ProductListItemDto>>> List(
         [FromQuery] ListQuery query,
         CancellationToken cancellationToken = default) =>
         Ok(await _products.ListAsync(query, cancellationToken));
 
     [HttpGet("{id:guid}")]
+    [RequireSalonCatalogProductsRead]
     public async Task<ActionResult<ProductListItemDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
         var item = await _products.GetByIdAsync(id, cancellationToken);
@@ -30,6 +32,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPost]
+    [RequireFeature(FeatureCodes.CatalogProducts)]
     public async Task<ActionResult<ProductListItemDto>> Create(
         [FromBody] CreateProductDto dto,
         CancellationToken cancellationToken = default)
@@ -48,6 +51,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [RequireFeature(FeatureCodes.CatalogProducts)]
     public async Task<ActionResult<ProductListItemDto>> Update(
         Guid id,
         [FromBody] UpdateProductDto dto,
@@ -67,6 +71,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [RequireFeature(FeatureCodes.CatalogProducts)]
     public async Task<IActionResult> SoftDelete(Guid id, CancellationToken cancellationToken = default)
     {
         var ok = await _products.SoftDeleteAsync(id, cancellationToken);
@@ -74,6 +79,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/recipe")]
+    [RequireSalonCatalogProductsRead]
     public async Task<ActionResult<ProductRecipeDto>> GetRecipe(Guid id, CancellationToken cancellationToken = default)
     {
         var recipe = await _products.GetRecipeAsync(id, cancellationToken);
@@ -81,6 +87,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/image")]
+    [RequireFeature(FeatureCodes.CatalogProducts)]
     [RequestSizeLimit(6 * 1024 * 1024)]
     public async Task<ActionResult<ProductListItemDto>> SetImage(
         Guid id,
@@ -103,6 +110,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}/image")]
+    [RequireFeature(FeatureCodes.CatalogProducts)]
     public async Task<ActionResult<ProductListItemDto>> RemoveImage(Guid id, CancellationToken cancellationToken = default)
     {
         var updated = await _products.RemoveImageAsync(id, cancellationToken);
@@ -110,6 +118,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/recipe")]
+    [RequireFeature(FeatureCodes.CatalogProducts)]
     public async Task<ActionResult<ProductRecipeDto>> SetRecipe(
         Guid id,
         [FromBody] SetProductRecipeDto dto,
@@ -129,6 +138,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet("{id:guid}/bundle")]
+    [RequireSalonCatalogProductsRead]
     public async Task<ActionResult<ProductBundleDto>> GetBundle(Guid id, CancellationToken cancellationToken = default)
     {
         var bundle = await _products.GetBundleAsync(id, cancellationToken);
@@ -136,6 +146,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/bundle")]
+    [RequireFeature(FeatureCodes.CatalogProducts)]
     public async Task<ActionResult<ProductBundleDto>> SetBundle(
         Guid id,
         [FromBody] SetProductBundleDto dto,

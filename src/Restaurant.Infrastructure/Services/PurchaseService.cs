@@ -34,17 +34,40 @@ public sealed class PurchaseService : IPurchaseService
         _mapper = mapper;
     }
 
-    public Task<PagedResult<PurchaseListItemDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default) =>
-        ListQueryHelpers.ToPagedResultAsync(
-            _purchases.Query()
-                .AsNoTracking()
-                .Include(p => p.Provider)
-                .Include(p => p.Lines),
-            query,
-            q => PagedEntityQueries.ShapePurchases(q, query),
-            entities => Task.FromResult<IReadOnlyList<PurchaseListItemDto>>(
-                _mapper.Map<IReadOnlyList<PurchaseListItemDto>>(entities.ToList())),
-            cancellationToken);
+    public async Task<PagedResult<PurchaseListItemDto>> ListAsync(
+        ListQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var (page, pageSize) = query.Normalize();
+        var shaped = PagedEntityQueries.ShapePurchases(_purchases.Query().AsNoTracking(), query);
+        var projected = shaped.Select(p => new PurchaseListItemDto
+        {
+            Id = p.Id,
+            ProviderId = p.ProviderId,
+            ProviderName = p.Provider.Name,
+            BillNumber = p.BillNumber,
+            PurchasedAtUtc = p.PurchasedAtUtc,
+            PaymentDateUtc = p.PaymentDateUtc,
+            Subtotal = p.Subtotal,
+            TaxAmount = p.TaxAmount,
+            Total = p.Total,
+            LineCount = p.Lines.Count,
+        });
+
+        var totalCount = await projected.CountAsync(cancellationToken);
+        var items = await projected
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<PurchaseListItemDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+        };
+    }
 
     public async Task<PurchaseDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {

@@ -1,5 +1,6 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Restaurant.Application.Common.Interfaces;
@@ -10,7 +11,7 @@ using Restaurant.Infrastructure.Persistence;
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[RequireFeature(FeatureCodes.PaymentsCheckout)]
 [Route("api/[controller]")]
 public sealed class BillsController : ControllerBase
 {

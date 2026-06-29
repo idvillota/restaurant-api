@@ -420,6 +420,23 @@ public static class DevelopmentDataSeeder
                 cancellationToken);
         }
 
+        for (var i = 0; i < DefaultIngredientMovementTypes.All.Length; i++)
+        {
+            var def = DefaultIngredientMovementTypes.All[i];
+            await db.IngredientMovementTypes.AddAsync(
+                new IngredientMovementType
+                {
+                    Id = DevelopmentSeedIds.IngredientMovementTypeIds[i],
+                    TenantId = tenantId,
+                    Name = def.Name,
+                    Description = def.Description,
+                    IsInput = def.IsInput,
+                    SortOrder = def.SortOrder,
+                    IsActive = true,
+                },
+                cancellationToken);
+        }
+
         var typeNames = new[]
         {
             "Pizzas", "Pastas", "Ensaladas", "Hamburguesas", "Postres", "Refrescos", "Cerveza", "Vino", "Entradas", "Especiales", "Promociones",

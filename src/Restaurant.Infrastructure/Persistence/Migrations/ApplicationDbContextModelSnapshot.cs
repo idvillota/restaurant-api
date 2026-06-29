@@ -120,6 +120,8 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "Number")
                         .IsUnique();
 
+                    b.HasIndex("TenantId", "PaidAtUtc");
+
                     b.ToTable("Bills");
                 });
 
@@ -169,6 +171,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("UnitCostPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 2)
@@ -350,6 +356,8 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "TaxId");
 
                     b.ToTable("Customers");
                 });
@@ -598,6 +606,137 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.ToTable("IngredientCategories");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.IngredientMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IngredientMovementDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("StockQuantitySnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("UnitCostSnapshot")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngredientId");
+
+                    b.HasIndex("IngredientMovementDocumentId", "IngredientId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "IngredientId");
+
+                    b.ToTable("IngredientMovements");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.IngredientMovementDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("IngredientMovementTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("IngredientMovementTypeId");
+
+                    b.HasIndex("TenantId", "DocumentNumber");
+
+                    b.HasIndex("TenantId", "OccurredAtUtc");
+
+                    b.ToTable("IngredientMovementDocuments");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.IngredientMovementType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsInput")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.ToTable("IngredientMovementTypes");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.Invoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -710,13 +849,52 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BillId");
 
-                    b.HasIndex("CashierShiftId");
-
                     b.HasIndex("InvoiceId");
 
                     b.HasIndex("SalesOrderId");
 
+                    b.HasIndex("CashierShiftId", "Status");
+
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.PrinterStation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("PrinterStations");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.Product", b =>
@@ -877,6 +1055,39 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.ToTable("ProductTypes");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.ProductTypePrinterMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PrinterStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrinterStationId");
+
+                    b.HasIndex("ProductTypeId");
+
+                    b.HasIndex("TenantId", "ProductTypeId")
+                        .IsUnique();
+
+                    b.ToTable("ProductTypePrinterMappings");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.Provider", b =>
                 {
                     b.Property<Guid>("Id")
@@ -976,6 +1187,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "BillNumber")
                         .IsUnique();
+
+                    b.HasIndex("TenantId", "PaymentDateUtc");
+
+                    b.HasIndex("TenantId", "PurchasedAtUtc");
 
                     b.ToTable("Purchases");
                 });
@@ -1222,6 +1437,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("DiningTableId");
 
+                    b.HasIndex("TenantId", "ClosedAtUtc");
+
+                    b.HasIndex("TenantId", "Status");
+
                     b.HasIndex("TenantId", "DiningTableId", "Status");
 
                     b.ToTable("SalesOrders");
@@ -1260,6 +1479,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("UnitCostPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -1271,7 +1494,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.HasIndex("SalesOrderId");
+                    b.HasIndex("SalesOrderId", "SentToKitchenAtUtc");
+
+                    b.HasIndex("TenantId", "CreatedAtUtc");
 
                     b.ToTable("SalesOrderLines");
                 });
@@ -1319,12 +1544,20 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("ForecastDays")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("GeneratedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("HtmlContent")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("ReportType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateOnly>("SalesEndDate")
                         .HasColumnType("date");
@@ -1340,7 +1573,7 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId", "SalesStartDate", "SalesEndDate", "CacheDate")
+                    b.HasIndex("TenantId", "ReportType", "SalesStartDate", "SalesEndDate", "ForecastDays", "CacheDate")
                         .IsUnique();
 
                     b.ToTable("StrategicAiReportCaches");
@@ -1409,6 +1642,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
+
+                    b.Property<string>("DashboardLayoutJson")
+                        .HasColumnType("text");
 
                     b.Property<int>("DianNextConsecutive")
                         .HasColumnType("integer");
@@ -1480,6 +1716,16 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("BrandTheme")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ColorScheme")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1684,6 +1930,44 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("IngredientCategory");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.IngredientMovement", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.IngredientMovementDocument", "Document")
+                        .WithMany("Lines")
+                        .HasForeignKey("IngredientMovementDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+
+                    b.Navigation("Ingredient");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.IngredientMovementDocument", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.IngredientMovementType", "MovementType")
+                        .WithMany("Documents")
+                        .HasForeignKey("IngredientMovementTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("MovementType");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.Invoice", b =>
                 {
                     b.HasOne("Restaurant.Domain.Entities.Bill", "Bill")
@@ -1781,6 +2065,25 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("Ingredient");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.ProductTypePrinterMapping", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.PrinterStation", "PrinterStation")
+                        .WithMany("ProductTypeMappings")
+                        .HasForeignKey("PrinterStationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.ProductType", "ProductType")
+                        .WithMany()
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PrinterStation");
+
+                    b.Navigation("ProductType");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.Purchase", b =>
@@ -2011,9 +2314,24 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("Ingredients");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.IngredientMovementDocument", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.IngredientMovementType", b =>
+                {
+                    b.Navigation("Documents");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.Invoice", b =>
                 {
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.PrinterStation", b =>
+                {
+                    b.Navigation("ProductTypeMappings");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.Product", b =>

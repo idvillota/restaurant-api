@@ -1,12 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Inventory;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[RequireFeature(FeatureCodes.ServiceSalon)]
 [Route("api/[controller]")]
 public sealed class InventoryController : ControllerBase
 {

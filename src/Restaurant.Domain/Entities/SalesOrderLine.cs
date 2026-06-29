@@ -10,6 +10,8 @@ public class SalesOrderLine : EntityBase, ITenantScoped
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
+    /// <summary>Recipe-based unit cost captured when the order line is paid.</summary>
+    public decimal? UnitCostPrice { get; set; }
     public string? Notes { get; set; }
 
     /// <summary>When set, this line was included on a kitchen ticket for preparation.</summary>

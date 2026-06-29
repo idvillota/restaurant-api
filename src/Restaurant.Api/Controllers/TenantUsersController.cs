@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Organization.TenantUsers;
-using Restaurant.Infrastructure.Authorization;
 
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = $"{SystemRoles.Administrator},{SystemRoles.Owner},{SystemRoles.Manager}")]
+[RequireFeature(FeatureCodes.OrganizationTeam)]
 [Route("api/[controller]")]
 public sealed class TenantUsersController : ControllerBase
 {

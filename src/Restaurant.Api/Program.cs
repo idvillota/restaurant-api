@@ -1,11 +1,13 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Restaurant.Api.Middleware;
 using Restaurant.Application;
+using Restaurant.Api.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Infrastructure;
@@ -37,12 +39,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-});
+// Secured controllers use [RequireFeature]; public endpoints use [AllowAnonymous].
+builder.Services.AddFeatureAuthorization();
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -79,6 +77,16 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>(tags: ["db", "ready"]);
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -88,6 +96,8 @@ using (var scope = app.Services.CreateScope())
 
     var permissionLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     await PermissionBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
+    await IngredientMovementTypeBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
+    await KitchenPrinterBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
 
     if (app.Environment.IsDevelopment())
     {
@@ -102,6 +112,8 @@ using (var scope = app.Services.CreateScope())
             tenantContext,
             app.Environment,
             productImages);
+
+        await DevelopmentHistoricalDataSeeder.SeedAsync(db, logger, tenantContext, CancellationToken.None);
     }
 }
 
@@ -117,7 +129,9 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsDevelopment())
 {
+    app.UseForwardedHeaders();
     app.UseHttpsRedirection();
+    app.UseHsts();
 }
 
 app.UseCors();
@@ -146,4 +160,5 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
 app.Run();
