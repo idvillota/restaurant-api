@@ -8,7 +8,6 @@ using Restaurant.Application.Features.Catalog.ProductTypes;
 namespace Restaurant.Api.Controllers;
 
 [ApiController]
-[RequireFeature(FeatureCodes.CatalogProductTypes)]
 [Route("api/[controller]")]
 public sealed class ProductTypesController : ControllerBase
 {
@@ -17,12 +16,14 @@ public sealed class ProductTypesController : ControllerBase
     public ProductTypesController(IProductTypeService service) => _service = service;
 
     [HttpGet]
+    [RequireSalonCatalogProductTypesRead]
     public async Task<ActionResult<PagedResult<ProductTypeDto>>> List(
         [FromQuery] ListQuery query,
         CancellationToken cancellationToken = default) =>
         Ok(await _service.ListAsync(query, cancellationToken));
 
     [HttpGet("{id:guid}")]
+    [RequireSalonCatalogProductTypesRead]
     public async Task<ActionResult<ProductTypeDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
         var item = await _service.GetByIdAsync(id, cancellationToken);
@@ -30,6 +31,7 @@ public sealed class ProductTypesController : ControllerBase
     }
 
     [HttpPost]
+    [RequireFeature(FeatureCodes.CatalogProductTypes)]
     public async Task<ActionResult<ProductTypeDto>> Create(
         [FromBody] CreateProductTypeDto dto,
         CancellationToken cancellationToken = default)
@@ -48,6 +50,7 @@ public sealed class ProductTypesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [RequireFeature(FeatureCodes.CatalogProductTypes)]
     public async Task<ActionResult<ProductTypeDto>> Update(
         Guid id,
         [FromBody] UpdateProductTypeDto dto,
@@ -67,6 +70,7 @@ public sealed class ProductTypesController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [RequireFeature(FeatureCodes.CatalogProductTypes)]
     public async Task<IActionResult> SoftDelete(Guid id, CancellationToken cancellationToken = default)
     {
         try
