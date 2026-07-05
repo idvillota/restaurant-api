@@ -27,10 +27,6 @@ internal static class QuestPdfKitchenTicketDocument
                         column.Spacing(4);
 
                         column.Item().AlignCenter().Text($"MESA {ticket.TableCode}").Bold().FontSize(14);
-                        if (!string.IsNullOrWhiteSpace(ticket.TableZone))
-                        {
-                            column.Item().AlignCenter().Text(ticket.TableZone).FontSize(9);
-                        }
 
                         if (!string.IsNullOrWhiteSpace(ticket.PrinterStationName))
                         {

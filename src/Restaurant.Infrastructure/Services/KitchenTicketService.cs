@@ -132,9 +132,6 @@ public sealed class KitchenTicketService : IKitchenTicketService
         return new KitchenTicketModel
         {
             TableCode = order.DiningTable?.Code ?? "—",
-            TableZone = string.IsNullOrWhiteSpace(order.DiningTable?.Zone)
-                ? null
-                : order.DiningTable!.Zone!.Trim(),
             OrderNumber = order.Number,
             SentBy = sentBy,
             SentAtUtc = DateTime.UtcNow,
