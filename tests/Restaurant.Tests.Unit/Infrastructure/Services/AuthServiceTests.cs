@@ -3,6 +3,7 @@ using Moq;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Auth;
 using Restaurant.Application.Features.Organization.RolePermissions;
+using Restaurant.Application.Authorization;
 using Restaurant.Domain.Entities;
 using Restaurant.Infrastructure.Authorization;
 using Restaurant.Infrastructure.Identity;
@@ -135,5 +136,63 @@ public sealed class AuthServiceTests
 
         Assert.Equal("jwt-value", login.AccessToken);
         Assert.Equal("chef@example.com", login.Email);
+    }
+
+    [Fact]
+    public async Task LoginAsync_without_slug_throws_when_multiple_tenants()
+    {
+        using var fx = new NoTenantDbFixture();
+        await SeedFeaturesAsync(fx);
+        var sut = CreateSut(fx);
+
+        await sut.RegisterTenantAsync(
+            new RegisterTenantDto
+            {
+                TenantName = "Cafe Norte",
+                AdminEmail = "multi@example.com",
+                Password = "Secret123!",
+            });
+
+        var tenantB = new Tenant
+        {
+            Id = Guid.NewGuid(),
+            Name = "Cafe Sur",
+            Slug = "cafe-sur",
+            IsActive = true,
+        };
+        await fx.Db.Tenants.AddAsync(tenantB);
+
+        var user = await fx.Db.Users.FirstAsync(u => u.Email == "multi@example.com");
+        var role = new Role
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB.Id,
+            Name = SystemRoles.Manager,
+            NormalizedName = SystemRoles.Manager.ToUpperInvariant(),
+        };
+        await fx.Db.Roles.AddAsync(role);
+        var tenantUser = new TenantUser
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB.Id,
+            UserId = user.Id,
+            IsActive = true,
+        };
+        tenantUser.TenantUserRoles.Add(new TenantUserRole
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantB.Id,
+            TenantUserId = tenantUser.Id,
+            RoleId = role.Id,
+        });
+        await fx.Db.TenantUsers.AddAsync(tenantUser);
+        await fx.Db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<MultipleTenantsLoginException>(() =>
+            sut.LoginAsync(new LoginDto { Email = "multi@example.com", Password = "Secret123!" }));
+
+        Assert.Equal(2, ex.Tenants.Count);
+        Assert.Contains(ex.Tenants, t => t.Slug == "cafe-norte");
+        Assert.Contains(ex.Tenants, t => t.Slug == "cafe-sur");
     }
 }

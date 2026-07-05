@@ -152,6 +152,13 @@ var kitchenTicketRoot = Path.IsPathRooted(kitchenTicketOptions.RootPath)
     : Path.Combine(app.Environment.ContentRootPath, kitchenTicketOptions.RootPath);
 Directory.CreateDirectory(kitchenTicketRoot);
 
+var salesReceiptOptions = app.Configuration.GetSection(SalesReceiptOptions.SectionName).Get<SalesReceiptOptions>()
+    ?? new SalesReceiptOptions();
+var salesReceiptRoot = Path.IsPathRooted(salesReceiptOptions.RootPath)
+    ? salesReceiptOptions.RootPath
+    : Path.Combine(app.Environment.ContentRootPath, salesReceiptOptions.RootPath);
+Directory.CreateDirectory(salesReceiptRoot);
+
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(productImageRoot),

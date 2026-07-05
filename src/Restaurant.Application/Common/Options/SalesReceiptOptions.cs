@@ -4,5 +4,5 @@ public sealed class SalesReceiptOptions
 {
     public const string SectionName = "SalesReceipts";
 
-    public string RootPath { get; set; } = "orders/sales-receipts";
+    public string RootPath { get; set; } = "files/receipts";
 }

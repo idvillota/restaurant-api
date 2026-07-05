@@ -47,7 +47,20 @@ public sealed class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             _logger.LogWarning("Login failed for email: {Email} - {Message}", dto.Email, ex.Message);
-            return Unauthorized(new { message = ex.Message });
+            return Unauthorized(new { message = MapLoginErrorMessage(ex.Message) });
+        }
+        catch (MultipleTenantsLoginException ex)
+        {
+            _logger.LogInformation(
+                "Login requires tenant selection for email: {Email} ({Count} tenants)",
+                dto.Email,
+                ex.Tenants.Count);
+            return BadRequest(new
+            {
+                code = MultipleTenantsLoginException.ErrorCode,
+                message = ex.Message,
+                tenants = ex.Tenants,
+            });
         }
         catch (InvalidOperationException ex)
         {
@@ -55,4 +68,13 @@ public sealed class AuthController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    private static string MapLoginErrorMessage(string message) =>
+        message switch
+        {
+            "Invalid credentials." => "Correo o contraseña incorrectos.",
+            "No active tenant memberships." => "No tiene acceso activo a ningún local.",
+            "Tenant not found for this account." => "Ese local no está asociado a su cuenta.",
+            _ => message,
+        };
 }

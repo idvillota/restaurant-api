@@ -11,8 +11,13 @@ namespace Restaurant.Api.Controllers;
 public sealed class CashierShiftsController : ControllerBase
 {
     private readonly ICashierShiftService _service;
+    private readonly IDailyClosureService _dailyClosure;
 
-    public CashierShiftsController(ICashierShiftService service) => _service = service;
+    public CashierShiftsController(ICashierShiftService service, IDailyClosureService dailyClosure)
+    {
+        _service = service;
+        _dailyClosure = dailyClosure;
+    }
 
     [HttpGet("context")]
     [RequireOperationalCashierContextRead]
@@ -33,6 +38,17 @@ public sealed class CashierShiftsController : ControllerBase
         [FromQuery] DateOnly? businessDate,
         CancellationToken cancellationToken) =>
         OkResult(_service.ListShiftsAsync(businessDate, cancellationToken));
+
+    [HttpGet("day-summary")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
+    public async Task<ActionResult<DailyClosureReportDto>> GetDaySummary(
+        [FromQuery] DateOnly? businessDate,
+        CancellationToken cancellationToken)
+    {
+        var date = businessDate
+            ?? (await _service.GetBusinessDayContextAsync(cancellationToken)).BusinessDate;
+        return Ok(await _dailyClosure.GetDailyReportAsync(date, cancellationToken));
+    }
 
     [HttpGet("{id:guid}")]
     [RequireFeature(FeatureCodes.CashierShifts)]

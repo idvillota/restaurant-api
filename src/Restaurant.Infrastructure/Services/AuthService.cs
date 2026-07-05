@@ -168,8 +168,15 @@ public sealed class AuthService : IAuthService
         }
         else
         {
-            throw new InvalidOperationException(
-                "Multiple tenants available; specify tenantSlug (GET /api/auth/tenants can list them).");
+            var options = memberships
+                .Select(m => new LoginTenantOptionDto
+                {
+                    Slug = m.Tenant.Slug,
+                    Name = m.Tenant.Name,
+                })
+                .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            throw new MultipleTenantsLoginException(options);
         }
 
         var roles = membership.TenantUserRoles.Select(tur => tur.Role.Name).Distinct().ToList();
