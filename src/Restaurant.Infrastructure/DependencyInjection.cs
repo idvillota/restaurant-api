@@ -17,6 +17,7 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+        services.Configure<PlatformOptions>(configuration.GetSection(PlatformOptions.SectionName));
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<ICurrentTenantContext, CurrentTenantContext>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -108,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<IStrategicAiInsightService, StrategicAiInsightService>();
         services.AddScoped<IOperationalReportsService, OperationalReportsService>();
         services.AddScoped<IPublicMenuService, PublicMenuService>();
+        services.AddScoped<ITenantInitialDataImportService, TenantInitialDataImportService>();
 
         return services;
     }

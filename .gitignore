@@ -33,6 +33,9 @@ msbuild.wrn
 # Visual Studio 2015
 .vs/
 
+# Environment-specific secrets (copy from *.example.json)
+appsettings.Qa.json
+
 # Uploaded product images (local storage)
 uploads/
 
