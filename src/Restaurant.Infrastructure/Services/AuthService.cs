@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Auth;
 using Restaurant.Domain.Common;
 using Restaurant.Domain.Entities;
@@ -20,6 +22,7 @@ public sealed class AuthService : IAuthService
     private readonly IRolePermissionService _rolePermissions;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IKitchenPrinterService _kitchenPrinters;
+    private readonly PlatformOptions _platform;
 
     public AuthService(
         IUnitOfWork unitOfWork,
@@ -28,7 +31,8 @@ public sealed class AuthService : IAuthService
         IJwtTokenService jwtTokenService,
         IRolePermissionService rolePermissions,
         ICurrentTenantContext tenantContext,
-        IKitchenPrinterService kitchenPrinters)
+        IKitchenPrinterService kitchenPrinters,
+        IOptions<PlatformOptions> platform)
     {
         _unitOfWork = unitOfWork;
         _db = db;
@@ -37,6 +41,7 @@ public sealed class AuthService : IAuthService
         _rolePermissions = rolePermissions;
         _tenantContext = tenantContext;
         _kitchenPrinters = kitchenPrinters;
+        _platform = platform.Value;
     }
 
     public async Task<AuthResponseDto> RegisterTenantAsync(RegisterTenantDto dto, CancellationToken cancellationToken = default)
@@ -130,6 +135,7 @@ public sealed class AuthService : IAuthService
             Email = user.Email,
             Roles = new[] { SystemRoles.Administrator },
             Permissions = permissions,
+            IsPlatformAdmin = IsPlatformAdminEmail(user.Email),
             BrandTheme = UserPreferences.NormalizeBrandTheme(tenantUser.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(tenantUser.ColorScheme),
         };
@@ -199,9 +205,16 @@ public sealed class AuthService : IAuthService
             Email = user.Email,
             Roles = roles,
             Permissions = permissions,
+            IsPlatformAdmin = IsPlatformAdminEmail(user.Email),
             BrandTheme = UserPreferences.NormalizeBrandTheme(membership.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(membership.ColorScheme),
         };
+    }
+
+    private bool IsPlatformAdminEmail(string email)
+    {
+        var allowed = _platform.AdminEmails ?? [];
+        return allowed.Any(a => string.Equals(a.Trim(), email.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task AssignDefaultRolePermissionsAsync(

@@ -42,7 +42,15 @@ public static class FeatureAuthorizationExtensions
                         HasPermission(context, FeatureCodes.CashierShifts)
                         || HasPermission(context, FeatureCodes.PaymentsCheckout)
                         || HasPermission(context, FeatureCodes.ReportsDailyClosure)));
+
+            options.AddPolicy(
+                PlatformAuthorizationPolicies.PlatformAdmin,
+                policy => policy
+                    .RequireAuthenticatedUser()
+                    .AddRequirements(new PlatformAdminRequirement()));
         });
+
+        services.AddSingleton<IAuthorizationHandler, PlatformAdminAuthorizationHandler>();
 
         return services;
     }

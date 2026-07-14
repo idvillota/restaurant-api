@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Moq;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Auth;
 using Restaurant.Application.Features.Organization.RolePermissions;
 using Restaurant.Application.Authorization;
@@ -52,6 +54,10 @@ public sealed class AuthServiceTests
         kitchenPrinters
             .Setup(s => s.EnsureDefaultStationAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        var platform = Options.Create(new PlatformOptions
+        {
+            AdminEmails = ["idvillota@gmail.com"],
+        });
         return new AuthService(
             fx.UnitOfWork,
             fx.Db,
@@ -59,7 +65,8 @@ public sealed class AuthServiceTests
             jwt.Object,
             rolePermissions,
             tenantContext,
-            kitchenPrinters.Object);
+            kitchenPrinters.Object,
+            platform);
     }
 
     [Fact]
