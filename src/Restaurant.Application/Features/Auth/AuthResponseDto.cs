@@ -9,6 +9,8 @@ public sealed class AuthResponseDto
     public string Email { get; set; } = string.Empty;
     public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
+    /// <summary>True when email is listed in Platform:AdminEmails (cross-tenant ops).</summary>
+    public bool IsPlatformAdmin { get; set; }
     public string BrandTheme { get; set; } = string.Empty;
     public string ColorScheme { get; set; } = string.Empty;
 }
