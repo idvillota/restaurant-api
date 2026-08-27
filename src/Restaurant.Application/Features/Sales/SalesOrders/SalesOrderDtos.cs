@@ -98,3 +98,35 @@ public sealed class TableServiceSummaryDto
 
     public int OpenOrderPendingKitchenLineCount { get; set; }
 }
+
+public sealed class RelocateOrderDto
+{
+    [Required]
+    public Guid TargetTableId { get; set; }
+
+    /// <summary>
+    /// When the target table is busy: null = ask client to confirm merge;
+    /// false = cancel (no changes); true = merge into the target order.
+    /// Ignored when the target is free.
+    /// </summary>
+    public bool? MergeIfTargetBusy { get; set; }
+}
+
+public static class RelocateOrderActions
+{
+    public const string Transferred = "transferred";
+    public const string Merged = "merged";
+    public const string Cancelled = "cancelled";
+    public const string MergeRequired = "merge_required";
+}
+
+public sealed class RelocateOrderResultDto
+{
+    public string Action { get; set; } = string.Empty;
+    public SalesOrderDto? Order { get; set; }
+    public Guid? SourceTableId { get; set; }
+    public Guid? TargetTableId { get; set; }
+    public string? TargetTableCode { get; set; }
+    public Guid? TargetOrderId { get; set; }
+    public string? Message { get; set; }
+}

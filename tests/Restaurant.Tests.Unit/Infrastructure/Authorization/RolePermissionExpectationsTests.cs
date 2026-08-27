@@ -25,6 +25,7 @@ public sealed class RolePermissionExpectationsTests
         var permissions = Permissions(SystemRoles.Waitress);
 
         Assert.Contains(FeatureCodes.ServiceSalon, permissions);
+        Assert.Contains(FeatureCodes.ServiceRelocateTable, permissions);
         Assert.Contains(FeatureCodes.ReservationsManage, permissions);
         Assert.Contains(FeatureCodes.CustomersManage, permissions);
         Assert.DoesNotContain(FeatureCodes.CatalogProducts, permissions);

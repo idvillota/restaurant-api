@@ -352,6 +352,152 @@ public sealed class SalesOrderService : ISalesOrderService
         };
     }
 
+    public async Task<RelocateOrderResultDto?> RelocateOrderAsync(
+        Guid sourceOrderId,
+        RelocateOrderDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
+        if (dto.TargetTableId == Guid.Empty)
+            throw new InvalidOperationException("Debe indicar la mesa de destino.");
+
+        var sourceOrder = await OrderWithLinesQuery(tracked: true)
+            .FirstOrDefaultAsync(o => o.Id == sourceOrderId, cancellationToken);
+
+        if (sourceOrder is null)
+            return null;
+
+        if (sourceOrder.Status is not (SalesOrderStatus.Draft or SalesOrderStatus.Open))
+            throw new InvalidOperationException("Solo se pueden mover pedidos activos (borrador o abiertos).");
+
+        if (sourceOrder.DiningTableId is not { } sourceTableId)
+            throw new InvalidOperationException("El pedido no está asociado a una mesa.");
+
+        if (sourceTableId == dto.TargetTableId)
+            throw new InvalidOperationException("La mesa de destino debe ser distinta a la mesa actual.");
+
+        var sourceTable = await _tables.GetByIdAsync(sourceTableId, cancellationToken)
+            ?? throw new InvalidOperationException("No se encontró la mesa de origen.");
+
+        var targetTable = await _tables.GetByIdAsync(dto.TargetTableId, cancellationToken);
+        if (targetTable is null || !targetTable.IsActive)
+            throw new InvalidOperationException("La mesa de destino no existe o está inactiva.");
+
+        await EnsureNoOpenBillForOrderAsync(sourceOrder.Id, cancellationToken);
+
+        var targetOrder = await OrderWithLinesQuery(tracked: true)
+            .FirstOrDefaultAsync(
+                o => o.DiningTableId == dto.TargetTableId &&
+                     (o.Status == SalesOrderStatus.Draft || o.Status == SalesOrderStatus.Open),
+                cancellationToken);
+
+        var targetBusy = targetOrder is not null
+            || targetTable.Status is ETableStatus.Busy or ETableStatus.Reserved;
+
+        if (targetBusy)
+        {
+            if (targetOrder is null)
+                throw new InvalidOperationException(
+                    "La mesa de destino está ocupada o reservada pero no tiene un pedido activo. Libere la mesa o inicie el pedido antes de fusionar.");
+
+            await EnsureNoOpenBillForOrderAsync(targetOrder.Id, cancellationToken);
+
+            if (dto.MergeIfTargetBusy is null)
+            {
+                return new RelocateOrderResultDto
+                {
+                    Action = RelocateOrderActions.MergeRequired,
+                    SourceTableId = sourceTableId,
+                    TargetTableId = targetTable.Id,
+                    TargetTableCode = targetTable.Code,
+                    TargetOrderId = targetOrder.Id,
+                    Message =
+                        $"La mesa {targetTable.Code} tiene un pedido abierto. ¿Desea fusionar los pedidos?",
+                };
+            }
+
+            if (dto.MergeIfTargetBusy == false)
+            {
+                return new RelocateOrderResultDto
+                {
+                    Action = RelocateOrderActions.Cancelled,
+                    SourceTableId = sourceTableId,
+                    TargetTableId = targetTable.Id,
+                    TargetTableCode = targetTable.Code,
+                    TargetOrderId = targetOrder.Id,
+                    Message = "Cambio de mesa cancelado.",
+                };
+            }
+
+            var sourceLines = DistinctLines(sourceOrder.Lines).ToList();
+            foreach (var line in sourceLines)
+            {
+                sourceOrder.Lines.Remove(line);
+                line.SalesOrderId = targetOrder.Id;
+                targetOrder.Lines.Add(line);
+                _lines.Update(line);
+            }
+
+            RecalculateOrderTotals(targetOrder);
+            if (targetOrder.Status == SalesOrderStatus.Draft && sourceOrder.Status == SalesOrderStatus.Open)
+                targetOrder.Status = SalesOrderStatus.Open;
+
+            sourceOrder.Status = SalesOrderStatus.Voided;
+            sourceOrder.ClosedAtUtc = DateTime.UtcNow;
+            sourceOrder.DiningTableId = null;
+            RecalculateOrderTotals(sourceOrder);
+
+            _orders.Update(targetOrder);
+            _orders.Update(sourceOrder);
+
+            SetTableAvailable(sourceTable);
+            if (targetTable.Status != ETableStatus.Busy)
+            {
+                TableStatusTransitions.EnsureCanTransition(targetTable.Status, ETableStatus.Busy);
+                targetTable.Status = ETableStatus.Busy;
+                _tables.Update(targetTable);
+            }
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return new RelocateOrderResultDto
+            {
+                Action = RelocateOrderActions.Merged,
+                Order = await GetByIdAsync(targetOrder.Id, cancellationToken),
+                SourceTableId = sourceTableId,
+                TargetTableId = targetTable.Id,
+                TargetTableCode = targetTable.Code,
+                TargetOrderId = targetOrder.Id,
+                Message = $"Pedidos fusionados en la mesa {targetTable.Code}.",
+            };
+        }
+
+        sourceOrder.DiningTableId = targetTable.Id;
+        _orders.Update(sourceOrder);
+
+        SetTableAvailable(sourceTable);
+        if (targetTable.Status != ETableStatus.Busy)
+        {
+            TableStatusTransitions.EnsureCanTransition(targetTable.Status, ETableStatus.Busy);
+            targetTable.Status = ETableStatus.Busy;
+            _tables.Update(targetTable);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new RelocateOrderResultDto
+        {
+            Action = RelocateOrderActions.Transferred,
+            Order = await GetByIdAsync(sourceOrder.Id, cancellationToken),
+            SourceTableId = sourceTableId,
+            TargetTableId = targetTable.Id,
+            TargetTableCode = targetTable.Code,
+            TargetOrderId = sourceOrder.Id,
+            Message = $"Pedido trasladado a la mesa {targetTable.Code}.",
+        };
+    }
+
     private async Task ApplyLineToOrderAsync(
         SalesOrder order,
         AddSalesOrderLineDto dto,
@@ -582,5 +728,33 @@ public sealed class SalesOrderService : ISalesOrderService
         if (day.ClosureStatus == DailyClosureStatus.Closed)
             throw new InvalidOperationException(
                 "El día operativo está cerrado. Tras el cierre diario, el sistema pasa al siguiente día operativo: abra un turno de caja antes de tomar pedidos o cobrar.");
+    }
+
+    private void SetTableAvailable(DiningTable table)
+    {
+        if (table.Status is ETableStatus.Busy or ETableStatus.Reserved)
+        {
+            TableStatusTransitions.EnsureCanTransition(table.Status, ETableStatus.Available);
+            table.Status = ETableStatus.Available;
+            _tables.Update(table);
+        }
+        else if (table.Status != ETableStatus.Available)
+        {
+            table.Status = ETableStatus.Available;
+            _tables.Update(table);
+        }
+    }
+
+    private async Task EnsureNoOpenBillForOrderAsync(Guid salesOrderId, CancellationToken cancellationToken)
+    {
+        var hasOpenBill = await (
+            from link in _db.Set<BillSalesOrder>().AsNoTracking()
+            join bill in _db.Set<Bill>().AsNoTracking() on link.BillId equals bill.Id
+            where link.SalesOrderId == salesOrderId && bill.Status == BillStatus.Issued
+            select link.BillId).AnyAsync(cancellationToken);
+
+        if (hasOpenBill)
+            throw new InvalidOperationException(
+                "No se puede cambiar de mesa mientras exista una cuenta abierta. Cierre o anule la cuenta primero.");
     }
 }
