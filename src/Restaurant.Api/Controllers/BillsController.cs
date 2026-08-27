@@ -2,9 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Restaurant.Api.Authorization;
 using Restaurant.Application.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Restaurant.Application.Common.Interfaces;
-using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Sales.Bills;
 using Restaurant.Infrastructure.Persistence;
 
@@ -17,20 +15,16 @@ public sealed class BillsController : ControllerBase
 {
     private readonly IBillService _service;
     private readonly ApplicationDbContext _db;
-    private readonly string _receiptRoot;
+    private readonly IGeneratedFileStorage _fileStorage;
 
     public BillsController(
         IBillService service,
         ApplicationDbContext db,
-        IOptions<SalesReceiptOptions> receiptOptions,
-        IHostEnvironment environment)
+        IGeneratedFileStorage fileStorage)
     {
         _service = service;
         _db = db;
-        var rootPath = receiptOptions.Value.RootPath.Trim().TrimEnd('/', '\\');
-        _receiptRoot = Path.IsPathRooted(rootPath)
-            ? rootPath
-            : Path.Combine(environment.ContentRootPath, rootPath);
+        _fileStorage = fileStorage;
     }
 
     [HttpGet("payable")]
@@ -82,14 +76,11 @@ public sealed class BillsController : ControllerBase
         if (bill?.ReceiptPdfRelativePath is null)
             return NotFound();
 
-        var path = Path.Combine(_receiptRoot, bill.ReceiptPdfRelativePath.Replace('/', Path.DirectorySeparatorChar));
-        if (!System.IO.File.Exists(path))
+        var file = await _fileStorage.OpenReadAsync(bill.ReceiptPdfRelativePath, cancellationToken);
+        if (file is null)
             return NotFound();
 
-        return PhysicalFile(
-            path,
-            "application/pdf",
-            $"factura-{bill.DianConsecutiveNumber}.pdf");
+        return File(file.Stream, "application/pdf", $"factura-{bill.DianConsecutiveNumber}.pdf");
     }
 
     [HttpGet("{id:guid}/receipt/xml")]
@@ -99,13 +90,10 @@ public sealed class BillsController : ControllerBase
         if (bill?.ReceiptXmlRelativePath is null)
             return NotFound();
 
-        var path = Path.Combine(_receiptRoot, bill.ReceiptXmlRelativePath.Replace('/', Path.DirectorySeparatorChar));
-        if (!System.IO.File.Exists(path))
+        var file = await _fileStorage.OpenReadAsync(bill.ReceiptXmlRelativePath, cancellationToken);
+        if (file is null)
             return NotFound();
 
-        return PhysicalFile(
-            path,
-            "application/xml",
-            $"factura-{bill.DianConsecutiveNumber}.xml");
+        return File(file.Stream, "application/xml", $"factura-{bill.DianConsecutiveNumber}.xml");
     }
 }

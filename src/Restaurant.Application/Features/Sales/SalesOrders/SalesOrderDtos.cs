@@ -79,7 +79,7 @@ public sealed class ConfirmSalesOrderResultDto
 {
     public SalesOrderDto Order { get; set; } = null!;
 
-    /// <summary>Relative paths under the comanda files root (files/orders).</summary>
+    /// <summary>Storage-relative paths for the comanda PDFs (orders/{tenant}/...).</summary>
     public List<KitchenTicketFileDto> KitchenTickets { get; set; } = [];
 }
 

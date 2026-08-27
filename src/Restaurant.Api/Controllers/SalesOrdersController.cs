@@ -70,6 +70,13 @@ public sealed class SalesOrdersController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
+        catch (Exception ex)
+        {
+            // Kitchen PDF / file storage failures otherwise return empty 500 under env "dev".
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { message = $"No se pudo enviar a cocina (PDF/almacenamiento): {ex.Message}" });
+        }
     }
 
     [HttpDelete("{orderId:guid}/lines/{lineId:guid}")]
