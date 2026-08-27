@@ -89,6 +89,9 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// Local (local DB) seeds demo data + Swagger; dev/production skip seeding and enforce HTTPS.
+var isLocal = app.Environment.IsEnvironment("local");
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -99,7 +102,7 @@ using (var scope = app.Services.CreateScope())
     await IngredientMovementTypeBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
     await KitchenPrinterBootstrap.EnsureAsync(db, permissionLogger, CancellationToken.None);
 
-    if (app.Environment.IsDevelopment())
+    if (isLocal)
     {
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         var tenantContext = scope.ServiceProvider.GetRequiredService<ICurrentTenantContext>();
@@ -117,7 +120,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-if (app.Environment.IsDevelopment())
+if (isLocal)
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
@@ -127,7 +130,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-if (!app.Environment.IsDevelopment())
+if (!isLocal)
 {
     app.UseForwardedHeaders();
     app.UseHttpsRedirection();
@@ -144,20 +147,6 @@ var productImageRoot = Path.IsPathRooted(productImageOptions.RootPath)
     ? productImageOptions.RootPath
     : Path.Combine(app.Environment.ContentRootPath, productImageOptions.RootPath);
 Directory.CreateDirectory(productImageRoot);
-
-var kitchenTicketOptions = app.Configuration.GetSection(KitchenTicketOptions.SectionName).Get<KitchenTicketOptions>()
-    ?? new KitchenTicketOptions();
-var kitchenTicketRoot = Path.IsPathRooted(kitchenTicketOptions.RootPath)
-    ? kitchenTicketOptions.RootPath
-    : Path.Combine(app.Environment.ContentRootPath, kitchenTicketOptions.RootPath);
-Directory.CreateDirectory(kitchenTicketRoot);
-
-var salesReceiptOptions = app.Configuration.GetSection(SalesReceiptOptions.SectionName).Get<SalesReceiptOptions>()
-    ?? new SalesReceiptOptions();
-var salesReceiptRoot = Path.IsPathRooted(salesReceiptOptions.RootPath)
-    ? salesReceiptOptions.RootPath
-    : Path.Combine(app.Environment.ContentRootPath, salesReceiptOptions.RootPath);
-Directory.CreateDirectory(salesReceiptRoot);
 
 app.UseStaticFiles(new StaticFileOptions
 {

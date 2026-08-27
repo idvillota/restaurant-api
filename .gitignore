@@ -34,7 +34,12 @@ msbuild.wrn
 .vs/
 
 # Environment-specific secrets (copy from *.example.json)
-appsettings.Qa.json
+appsettings.dev.json
+appsettings.local.json
+appsettings.Production.json
+
+# Local-only secrets (connection strings, tokens)
+.local/
 
 # Uploaded product images (local storage)
 uploads/
