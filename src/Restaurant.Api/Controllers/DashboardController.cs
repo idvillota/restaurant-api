@@ -33,6 +33,7 @@ public sealed class DashboardController : ControllerBase
 
     [HttpGet("catalog")]
     [RequireFeature(FeatureCodes.DashboardConfigure)]
-    public ActionResult<IReadOnlyList<DashboardWidgetDefinitionDto>> GetCatalog() =>
-        Ok(_service.GetCatalog());
+    public async Task<ActionResult<IReadOnlyList<DashboardWidgetDefinitionDto>>> GetCatalog(
+        CancellationToken cancellationToken = default) =>
+        Ok(await _service.GetCatalogAsync(cancellationToken));
 }

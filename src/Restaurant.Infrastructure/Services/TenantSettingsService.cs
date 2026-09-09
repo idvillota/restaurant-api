@@ -51,6 +51,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.DianResolutionTo = dto.DianResolutionTo;
         settings.InvoiceNumberPrefix = dto.InvoiceNumberPrefix?.Trim();
         settings.ImpoconsumoPercent = dto.ImpoconsumoPercent;
+        settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
 
@@ -74,6 +75,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             ImpoconsumoPercent = 8m,
             TaxRegime = "Régimen Simplificado",
             Country = "Colombia",
+            ShowOperationalSalesPanel = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -127,5 +129,6 @@ public sealed class TenantSettingsService : ITenantSettingsService
             DianNextConsecutive = settings.DianNextConsecutive,
             InvoiceNumberPrefix = settings.InvoiceNumberPrefix,
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
+            ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
         };
 }

@@ -27,23 +27,74 @@ public sealed class DashboardService : IDashboardService
     public async Task<DashboardLayoutDto> GetLayoutAsync(CancellationToken cancellationToken = default)
     {
         var settings = await GetOrCreateSettingsAsync(cancellationToken);
-        return DeserializeLayout(settings.DashboardLayoutJson) ?? DefaultDashboardLayout.Create();
+        var layout = DeserializeLayout(settings.DashboardLayoutJson) ?? DefaultDashboardLayout.Create();
+        return ApplyOperationalSalesPanelVisibility(layout, settings.ShowOperationalSalesPanel);
     }
 
     public async Task<DashboardLayoutDto> UpdateLayoutAsync(
         DashboardLayoutDto layout,
         CancellationToken cancellationToken = default)
     {
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        layout = ApplyOperationalSalesPanelVisibility(layout, settings.ShowOperationalSalesPanel);
         ValidateLayout(layout);
 
-        var settings = await GetOrCreateSettingsAsync(cancellationToken);
         settings.DashboardLayoutJson = JsonSerializer.Serialize(layout, JsonOptions);
         _db.TenantSettings.Update(settings);
         await _db.SaveChangesAsync(cancellationToken);
         return layout;
     }
 
-    public IReadOnlyList<DashboardWidgetDefinitionDto> GetCatalog() => DashboardCatalog.Widgets;
+    public async Task<IReadOnlyList<DashboardWidgetDefinitionDto>> GetCatalogAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        if (settings.ShowOperationalSalesPanel)
+            return DashboardCatalog.Widgets;
+
+        return DashboardCatalog.Widgets
+            .Where(w => w.WidgetType != DashboardCatalog.OperationalSalesDetailWidgetType)
+            .ToList();
+    }
+
+    private static DashboardLayoutDto ApplyOperationalSalesPanelVisibility(
+        DashboardLayoutDto layout,
+        bool show)
+    {
+        var panels = layout.Panels
+            .Where(p => p.WidgetType != DashboardCatalog.OperationalSalesDetailWidgetType)
+            .ToList();
+
+        if (show)
+        {
+            var existing = layout.Panels.FirstOrDefault(
+                p => p.WidgetType == DashboardCatalog.OperationalSalesDetailWidgetType);
+            if (existing is not null)
+            {
+                panels.Add(existing);
+            }
+            else
+            {
+                var y = panels.Count == 0 ? 0 : panels.Max(p => p.Y + p.H);
+                panels.Add(
+                    new DashboardPanelDto
+                    {
+                        Id = "operational-sales-detail",
+                        WidgetType = DashboardCatalog.OperationalSalesDetailWidgetType,
+                        X = 0,
+                        Y = y,
+                        W = 6,
+                        H = 4,
+                    });
+            }
+        }
+
+        return new DashboardLayoutDto
+        {
+            Version = layout.Version,
+            Panels = panels,
+        };
+    }
 
     private static void ValidateLayout(DashboardLayoutDto layout)
     {
@@ -104,6 +155,7 @@ public sealed class DashboardService : IDashboardService
             ImpoconsumoPercent = 8m,
             TaxRegime = "Régimen Simplificado",
             Country = "Colombia",
+            ShowOperationalSalesPanel = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);

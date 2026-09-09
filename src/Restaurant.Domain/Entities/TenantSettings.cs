@@ -32,5 +32,11 @@ public class TenantSettings : ITenantScoped
     /// <summary>JSON layout for tenant dashboard panels (react-grid-layout).</summary>
     public string? DashboardLayoutJson { get; set; }
 
+    /// <summary>
+    /// When true, the dashboard may show the operational sales detail panel
+    /// (bills for today / current shift). Default true for new tenants.
+    /// </summary>
+    public bool ShowOperationalSalesPanel { get; set; } = true;
+
     public Tenant Tenant { get; set; } = null!;
 }

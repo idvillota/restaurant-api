@@ -24,7 +24,7 @@ public static class DefaultDashboardLayout
                     X = 0,
                     Y = 3,
                     W = 4,
-                    H = 2,
+                    H = 3,
                     Config = new Dictionary<string, System.Text.Json.JsonElement>
                     {
                         ["days"] = System.Text.Json.JsonSerializer.SerializeToElement(7),
@@ -37,7 +37,7 @@ public static class DefaultDashboardLayout
                     X = 4,
                     Y = 3,
                     W = 4,
-                    H = 2,
+                    H = 3,
                 },
                 new DashboardPanelDto
                 {
@@ -46,14 +46,14 @@ public static class DefaultDashboardLayout
                     X = 8,
                     Y = 3,
                     W = 4,
-                    H = 2,
+                    H = 3,
                 },
                 new DashboardPanelDto
                 {
                     Id = "sales-trend",
                     WidgetType = "sales_trend",
                     X = 0,
-                    Y = 5,
+                    Y = 6,
                     W = 8,
                     H = 4,
                     Config = new Dictionary<string, System.Text.Json.JsonElement>
@@ -66,13 +66,22 @@ public static class DefaultDashboardLayout
                     Id = "low-stock",
                     WidgetType = "ingredients_low_stock",
                     X = 8,
-                    Y = 5,
+                    Y = 6,
                     W = 4,
                     H = 4,
                     Config = new Dictionary<string, System.Text.Json.JsonElement>
                     {
                         ["limit"] = System.Text.Json.JsonSerializer.SerializeToElement(8),
                     },
+                },
+                new DashboardPanelDto
+                {
+                    Id = "operational-sales-detail",
+                    WidgetType = "operational_sales_detail",
+                    X = 0,
+                    Y = 10,
+                    W = 6,
+                    H = 4,
                 },
             ],
         };
