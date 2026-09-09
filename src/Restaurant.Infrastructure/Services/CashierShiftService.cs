@@ -266,6 +266,7 @@ public sealed class CashierShiftService : ICashierShiftService
                     PaymentId = p.Id,
                     BillId = b.Id,
                     BillNumber = b.Number,
+                    TableCodes = b.TableCodesSnapshot,
                     Amount = p.Amount,
                     Method = p.Method,
                     ExternalReference = p.ExternalReference,
@@ -273,6 +274,8 @@ public sealed class CashierShiftService : ICashierShiftService
                 })
             .OrderBy(p => p.PaidAtUtc)
             .ToListAsync(cancellationToken);
+
+        await ShiftPaymentTableCodes.FillMissingAsync(_db, payments, cancellationToken);
 
         var outflows = await _db.CashMovements
             .AsNoTracking()

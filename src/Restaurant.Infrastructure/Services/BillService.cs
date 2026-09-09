@@ -143,7 +143,7 @@ public sealed class BillService : IBillService
             settings.InvoiceNumberPrefix,
             dianConsecutive);
 
-        var tableCodes = string.Join(", ", orders.Select(o => o.DiningTable?.Code).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct());
+        var tableCodes = await ResolveTableCodesSnapshotAsync(orders, cancellationToken);
         var orderNumbers = string.Join(", ", orders.Select(o => o.Number).Distinct());
 
         var bill = new Bill
@@ -164,7 +164,7 @@ public sealed class BillService : IBillService
             ProcessedByUserId = processedByUserId,
             DianConsecutiveNumber = dianConsecutive,
             ProcessedByDisplayName = cashierName,
-            TableCodesSnapshot = string.IsNullOrWhiteSpace(tableCodes) ? null : tableCodes,
+            TableCodesSnapshot = tableCodes,
             OrderNumbersSnapshot = orderNumbers,
         };
 
@@ -540,6 +540,39 @@ public sealed class BillService : IBillService
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         return settings;
+    }
+
+    private async Task<string?> ResolveTableCodesSnapshotAsync(
+        IReadOnlyList<SalesOrder> orders,
+        CancellationToken cancellationToken)
+    {
+        var fromNav = orders
+            .Select(o => o.DiningTable?.Code)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (fromNav.Count > 0)
+            return string.Join(", ", fromNav);
+
+        var tableIds = orders
+            .Select(o => o.DiningTableId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        if (tableIds.Count == 0)
+            return null;
+
+        var codes = await _db.DiningTables.AsNoTracking()
+            .Where(t => tableIds.Contains(t.Id))
+            .Select(t => t.Code)
+            .Where(c => c != null && c != "")
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return codes.Count == 0 ? null : string.Join(", ", codes);
     }
 
     private IQueryable<SalesOrder> LoadOpenOrdersReadQuery() =>

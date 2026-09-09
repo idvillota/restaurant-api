@@ -10,5 +10,6 @@ public interface IDashboardService
         DashboardLayoutDto layout,
         CancellationToken cancellationToken = default);
 
-    IReadOnlyList<DashboardWidgetDefinitionDto> GetCatalog();
+    Task<IReadOnlyList<DashboardWidgetDefinitionDto>> GetCatalogAsync(
+        CancellationToken cancellationToken = default);
 }

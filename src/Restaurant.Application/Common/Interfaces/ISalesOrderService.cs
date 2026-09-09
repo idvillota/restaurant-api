@@ -30,5 +30,13 @@ public interface ISalesOrderService
         ConfirmSalesOrderDto dto,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Move an active order to another table (transfer) or merge into the target's open order.
+    /// </summary>
+    Task<RelocateOrderResultDto?> RelocateOrderAsync(
+        Guid sourceOrderId,
+        RelocateOrderDto dto,
+        CancellationToken cancellationToken = default);
+
     Task<SalesOrderDto?> CompleteAsync(Guid orderId, CancellationToken cancellationToken = default);
 }

@@ -109,6 +109,7 @@ BEGIN
         ('f1000001-0001-4001-8001-000000000001', 'dashboard.view', 'Panel', 'General', 10, v_now),
         ('f1000021-0027-4027-8027-000000000021', 'dashboard.configure', 'Configurar panel', 'Administración', 11, v_now),
         ('f1000002-0002-4002-8002-000000000002', 'service.salon', 'Salón', 'Servicio', 20, v_now),
+        ('f1000022-0028-4028-8028-000000000022', 'service.relocate_table', 'Cambiar / fusionar mesa', 'Servicio', 25, v_now),
         ('f1000003-0003-4003-8003-000000000003', 'payments.checkout', 'Pagos', 'Servicio', 30, v_now),
         ('f1000004-0004-4004-8004-000000000004', 'reservations.manage', 'Reservas', 'Servicio', 40, v_now),
         ('f1000005-0005-4005-8005-000000000005', 'customers.manage', 'Clientes', 'Servicio', 50, v_now),
@@ -136,7 +137,7 @@ BEGIN
     ON CONFLICT ("Code") DO NOTHING;
 
     SELECT COUNT(*) INTO v_feature_count FROM "Features";
-    IF v_feature_count < 27 THEN
+    IF v_feature_count < 28 THEN
         RAISE EXCEPTION 'Features catalog incomplete (% rows). Run API once or fix seed above.', v_feature_count;
     END IF;
 
@@ -238,7 +239,7 @@ BEGIN
     SELECT gen_random_uuid(), v_tenant_id, v_role_manager_id, f."Id", v_now
     FROM "Features" f
     WHERE f."Code" IN (
-        'dashboard.view', 'dashboard.configure', 'service.salon', 'payments.checkout', 'cashier.shifts',
+        'dashboard.view', 'dashboard.configure', 'service.salon', 'service.relocate_table', 'payments.checkout', 'cashier.shifts',
         'reservations.manage', 'customers.manage', 'tables.manage',
         'catalog.products', 'catalog.product-types', 'catalog.ingredient-categories', 'catalog.ingredients',
         'inventory.ingredient-movement-types', 'inventory.ingredient-movements', 'catalog.public_menu_qr',
@@ -251,14 +252,14 @@ BEGIN
     SELECT gen_random_uuid(), v_tenant_id, v_role_waitress_id, f."Id", v_now
     FROM "Features" f
     WHERE f."Code" IN (
-        'dashboard.view', 'service.salon', 'reservations.manage', 'customers.manage', 'catalog.public_menu_qr'
+        'dashboard.view', 'service.salon', 'service.relocate_table', 'reservations.manage', 'customers.manage', 'catalog.public_menu_qr'
     );
 
     INSERT INTO "RoleFeatures" ("Id", "TenantId", "RoleId", "FeatureId", "CreatedAtUtc")
     SELECT gen_random_uuid(), v_tenant_id, v_role_cashier_id, f."Id", v_now
     FROM "Features" f
     WHERE f."Code" IN (
-        'dashboard.view', 'service.salon', 'payments.checkout', 'cashier.shifts',
+        'dashboard.view', 'service.salon', 'service.relocate_table', 'payments.checkout', 'cashier.shifts',
         'customers.manage', 'catalog.public_menu_qr', 'reports.sales', 'reports.sales_by_date'
     );
 

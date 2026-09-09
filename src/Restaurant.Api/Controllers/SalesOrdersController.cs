@@ -154,4 +154,31 @@ public sealed class SalesOrdersController : ControllerBase
             return Conflict(new { message = ex.Message });
         }
     }
+
+    [HttpPost("{id:guid}/relocate")]
+    [RequireFeature(FeatureCodes.ServiceRelocateTable)]
+    public async Task<ActionResult<RelocateOrderResultDto>> Relocate(
+        Guid id,
+        [FromBody] RelocateOrderDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var result = await _service.RelocateOrderAsync(id, dto, cancellationToken);
+            if (result is null)
+                return NotFound();
+
+            if (result.Action == RelocateOrderActions.MergeRequired)
+                return Conflict(result);
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 }
