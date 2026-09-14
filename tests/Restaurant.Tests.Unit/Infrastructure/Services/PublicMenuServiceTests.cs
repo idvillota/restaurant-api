@@ -36,7 +36,6 @@ public sealed class PublicMenuServiceTests
                 Id = pizzasId,
                 TenantId = tenantId,
                 Name = "Pizzas",
-                SortOrder = 0,
                 IsActive = true,
             },
             new ProductType
@@ -44,7 +43,6 @@ public sealed class PublicMenuServiceTests
                 Id = drinksId,
                 TenantId = tenantId,
                 Name = "Refrescos",
-                SortOrder = 1,
                 IsActive = true,
             });
 

@@ -379,7 +379,6 @@ public static class DevelopmentDataSeeder
                     TenantId = tenantId,
                     Name = categoryNames[i],
                     Description = $"Categoría demo: {categoryNames[i]}",
-                    SortOrder = i,
                     IsActive = true,
                 },
                 cancellationToken);
@@ -431,7 +430,6 @@ public static class DevelopmentDataSeeder
                     Name = def.Name,
                     Description = def.Description,
                     IsInput = def.IsInput,
-                    SortOrder = def.SortOrder,
                     IsActive = true,
                 },
                 cancellationToken);
@@ -451,7 +449,6 @@ public static class DevelopmentDataSeeder
                     TenantId = tenantId,
                     Name = typeNames[i],
                     Description = $"Sección del menú: {typeNames[i]}",
-                    SortOrder = i,
                     IsActive = true,
                 },
                 cancellationToken);

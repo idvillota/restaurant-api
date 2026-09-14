@@ -7,7 +7,6 @@ public sealed class IngredientCategoryDto
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public int SortOrder { get; set; }
     public bool IsActive { get; set; }
 }
 
@@ -19,8 +18,6 @@ public sealed class CreateIngredientCategoryDto
 
     [MaxLength(2000)]
     public string? Description { get; set; }
-
-    public int SortOrder { get; set; }
 }
 
 public sealed class UpdateIngredientCategoryDto
@@ -32,6 +29,5 @@ public sealed class UpdateIngredientCategoryDto
     [MaxLength(2000)]
     public string? Description { get; set; }
 
-    public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
 }

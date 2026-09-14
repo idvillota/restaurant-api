@@ -19,7 +19,6 @@ public sealed class ProductTypeServiceTests
                 Id = typeId,
                 TenantId = fx.TenantId,
                 Name = "Drinks",
-                SortOrder = 0,
                 IsActive = true,
             });
         fx.Db.Products.Add(

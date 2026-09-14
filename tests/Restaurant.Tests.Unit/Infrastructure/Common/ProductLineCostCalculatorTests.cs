@@ -13,7 +13,7 @@ public sealed class ProductLineCostCalculatorTests
         using var fx = new TenantDbFixture();
         var categoryId = Guid.NewGuid();
         fx.Db.IngredientCategories.Add(
-            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Base", SortOrder = 0, IsActive = true });
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Base", IsActive = true });
 
         var flourId = Guid.NewGuid();
         var cheeseId = Guid.NewGuid();
@@ -41,7 +41,7 @@ public sealed class ProductLineCostCalculatorTests
 
         var typeId = Guid.NewGuid();
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Pizza", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Pizza", IsActive = true });
 
         var productId = Guid.NewGuid();
         fx.Db.Products.Add(
@@ -77,7 +77,7 @@ public sealed class ProductLineCostCalculatorTests
         using var fx = new TenantDbFixture();
         var categoryId = Guid.NewGuid();
         fx.Db.IngredientCategories.Add(
-            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Base", SortOrder = 0, IsActive = true });
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Base", IsActive = true });
 
         var flourId = Guid.NewGuid();
         var cheeseId = Guid.NewGuid();
@@ -105,7 +105,7 @@ public sealed class ProductLineCostCalculatorTests
 
         var typeId = Guid.NewGuid();
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Pizza", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Pizza", IsActive = true });
 
         var productId = Guid.NewGuid();
         fx.Db.Products.Add(

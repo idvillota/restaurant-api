@@ -70,14 +70,12 @@ internal static class InitialDataExcelParser
         billing.Cell(2, 13).Value = 8;
 
         var productTypes = xl.AddWorksheet(InitialDataSheetNames.ProductTypes);
-        WriteHeader(productTypes, ["Code", "Name", "Description", "SortOrder"]);
+        WriteHeader(productTypes, ["Code", "Name", "Description"]);
         productTypes.Cell(2, 1).Value = "PLATOS";
         productTypes.Cell(2, 2).Value = "Platos";
         productTypes.Cell(2, 3).Value = "Comidas principales";
-        productTypes.Cell(2, 4).Value = 10;
         productTypes.Cell(3, 1).Value = "BEBIDAS";
         productTypes.Cell(3, 2).Value = "Bebidas";
-        productTypes.Cell(3, 4).Value = 20;
 
         var products = xl.AddWorksheet(InitialDataSheetNames.Products);
         WriteHeader(products, ["Code", "Name", "ProductTypeCode", "CompositionType", "UnitPrice", "Description", "IsActive"]);
@@ -241,7 +239,6 @@ internal static class InitialDataExcelParser
                 Code = Cell(row, map, "Code"),
                 Name = Cell(row, map, "Name"),
                 Description = OptionalCell(row, map, "Description"),
-                SortOrder = ParseInt(row, map, "SortOrder", 0, errors, InitialDataSheetNames.ProductTypes),
             };
         }
     }
