@@ -150,8 +150,7 @@ public sealed class KitchenPrinterService : IKitchenPrinterService
         var stations = await ListStationsAsync(cancellationToken);
         var productTypes = await _db.ProductTypes.AsNoTracking()
             .Where(pt => pt.TenantId == tenantId)
-            .OrderBy(pt => pt.SortOrder)
-            .ThenBy(pt => pt.Name)
+            .OrderBy(pt => pt.Name)
             .ToListAsync(cancellationToken);
 
         var mappings = await _db.ProductTypePrinterMappings.AsNoTracking()

@@ -266,13 +266,13 @@ BEGIN
     -- -------------------------------------------------------------------------
     -- Ingredient movement types (5 defaults)
     -- -------------------------------------------------------------------------
-    INSERT INTO "IngredientMovementTypes" ("Id", "TenantId", "Name", "Description", "IsInput", "SortOrder", "IsActive", "CreatedAtUtc")
+    INSERT INTO "IngredientMovementTypes" ("Id", "TenantId", "Name", "Description", "IsInput", "IsActive", "CreatedAtUtc")
     VALUES
-        (gen_random_uuid(), v_tenant_id, 'Ingreso por regalo', 'Stock recibido sin costo de compra', true,  10, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Ajuste positivo',    'Corrección por conteo físico (más stock)', true,  20, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Salida por baja',    'Descarte intencional de producto', false, 30, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Salida por pérdida', 'Merma o deterioro no planificado', false, 40, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Ajuste negativo',    'Corrección por conteo físico (menos stock)', false, 50, true, v_now);
+        (gen_random_uuid(), v_tenant_id, 'Ingreso por regalo', 'Stock recibido sin costo de compra', true,  true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Ajuste positivo',    'Corrección por conteo físico (más stock)', true,  true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Salida por baja',    'Descarte intencional de producto', false, true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Salida por pérdida', 'Merma o deterioro no planificado', false, true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Ajuste negativo',    'Corrección por conteo físico (menos stock)', false, true, v_now);
 
     -- -------------------------------------------------------------------------
     -- Default kitchen printer station
@@ -285,12 +285,12 @@ BEGIN
     -- CompositionType: 0 = Prepared
     -- IngredientUnit: 0 = Unit, 2 = Gram
     -- -------------------------------------------------------------------------
-    INSERT INTO "IngredientCategories" ("Id", "TenantId", "Name", "Description", "SortOrder", "IsActive", "CreatedAtUtc")
+    INSERT INTO "IngredientCategories" ("Id", "TenantId", "Name", "Description", "IsActive", "CreatedAtUtc")
     VALUES
-        (v_cat_verduras_id, v_tenant_id, 'Verduras',  'Categoría: verduras',  0, true, v_now),
-        (v_cat_lacteos_id,  v_tenant_id, 'Lácteos',   'Categoría: lácteos',   1, true, v_now),
-        (v_cat_frutas_id,   v_tenant_id, 'Frutas',    'Categoría: frutas',    2, true, v_now),
-        (v_cat_insumos_id,  v_tenant_id, 'Insumos',   'Categoría: insumos',   3, true, v_now);
+        (v_cat_verduras_id, v_tenant_id, 'Verduras',  'Categoría: verduras',  true, v_now),
+        (v_cat_lacteos_id,  v_tenant_id, 'Lácteos',   'Categoría: lácteos',   true, v_now),
+        (v_cat_frutas_id,   v_tenant_id, 'Frutas',    'Categoría: frutas',    true, v_now),
+        (v_cat_insumos_id,  v_tenant_id, 'Insumos',   'Categoría: insumos',   true, v_now);
 
     INSERT INTO "Ingredients" ("Id", "TenantId", "IngredientCategoryId", "Name", "Unit", "IsActive", "StockQuantity", "ReorderLevel", "UnitCost", "CreatedAtUtc")
     VALUES
@@ -299,10 +299,10 @@ BEGIN
         (v_ing_limon_id,   v_tenant_id, v_cat_frutas_id,   'Limón',            0, true, 200,   40,    500,  v_now),
         (v_ing_azucar_id,  v_tenant_id, v_cat_insumos_id,  'Azúcar',           2, true, 5000,  1000,  5,    v_now);
 
-    INSERT INTO "ProductTypes" ("Id", "TenantId", "Name", "Description", "SortOrder", "IsActive", "CreatedAtUtc")
+    INSERT INTO "ProductTypes" ("Id", "TenantId", "Name", "Description", "IsActive", "CreatedAtUtc")
     VALUES
-        (v_pt_platos_id,  v_tenant_id, 'Platos',  'Platos principales', 0, true, v_now),
-        (v_pt_bebidas_id, v_tenant_id, 'Bebidas', 'Bebidas',            1, true, v_now);
+        (v_pt_platos_id,  v_tenant_id, 'Platos',  'Platos principales', true, v_now),
+        (v_pt_bebidas_id, v_tenant_id, 'Bebidas', 'Bebidas',            true, v_now);
 
     INSERT INTO "Products" (
         "Id", "TenantId", "ProductTypeId", "CompositionType", "Name", "Description",

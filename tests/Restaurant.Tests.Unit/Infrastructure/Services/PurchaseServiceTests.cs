@@ -23,7 +23,6 @@ public sealed class PurchaseServiceTests
                 Id = categoryId,
                 TenantId = fx.TenantId,
                 Name = "Dry",
-                SortOrder = 0,
                 IsActive = true,
             });
         fx.Db.Providers.Add(
@@ -94,7 +93,6 @@ public sealed class PurchaseServiceTests
                 Id = categoryId,
                 TenantId = fx.TenantId,
                 Name = "Dry",
-                SortOrder = 0,
                 IsActive = true,
             });
         fx.Db.Providers.Add(
@@ -147,7 +145,6 @@ public sealed class PurchaseServiceTests
                 Id = categoryId,
                 TenantId = fx.TenantId,
                 Name = "Dry",
-                SortOrder = 0,
                 IsActive = true,
             });
         fx.Db.Providers.Add(
@@ -213,7 +210,6 @@ public sealed class PurchaseServiceTests
                 Id = categoryId,
                 TenantId = fx.TenantId,
                 Name = "Dry",
-                SortOrder = 0,
                 IsActive = true,
             });
         fx.Db.Providers.Add(
@@ -272,7 +268,6 @@ public sealed class PurchaseServiceTests
                 Id = categoryId,
                 TenantId = fx.TenantId,
                 Name = "Dry",
-                SortOrder = 0,
                 IsActive = true,
             });
         fx.Db.Providers.Add(

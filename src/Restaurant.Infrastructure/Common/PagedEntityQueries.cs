@@ -74,10 +74,6 @@ internal static class PagedEntityQueries
         if (q.FilterValue("description") is { } descFilter)
             query = query.Where(c => c.Description != null && EF.Functions.ILike(c.Description, EfTextSearch.LikePattern(descFilter)));
 
-        if (q.FilterValue("sortOrder") is { } sortRaw &&
-            ListQueryHelpers.TryParseInt(sortRaw, out var sortOrder))
-            query = query.Where(c => c.SortOrder == sortOrder);
-
         if (q.FilterValue("isActive") is { } activeRaw &&
             ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
             query = query.Where(c => c.IsActive == isActive);
@@ -105,10 +101,6 @@ internal static class PagedEntityQueries
 
         if (q.FilterValue("description") is { } descFilter)
             query = query.Where(t => t.Description != null && EF.Functions.ILike(t.Description, EfTextSearch.LikePattern(descFilter)));
-
-        if (q.FilterValue("sortOrder") is { } sortRaw &&
-            ListQueryHelpers.TryParseInt(sortRaw, out var sortOrder))
-            query = query.Where(t => t.SortOrder == sortOrder);
 
         if (q.FilterValue("isInput") is { } isInputRaw &&
             ListQueryHelpers.TryParseBool(isInputRaw, out var isInput))
@@ -238,10 +230,6 @@ internal static class PagedEntityQueries
 
         if (q.FilterValue("description") is { } descFilter)
             query = query.Where(t => t.Description != null && EF.Functions.ILike(t.Description, EfTextSearch.LikePattern(descFilter)));
-
-        if (q.FilterValue("sortOrder") is { } sortRaw &&
-            ListQueryHelpers.TryParseInt(sortRaw, out var sortOrder))
-            query = query.Where(t => t.SortOrder == sortOrder);
 
         if (q.FilterValue("isActive") is { } activeRaw &&
             ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
@@ -471,7 +459,6 @@ internal static class PagedEntityQueries
         return (q.SortBy?.ToLowerInvariant() ?? "name") switch
         {
             "description" => desc ? query.OrderByDescending(c => c.Description) : query.OrderBy(c => c.Description),
-            "sortorder" => desc ? query.OrderByDescending(c => c.SortOrder) : query.OrderBy(c => c.SortOrder),
             "isactive" => desc ? query.OrderByDescending(c => c.IsActive) : query.OrderBy(c => c.IsActive),
             _ => desc ? query.OrderByDescending(c => c.Name) : query.OrderBy(c => c.Name),
         };
@@ -502,7 +489,6 @@ internal static class PagedEntityQueries
         return (q.SortBy?.ToLowerInvariant() ?? "name") switch
         {
             "description" => desc ? query.OrderByDescending(t => t.Description) : query.OrderBy(t => t.Description),
-            "sortorder" => desc ? query.OrderByDescending(t => t.SortOrder) : query.OrderBy(t => t.SortOrder),
             "isactive" => desc ? query.OrderByDescending(t => t.IsActive) : query.OrderBy(t => t.IsActive),
             _ => desc ? query.OrderByDescending(t => t.Name) : query.OrderBy(t => t.Name),
         };
@@ -606,7 +592,6 @@ internal static class PagedEntityQueries
         return (q.SortBy?.ToLowerInvariant() ?? "name") switch
         {
             "description" => desc ? query.OrderByDescending(t => t.Description) : query.OrderBy(t => t.Description),
-            "sortorder" => desc ? query.OrderByDescending(t => t.SortOrder) : query.OrderBy(t => t.SortOrder),
             "isinput" => desc ? query.OrderByDescending(t => t.IsInput) : query.OrderBy(t => t.IsInput),
             "isactive" => desc ? query.OrderByDescending(t => t.IsActive) : query.OrderBy(t => t.IsActive),
             _ => desc ? query.OrderByDescending(t => t.Name) : query.OrderBy(t => t.Name),

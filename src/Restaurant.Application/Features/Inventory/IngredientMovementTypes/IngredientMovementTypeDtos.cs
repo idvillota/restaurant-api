@@ -8,7 +8,6 @@ public sealed class IngredientMovementTypeDto
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public bool IsInput { get; set; }
-    public int SortOrder { get; set; }
     public bool IsActive { get; set; }
 }
 
@@ -22,7 +21,6 @@ public sealed class CreateIngredientMovementTypeDto
     public string? Description { get; set; }
 
     public bool IsInput { get; set; }
-    public int SortOrder { get; set; }
 }
 
 public sealed class UpdateIngredientMovementTypeDto
@@ -35,6 +33,5 @@ public sealed class UpdateIngredientMovementTypeDto
     public string? Description { get; set; }
 
     public bool IsInput { get; set; }
-    public int SortOrder { get; set; }
     public bool IsActive { get; set; } = true;
 }
