@@ -55,7 +55,7 @@ public sealed class BillService : IBillService
                 o.DiningTableId,
                 TableCode = o.DiningTable != null ? o.DiningTable.Code : "—",
                 Zone = o.DiningTable != null ? o.DiningTable.Zone : null,
-                Lines = o.Lines.Select(l => new
+                Lines = o.Lines.Where(l => l.Quantity > 0).Select(l => new
                 {
                     l.Id,
                     l.ProductId,
@@ -431,6 +431,7 @@ public sealed class BillService : IBillService
         var distinctLines = order.Lines
             .GroupBy(l => l.Id)
             .Select(g => g.First())
+            .Where(l => l.Quantity > 0)
             .ToList();
 
         var requirements = new Dictionary<Guid, decimal>();
@@ -583,7 +584,7 @@ public sealed class BillService : IBillService
             .Include(o => o.Lines)
             .ThenInclude(l => l.Product)
             .ThenInclude(p => p.ProductType)
-            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any());
+            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any(l => l.Quantity > 0));
 
     private IQueryable<SalesOrder> LoadOpenOrdersQuery() =>
         _db.SalesOrders
@@ -594,11 +595,11 @@ public sealed class BillService : IBillService
             .ThenInclude(p => p.ProductType)
             .Include(o => o.Lines)
             .ThenInclude(l => l.ExcludedIngredients)
-            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any());
+            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any(l => l.Quantity > 0));
 
     private static PayableOrderDto MapPayableOrder(SalesOrder order)
     {
-        var lines = order.Lines.GroupBy(l => l.Id).Select(g => g.First()).ToList();
+        var lines = order.Lines.GroupBy(l => l.Id).Select(g => g.First()).Where(l => l.Quantity > 0).ToList();
         return new PayableOrderDto
         {
             OrderId = order.Id,
@@ -625,6 +626,7 @@ public sealed class BillService : IBillService
         order.Lines
             .GroupBy(l => l.Id)
             .Select(g => g.First())
+            .Where(l => l.Quantity > 0)
             .Select(l => new PayableOrderLineDto
             {
                 LineId = l.Id,

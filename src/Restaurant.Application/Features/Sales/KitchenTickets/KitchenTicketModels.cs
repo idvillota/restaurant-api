@@ -17,4 +17,10 @@ public sealed class KitchenTicketModel
     public string? PrinterStationName { get; set; }
     public string? PrinterStationCode { get; set; }
     public IReadOnlyList<KitchenTicketLineModel> Lines { get; set; } = [];
+
+    /// <summary>When true, ticket is an anulación (cancel) comanda rather than a send.</summary>
+    public bool IsCancellation { get; set; }
+
+    /// <summary>Human-readable cancel reason printed on anulación tickets.</summary>
+    public string? CancelReason { get; set; }
 }

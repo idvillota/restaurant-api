@@ -146,7 +146,6 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.ProductType).WithMany(x => x.Products).HasForeignKey(x => x.ProductTypeId);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.Name).HasMaxLength(200);
-            e.Property(x => x.Sku).HasMaxLength(80);
             e.Property(x => x.ImagePath).HasMaxLength(260);
         });
 
@@ -281,6 +280,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Subtotal).HasPrecision(18, 2);
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
+            e.Property(x => x.VoidReason).HasMaxLength(300);
             e.HasIndex(x => new { x.TenantId, x.DiningTableId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.ClosedAtUtc });
@@ -294,6 +294,8 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.LineTotal).HasPrecision(18, 2);
             e.Property(x => x.UnitCostPrice).HasPrecision(18, 2);
             e.Property(x => x.Quantity).HasPrecision(18, 4);
+            e.Property(x => x.CancelledQuantity).HasPrecision(18, 4);
+            e.Property(x => x.CancelReason).HasMaxLength(300);
             e.Property(x => x.Notes).HasMaxLength(500);
             e.HasIndex(x => new { x.TenantId, x.CreatedAtUtc });
             e.HasIndex(x => new { x.SalesOrderId, x.SentToKitchenAtUtc });

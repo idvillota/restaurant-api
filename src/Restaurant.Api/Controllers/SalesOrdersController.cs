@@ -181,4 +181,58 @@ public sealed class SalesOrdersController : ControllerBase
             return Conflict(new { message = ex.Message });
         }
     }
+
+    [HttpPost("{id:guid}/cancel-lines")]
+    [RequireFeature(FeatureCodes.ServiceCancelOrder)]
+    public async Task<ActionResult<CancelSalesOrderResultDto>> CancelLines(
+        Guid id,
+        [FromBody] CancelSalesOrderLinesDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var result = await _service.CancelLinesAsync(id, dto, cancellationToken);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { message = $"No se pudo anular productos (PDF/almacenamiento): {ex.Message}" });
+        }
+    }
+
+    [HttpPost("{id:guid}/void")]
+    [RequireFeature(FeatureCodes.ServiceCancelOrder)]
+    public async Task<ActionResult<CancelSalesOrderResultDto>> VoidOrder(
+        Guid id,
+        [FromBody] VoidSalesOrderDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var result = await _service.VoidOrderAsync(id, dto, cancellationToken);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { message = $"No se pudo anular el pedido (PDF/almacenamiento): {ex.Message}" });
+        }
+    }
 }

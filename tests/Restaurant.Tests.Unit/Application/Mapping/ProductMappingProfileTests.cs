@@ -28,7 +28,6 @@ public sealed class ProductMappingProfileTests
             ProductType = type,
             Name = "Cola",
             Description = "Sparkling cola drink",
-            Sku = "BEV-001",
             UnitPrice = 3.50m,
             CompositionType = EProductType.Resale,
             IsActive = true,
@@ -40,7 +39,6 @@ public sealed class ProductMappingProfileTests
         Assert.Equal(EProductType.Resale, dto.CompositionType);
         Assert.Equal("Cola", dto.Name);
         Assert.Equal("Sparkling cola drink", dto.Description);
-        Assert.Equal("BEV-001", dto.Sku);
         Assert.Equal(3.50m, dto.UnitPrice);
         Assert.Equal(type.Id, dto.ProductTypeId);
         Assert.Equal("Beverages", dto.ProductTypeName);

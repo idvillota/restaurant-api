@@ -7,6 +7,8 @@ public static class FeatureCodes
     public const string ServiceSalon = "service.salon";
     /// <summary>Transfer or merge an open table order to another table.</summary>
     public const string ServiceRelocateTable = "service.relocate_table";
+    /// <summary>Logically cancel sent order lines or void an unpaid order (admin/manager).</summary>
+    public const string ServiceCancelOrder = "service.cancel_order";
     public const string PaymentsCheckout = "payments.checkout";
     public const string ReservationsManage = "reservations.manage";
     public const string CustomersManage = "customers.manage";
@@ -38,6 +40,7 @@ public static class FeatureCodes
         DashboardConfigure,
         ServiceSalon,
         ServiceRelocateTable,
+        ServiceCancelOrder,
         PaymentsCheckout,
         ReservationsManage,
         CustomersManage,

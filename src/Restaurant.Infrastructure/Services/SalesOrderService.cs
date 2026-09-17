@@ -24,6 +24,7 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IKitchenTicketService _kitchenTickets;
     private readonly IKitchenPrinterService _kitchenPrinters;
     private readonly IOperationalBusinessDayService _operationalDay;
+    private readonly ICurrentTenantContext _tenantContext;
     private readonly ApplicationDbContext _db;
 
     public SalesOrderService(
@@ -39,6 +40,7 @@ public sealed class SalesOrderService : ISalesOrderService
         IKitchenTicketService kitchenTickets,
         IKitchenPrinterService kitchenPrinters,
         IOperationalBusinessDayService operationalDay,
+        ICurrentTenantContext tenantContext,
         ApplicationDbContext db)
     {
         _orders = orders;
@@ -53,6 +55,7 @@ public sealed class SalesOrderService : ISalesOrderService
         _kitchenTickets = kitchenTickets;
         _kitchenPrinters = kitchenPrinters;
         _operationalDay = operationalDay;
+        _tenantContext = tenantContext;
         _db = db;
     }
 
@@ -78,7 +81,9 @@ public sealed class SalesOrderService : ISalesOrderService
             ? new Dictionary<Guid, int>()
             : await _lines.Query()
                 .AsNoTracking()
-                .Where(l => orderIds.Contains(l.SalesOrderId) && l.SentToKitchenAtUtc == null)
+                .Where(l => orderIds.Contains(l.SalesOrderId) &&
+                            l.SentToKitchenAtUtc == null &&
+                            l.Quantity > 0)
                 .GroupBy(l => l.SalesOrderId)
                 .Select(g => new { OrderId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.OrderId, x => x.Count, cancellationToken);
@@ -279,7 +284,7 @@ public sealed class SalesOrderService : ISalesOrderService
             throw new InvalidOperationException("Only active table orders can be sent to the kitchen.");
 
         var pendingLines = DistinctLines(order.Lines)
-            .Where(l => l.SentToKitchenAtUtc is null)
+            .Where(l => l.SentToKitchenAtUtc is null && l.Quantity > 0)
             .ToList();
 
         if (pendingLines.Count == 0)
@@ -498,6 +503,191 @@ public sealed class SalesOrderService : ISalesOrderService
         };
     }
 
+    public async Task<CancelSalesOrderResultDto?> CancelLinesAsync(
+        Guid orderId,
+        CancelSalesOrderLinesDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
+        var reasonLabel = NormalizeCancelReason(dto.Reason, dto.ReasonDetail);
+        if (dto.Lines.Count == 0)
+            throw new InvalidOperationException("Debe indicar al menos un producto a anular.");
+
+        var order = await OrderWithLinesQuery(tracked: true)
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+        if (order is null)
+            return null;
+
+        EnsureOrderCancellable(order);
+        await EnsureNoOpenBillForOrderAsync(order.Id, cancellationToken);
+
+        var cancelledAt = DateTime.UtcNow;
+        var userId = _tenantContext.UserId;
+        var kitchenBatch = new List<AddSalesOrderLineDto>();
+
+        foreach (var item in dto.Lines)
+        {
+            if (item.Quantity <= 0)
+                throw new InvalidOperationException("La cantidad a anular debe ser mayor que cero.");
+
+            var line = DistinctLines(order.Lines).FirstOrDefault(l => l.Id == item.LineId);
+            if (line is null)
+                throw new InvalidOperationException("Uno de los productos no pertenece a este pedido.");
+
+            if (line.Quantity <= 0)
+                throw new InvalidOperationException($"El producto ya está anulado: línea {item.LineId}.");
+
+            if (item.Quantity > line.Quantity)
+                throw new InvalidOperationException(
+                    $"No se puede anular {item.Quantity} de '{line.Product?.Name ?? "producto"}' (disponible: {line.Quantity}).");
+
+            var cancelQty = item.Quantity;
+            var wasSent = line.SentToKitchenAtUtc is not null;
+
+            line.Quantity -= cancelQty;
+            line.CancelledQuantity += cancelQty;
+            line.CancelReason = reasonLabel;
+            line.CancelledByUserId = userId;
+            line.LineTotal = decimal.Round(line.Quantity * line.UnitPrice, 2, MidpointRounding.AwayFromZero);
+
+            if (line.Quantity == 0)
+                line.CancelledAtUtc = cancelledAt;
+
+            _lines.Update(line);
+
+            if (wasSent)
+            {
+                kitchenBatch.Add(
+                    new AddSalesOrderLineDto
+                    {
+                        ProductId = line.ProductId,
+                        Quantity = cancelQty,
+                        Notes = line.Notes,
+                        ExcludedIngredientIds = line.ExcludedIngredients
+                            .Select(e => e.IngredientId)
+                            .OrderBy(id => id)
+                            .ToList(),
+                    });
+            }
+        }
+
+        RecalculateOrderTotals(order);
+
+        var hasActiveLines = DistinctLines(order.Lines).Any(l => l.Quantity > 0);
+        var voidOrder = !hasActiveLines && dto.VoidOrderIfEmpty;
+        if (!hasActiveLines && dto.VoidOrderIfEmpty)
+            ApplyOrderVoid(order, reasonLabel, cancelledAt, userId);
+
+        _orders.Update(order);
+
+        DiningTable? freedTable = null;
+        if (voidOrder && order.DiningTableId is { } tableId)
+        {
+            freedTable = order.DiningTable ?? await _tables.GetByIdAsync(tableId, cancellationToken);
+            if (freedTable is not null)
+                await ReleaseTableIfIdleAsync(freedTable, order.Id, cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var kitchenTickets = await GenerateCancellationTicketsAsync(order, kitchenBatch, reasonLabel, cancellationToken);
+        var orderDto = await GetByIdAsync(orderId, cancellationToken);
+        if (orderDto is null)
+            return null;
+
+        return new CancelSalesOrderResultDto
+        {
+            Order = orderDto,
+            KitchenTickets = kitchenTickets,
+            OrderVoided = voidOrder,
+            Message = voidOrder
+                ? "Pedido anulado y mesa liberada."
+                : hasActiveLines
+                    ? "Productos anulados."
+                    : "Todos los productos fueron anulados. El pedido vacío sigue abierto.",
+        };
+    }
+
+    public async Task<CancelSalesOrderResultDto?> VoidOrderAsync(
+        Guid orderId,
+        VoidSalesOrderDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
+        var reasonLabel = NormalizeCancelReason(dto.Reason, dto.ReasonDetail);
+
+        var order = await OrderWithLinesQuery(tracked: true)
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+        if (order is null)
+            return null;
+
+        EnsureOrderCancellable(order);
+        await EnsureNoOpenBillForOrderAsync(order.Id, cancellationToken);
+
+        var cancelledAt = DateTime.UtcNow;
+        var userId = _tenantContext.UserId;
+        var kitchenBatch = new List<AddSalesOrderLineDto>();
+
+        foreach (var line in DistinctLines(order.Lines).Where(l => l.Quantity > 0).ToList())
+        {
+            var cancelQty = line.Quantity;
+            var wasSent = line.SentToKitchenAtUtc is not null;
+
+            if (wasSent)
+            {
+                kitchenBatch.Add(
+                    new AddSalesOrderLineDto
+                    {
+                        ProductId = line.ProductId,
+                        Quantity = cancelQty,
+                        Notes = line.Notes,
+                        ExcludedIngredientIds = line.ExcludedIngredients
+                            .Select(e => e.IngredientId)
+                            .OrderBy(id => id)
+                            .ToList(),
+                    });
+            }
+
+            line.CancelledQuantity += cancelQty;
+            line.Quantity = 0;
+            line.LineTotal = 0;
+            line.CancelledAtUtc = cancelledAt;
+            line.CancelledByUserId = userId;
+            line.CancelReason = reasonLabel;
+            _lines.Update(line);
+        }
+
+        ApplyOrderVoid(order, reasonLabel, cancelledAt, userId);
+        RecalculateOrderTotals(order);
+        _orders.Update(order);
+
+        if (order.DiningTableId is { } tableId)
+        {
+            var table = order.DiningTable ?? await _tables.GetByIdAsync(tableId, cancellationToken);
+            if (table is not null)
+                await ReleaseTableIfIdleAsync(table, order.Id, cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var kitchenTickets = await GenerateCancellationTicketsAsync(order, kitchenBatch, reasonLabel, cancellationToken);
+        var orderDto = await GetByIdAsync(orderId, cancellationToken);
+        if (orderDto is null)
+            return null;
+
+        return new CancelSalesOrderResultDto
+        {
+            Order = orderDto,
+            KitchenTickets = kitchenTickets,
+            OrderVoided = true,
+            Message = "Pedido anulado y mesa liberada.",
+        };
+    }
+
     private async Task ApplyLineToOrderAsync(
         SalesOrder order,
         AddSalesOrderLineDto dto,
@@ -576,7 +766,7 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order.Status != SalesOrderStatus.Open)
             throw new InvalidOperationException("Only open orders can be completed.");
 
-        if (!order.Lines.Any())
+        if (!DistinctLines(order.Lines).Any(l => l.Quantity > 0))
             throw new InvalidOperationException("Add at least one item before completing the order.");
 
         await SalesOrderLineCostSnapshot.ApplyToOrdersAsync(_db, [order], cancellationToken);
@@ -635,7 +825,7 @@ public sealed class SalesOrderService : ISalesOrderService
     private static void NormalizeOrderLinesAndTotals(SalesOrder order)
     {
         order.Lines = DistinctLines(order.Lines).ToList();
-        order.Subtotal = order.Lines.Sum(l => l.LineTotal);
+        order.Subtotal = order.Lines.Where(l => l.Quantity > 0).Sum(l => l.LineTotal);
         order.TaxAmount = 0;
         order.Total = order.Subtotal;
     }
@@ -695,7 +885,7 @@ public sealed class SalesOrderService : ISalesOrderService
         string? notes,
         IReadOnlyList<Guid> excludedIds)
     {
-        foreach (var line in DistinctLines(lines).Where(l => l.SentToKitchenAtUtc is null))
+        foreach (var line in DistinctLines(lines).Where(l => l.SentToKitchenAtUtc is null && l.Quantity > 0))
         {
             if (line.ProductId != productId)
                 continue;
@@ -717,9 +907,106 @@ public sealed class SalesOrderService : ISalesOrderService
     private static void RecalculateOrderTotals(SalesOrder order)
     {
         order.Lines = DistinctLines(order.Lines).ToList();
-        order.Subtotal = order.Lines.Sum(l => l.LineTotal);
+        order.Subtotal = order.Lines.Where(l => l.Quantity > 0).Sum(l => l.LineTotal);
         order.TaxAmount = 0;
         order.Total = order.Subtotal;
+    }
+
+    private static string NormalizeCancelReason(string reason, string? detail)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new InvalidOperationException("Debe indicar el motivo de la anulación.");
+
+        var code = reason.Trim();
+        if (!SalesOrderCancelReasons.IsKnown(code))
+            throw new InvalidOperationException("Motivo de anulación no válido.");
+
+        if (code.Equals(SalesOrderCancelReasons.Other, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(detail))
+            throw new InvalidOperationException("Indique el detalle del motivo «Otro».");
+
+        var label = SalesOrderCancelReasons.ToDisplayLabel(code, detail);
+        if (label.Length > 300)
+            label = label[..300];
+        return label;
+    }
+
+    private static void EnsureOrderCancellable(SalesOrder order)
+    {
+        if (order.Status == SalesOrderStatus.Paid)
+            throw new InvalidOperationException("No se puede anular un pedido ya cobrado.");
+
+        if (order.Status == SalesOrderStatus.Voided)
+            throw new InvalidOperationException("El pedido ya está anulado.");
+
+        if (order.Status is not (SalesOrderStatus.Draft or SalesOrderStatus.Open))
+            throw new InvalidOperationException("Solo se pueden anular pedidos activos (borrador o abiertos).");
+    }
+
+    private static void ApplyOrderVoid(SalesOrder order, string reasonLabel, DateTime cancelledAt, Guid? userId)
+    {
+        order.Status = SalesOrderStatus.Voided;
+        order.ClosedAtUtc = cancelledAt;
+        order.VoidedByUserId = userId;
+        order.VoidReason = reasonLabel;
+    }
+
+    private async Task ReleaseTableIfIdleAsync(
+        DiningTable table,
+        Guid excludingOrderId,
+        CancellationToken cancellationToken)
+    {
+        var otherOpen = await _orders.Query()
+            .AsNoTracking()
+            .AnyAsync(
+                o => o.DiningTableId == table.Id &&
+                     o.Id != excludingOrderId &&
+                     (o.Status == SalesOrderStatus.Draft || o.Status == SalesOrderStatus.Open),
+                cancellationToken);
+
+        if (!otherOpen)
+            SetTableAvailable(table);
+    }
+
+    private async Task<List<KitchenTicketFileDto>> GenerateCancellationTicketsAsync(
+        SalesOrder order,
+        IReadOnlyList<AddSalesOrderLineDto> kitchenBatch,
+        string reasonLabel,
+        CancellationToken cancellationToken)
+    {
+        if (kitchenBatch.Count == 0)
+            return [];
+
+        var groups = await _kitchenPrinters.GroupBatchByStationAsync(kitchenBatch, cancellationToken);
+        var kitchenTickets = new List<KitchenTicketFileDto>();
+
+        foreach (var (stationCode, group) in groups.OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, group.Lines, cancellationToken);
+            ticketModel.IsCancellation = true;
+            ticketModel.CancelReason = reasonLabel;
+            ticketModel.PrinterStationCode = stationCode;
+            ticketModel.PrinterStationName = group.StationName;
+
+            var ticketPath = await _kitchenTickets.GeneratePdfAsync(
+                ticketModel,
+                order.Id,
+                stationCode,
+                cancellationToken);
+
+            if (ticketPath is not null)
+            {
+                kitchenTickets.Add(
+                    new KitchenTicketFileDto
+                    {
+                        PrinterStationCode = stationCode,
+                        PrinterStationName = group.StationName,
+                        RelativePath = ticketPath,
+                    });
+            }
+        }
+
+        return kitchenTickets;
     }
 
     private async Task EnsureSalonOperationsAllowedAsync(CancellationToken cancellationToken)

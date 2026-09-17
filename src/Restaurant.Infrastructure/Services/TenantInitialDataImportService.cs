@@ -239,7 +239,6 @@ public sealed class TenantInitialDataImportService : ITenantInitialDataImportSer
                 CompositionType = Enum.Parse<EProductType>(row.CompositionType.Trim(), ignoreCase: true),
                 Name = row.Name.Trim(),
                 Description = row.Description?.Trim(),
-                Sku = row.Code.Trim(),
                 UnitPrice = row.UnitPrice,
                 IsActive = row.IsActive,
             };

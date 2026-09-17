@@ -8,7 +8,6 @@ public sealed class ProductListItemDto
     public EProductType CompositionType { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string? Sku { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal CostPrice { get; set; }
     public Guid ProductTypeId { get; set; }
