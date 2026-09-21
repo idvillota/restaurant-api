@@ -55,7 +55,7 @@ public sealed class BillService : IBillService
                 o.DiningTableId,
                 TableCode = o.DiningTable != null ? o.DiningTable.Code : "—",
                 Zone = o.DiningTable != null ? o.DiningTable.Zone : null,
-                Lines = o.Lines.Select(l => new
+                Lines = o.Lines.Where(l => l.Quantity > 0).Select(l => new
                 {
                     l.Id,
                     l.ProductId,
@@ -143,7 +143,7 @@ public sealed class BillService : IBillService
             settings.InvoiceNumberPrefix,
             dianConsecutive);
 
-        var tableCodes = string.Join(", ", orders.Select(o => o.DiningTable?.Code).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct());
+        var tableCodes = await ResolveTableCodesSnapshotAsync(orders, cancellationToken);
         var orderNumbers = string.Join(", ", orders.Select(o => o.Number).Distinct());
 
         var bill = new Bill
@@ -164,7 +164,7 @@ public sealed class BillService : IBillService
             ProcessedByUserId = processedByUserId,
             DianConsecutiveNumber = dianConsecutive,
             ProcessedByDisplayName = cashierName,
-            TableCodesSnapshot = string.IsNullOrWhiteSpace(tableCodes) ? null : tableCodes,
+            TableCodesSnapshot = tableCodes,
             OrderNumbersSnapshot = orderNumbers,
         };
 
@@ -431,6 +431,7 @@ public sealed class BillService : IBillService
         var distinctLines = order.Lines
             .GroupBy(l => l.Id)
             .Select(g => g.First())
+            .Where(l => l.Quantity > 0)
             .ToList();
 
         var requirements = new Dictionary<Guid, decimal>();
@@ -542,6 +543,39 @@ public sealed class BillService : IBillService
         return settings;
     }
 
+    private async Task<string?> ResolveTableCodesSnapshotAsync(
+        IReadOnlyList<SalesOrder> orders,
+        CancellationToken cancellationToken)
+    {
+        var fromNav = orders
+            .Select(o => o.DiningTable?.Code)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (fromNav.Count > 0)
+            return string.Join(", ", fromNav);
+
+        var tableIds = orders
+            .Select(o => o.DiningTableId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+
+        if (tableIds.Count == 0)
+            return null;
+
+        var codes = await _db.DiningTables.AsNoTracking()
+            .Where(t => tableIds.Contains(t.Id))
+            .Select(t => t.Code)
+            .Where(c => c != null && c != "")
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return codes.Count == 0 ? null : string.Join(", ", codes);
+    }
+
     private IQueryable<SalesOrder> LoadOpenOrdersReadQuery() =>
         _db.SalesOrders
             .AsNoTracking()
@@ -550,7 +584,7 @@ public sealed class BillService : IBillService
             .Include(o => o.Lines)
             .ThenInclude(l => l.Product)
             .ThenInclude(p => p.ProductType)
-            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any());
+            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any(l => l.Quantity > 0));
 
     private IQueryable<SalesOrder> LoadOpenOrdersQuery() =>
         _db.SalesOrders
@@ -561,11 +595,11 @@ public sealed class BillService : IBillService
             .ThenInclude(p => p.ProductType)
             .Include(o => o.Lines)
             .ThenInclude(l => l.ExcludedIngredients)
-            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any());
+            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any(l => l.Quantity > 0));
 
     private static PayableOrderDto MapPayableOrder(SalesOrder order)
     {
-        var lines = order.Lines.GroupBy(l => l.Id).Select(g => g.First()).ToList();
+        var lines = order.Lines.GroupBy(l => l.Id).Select(g => g.First()).Where(l => l.Quantity > 0).ToList();
         return new PayableOrderDto
         {
             OrderId = order.Id,
@@ -592,6 +626,7 @@ public sealed class BillService : IBillService
         order.Lines
             .GroupBy(l => l.Id)
             .Select(g => g.First())
+            .Where(l => l.Quantity > 0)
             .Select(l => new PayableOrderLineDto
             {
                 LineId = l.Id,

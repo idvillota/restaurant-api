@@ -38,6 +38,7 @@ public sealed class ShiftPaymentLineDto
     public Guid PaymentId { get; set; }
     public Guid BillId { get; set; }
     public string BillNumber { get; set; } = string.Empty;
+    public string? TableCodes { get; set; }
     public decimal Amount { get; set; }
     public PaymentMethod Method { get; set; }
     public string? ExternalReference { get; set; }

@@ -53,7 +53,6 @@ public sealed class IngredientMovementTypeService : IIngredientMovementTypeServi
             Name = name,
             Description = dto.Description?.Trim(),
             IsInput = dto.IsInput,
-            SortOrder = dto.SortOrder,
             IsActive = true,
         };
 
@@ -78,7 +77,6 @@ public sealed class IngredientMovementTypeService : IIngredientMovementTypeServi
         entity.Name = name;
         entity.Description = dto.Description?.Trim();
         entity.IsInput = dto.IsInput;
-        entity.SortOrder = dto.SortOrder;
         entity.IsActive = dto.IsActive;
         _types.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

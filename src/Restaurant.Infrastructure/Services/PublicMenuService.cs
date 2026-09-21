@@ -30,14 +30,12 @@ public sealed class PublicMenuService : IPublicMenuService
 
         var categories = await _db.ProductTypes.AsNoTracking()
             .Where(pt => pt.TenantId == tenant.Id && pt.IsActive)
-            .OrderBy(pt => pt.SortOrder)
-            .ThenBy(pt => pt.Name)
+            .OrderBy(pt => pt.Name)
             .Select(pt => new PublicMenuCategoryDto
             {
                 Id = pt.Id,
                 Name = pt.Name,
                 Description = pt.Description,
-                SortOrder = pt.SortOrder,
             })
             .ToListAsync(cancellationToken);
 

@@ -172,6 +172,7 @@ public sealed class DailyClosureService : IDailyClosureService
                         ShiftId = p.CashierShiftId!.Value,
                         BillId = b.Id,
                         BillNumber = b.Number,
+                        TableCodes = b.TableCodesSnapshot,
                         p.Amount,
                         p.Method,
                         p.ExternalReference,
@@ -186,12 +187,15 @@ public sealed class DailyClosureService : IDailyClosureService
                 PaymentId = p.Id,
                 BillId = p.BillId,
                 BillNumber = p.BillNumber,
+                TableCodes = p.TableCodes,
                 Amount = p.Amount,
                 Method = p.Method,
                 ExternalReference = p.ExternalReference,
                 PaidAtUtc = p.PaidAtUtc,
             })
             .ToList();
+
+        await ShiftPaymentTableCodes.FillMissingAsync(_db, payments, cancellationToken);
 
         var outflows = await _db.CashMovements
             .AsNoTracking()

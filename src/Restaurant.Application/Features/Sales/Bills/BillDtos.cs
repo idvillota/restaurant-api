@@ -23,6 +23,8 @@ public sealed class TenantSettingsDto
     public int DianNextConsecutive { get; set; }
     public string? InvoiceNumberPrefix { get; set; }
     public decimal ImpoconsumoPercent { get; set; }
+    /// <summary>Show dashboard panel with bill-level sales for today / current shift.</summary>
+    public bool ShowOperationalSalesPanel { get; set; } = true;
 }
 
 public sealed class UpdateTenantSettingsDto
@@ -67,16 +69,18 @@ public sealed class UpdateTenantSettingsDto
     public string? DianResolutionNumber { get; set; }
 
     [Range(1, int.MaxValue)]
-    public int DianResolutionFrom { get; set; }
+    public int DianResolutionFrom { get; set; } = 1;
 
     [Range(1, int.MaxValue)]
-    public int DianResolutionTo { get; set; }
+    public int DianResolutionTo { get; set; } = 1;
 
     [MaxLength(20)]
     public string? InvoiceNumberPrefix { get; set; }
 
     [Range(0, 100)]
     public decimal ImpoconsumoPercent { get; set; } = 8m;
+
+    public bool ShowOperationalSalesPanel { get; set; } = true;
 }
 
 public sealed class PayableTableGroupDto

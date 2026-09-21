@@ -33,11 +33,9 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         if (content.CanSeek && content.Length > _options.MaxBytes)
             throw new InvalidOperationException($"Image must be {_options.MaxBytes / (1024 * 1024)} MB or smaller.");
 
-        var tenantFolder = Path.Combine(_absoluteRoot, tenantId.ToString("N"));
-        Directory.CreateDirectory(tenantFolder);
-
-        var relativePath = Path.Combine(tenantId.ToString("N"), $"{productId:N}{extension}");
-        var absolutePath = Path.Combine(_absoluteRoot, relativePath);
+        var relativePath = $"products/{tenantId:N}/{productId:N}{extension}";
+        var absolutePath = Path.Combine(_absoluteRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
 
         await using var fileStream = new FileStream(
             absolutePath,

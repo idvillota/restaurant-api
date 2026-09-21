@@ -178,7 +178,6 @@ public sealed class TenantInitialDataImportService : ITenantInitialDataImportSer
         }
 
         var categoryByName = new Dictionary<string, IngredientCategory>(StringComparer.OrdinalIgnoreCase);
-        var sort = 10;
         foreach (var categoryName in workbook.Ingredients
                      .Select(i => i.Category.Trim())
                      .Where(n => n.Length > 0)
@@ -189,10 +188,8 @@ public sealed class TenantInitialDataImportService : ITenantInitialDataImportSer
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
                 Name = categoryName,
-                SortOrder = sort,
                 IsActive = true,
             };
-            sort += 10;
             categoryByName[categoryName] = category;
             _db.IngredientCategories.Add(category);
         }
@@ -225,7 +222,6 @@ public sealed class TenantInitialDataImportService : ITenantInitialDataImportSer
                 TenantId = tenantId,
                 Name = row.Name.Trim(),
                 Description = row.Description?.Trim(),
-                SortOrder = row.SortOrder,
                 IsActive = true,
             };
             productTypeByCode[row.Code.Trim()] = productType;
@@ -243,7 +239,6 @@ public sealed class TenantInitialDataImportService : ITenantInitialDataImportSer
                 CompositionType = Enum.Parse<EProductType>(row.CompositionType.Trim(), ignoreCase: true),
                 Name = row.Name.Trim(),
                 Description = row.Description?.Trim(),
-                Sku = row.Code.Trim(),
                 UnitPrice = row.UnitPrice,
                 IsActive = row.IsActive,
             };

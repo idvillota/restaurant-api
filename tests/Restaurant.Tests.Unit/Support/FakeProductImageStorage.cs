@@ -21,7 +21,7 @@ public sealed class FakeProductImageStorage : IProductImageStorage
         if (string.IsNullOrEmpty(extension))
             extension = ".jpg";
 
-        var relativePath = $"{tenantId:N}/{productId:N}{extension.ToLowerInvariant()}";
+        var relativePath = $"products/{tenantId:N}/{productId:N}{extension.ToLowerInvariant()}";
         _files[relativePath] = ms.ToArray();
         return relativePath;
     }
@@ -35,7 +35,7 @@ public sealed class FakeProductImageStorage : IProductImageStorage
     }
 
     public string? GetPublicUrl(string? relativePath) =>
-        string.IsNullOrWhiteSpace(relativePath) ? null : $"/media/products/{relativePath.Replace('\\', '/')}";
+        string.IsNullOrWhiteSpace(relativePath) ? null : $"/media/{relativePath.Replace('\\', '/')}";
 
     public bool FileExists(string? relativePath) =>
         !string.IsNullOrWhiteSpace(relativePath) && _files.ContainsKey(relativePath);

@@ -104,7 +104,6 @@ public sealed class InitialDataValidatorTests
             RowNumber = 2,
             Code = "PLATOS",
             Name = "Platos",
-            SortOrder = 10,
         });
         workbook.Products.Add(new ProductRow
         {

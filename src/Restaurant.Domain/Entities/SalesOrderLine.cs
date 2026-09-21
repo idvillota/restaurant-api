@@ -17,6 +17,17 @@ public class SalesOrderLine : EntityBase, ITenantScoped
     /// <summary>When set, this line was included on a kitchen ticket for preparation.</summary>
     public DateTime? SentToKitchenAtUtc { get; set; }
 
+    /// <summary>Cumulative quantity logically cancelled (never physically deleted).</summary>
+    public decimal CancelledQuantity { get; set; }
+
+    /// <summary>Set when the remaining active quantity reaches zero after a cancel.</summary>
+    public DateTime? CancelledAtUtc { get; set; }
+
+    public Guid? CancelledByUserId { get; set; }
+
+    /// <summary>Last cancel reason code or free-text detail (for audit / kitchen ticket).</summary>
+    public string? CancelReason { get; set; }
+
     public SalesOrder SalesOrder { get; set; } = null!;
     public Product Product { get; set; } = null!;
     public ICollection<SalesOrderLineExcludedIngredient> ExcludedIngredients { get; set; } =

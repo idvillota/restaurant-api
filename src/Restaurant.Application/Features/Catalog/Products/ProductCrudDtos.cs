@@ -16,9 +16,6 @@ public sealed class CreateProductDto
 
     public string? Description { get; set; }
 
-    [MaxLength(80)]
-    public string? Sku { get; set; }
-
     [Range(0, double.MaxValue)]
     public decimal UnitPrice { get; set; }
 
@@ -44,9 +41,6 @@ public sealed class UpdateProductDto
     public string Name { get; set; } = string.Empty;
 
     public string? Description { get; set; }
-
-    [MaxLength(80)]
-    public string? Sku { get; set; }
 
     [Range(0, double.MaxValue)]
     public decimal UnitPrice { get; set; }

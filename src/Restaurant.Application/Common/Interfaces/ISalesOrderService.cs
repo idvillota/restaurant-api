@@ -30,5 +30,27 @@ public interface ISalesOrderService
         ConfirmSalesOrderDto dto,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Move an active order to another table (transfer) or merge into the target's open order.
+    /// </summary>
+    Task<RelocateOrderResultDto?> RelocateOrderAsync(
+        Guid sourceOrderId,
+        RelocateOrderDto dto,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Logically cancel quantities on active lines (partial or full). Sent lines produce anulación comandas.
+    /// </summary>
+    Task<CancelSalesOrderResultDto?> CancelLinesAsync(
+        Guid orderId,
+        CancelSalesOrderLinesDto dto,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Logically void an unpaid order, print anulación for sent lines, and free the table.</summary>
+    Task<CancelSalesOrderResultDto?> VoidOrderAsync(
+        Guid orderId,
+        VoidSalesOrderDto dto,
+        CancellationToken cancellationToken = default);
+
     Task<SalesOrderDto?> CompleteAsync(Guid orderId, CancellationToken cancellationToken = default);
 }

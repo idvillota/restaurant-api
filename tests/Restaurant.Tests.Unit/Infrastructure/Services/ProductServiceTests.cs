@@ -35,7 +35,6 @@ public sealed class ProductServiceTests
                 Id = typeId,
                 TenantId = fx.TenantId,
                 Name = "Food",
-                SortOrder = 0,
                 IsActive = true,
             });
         fx.Db.Products.AddRange(
@@ -75,7 +74,7 @@ public sealed class ProductServiceTests
         using var fx = new TenantDbFixture();
         var typeId = Guid.NewGuid();
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         fx.Db.Products.AddRange(
             new Product
             {
@@ -136,7 +135,6 @@ public sealed class ProductServiceTests
                 Id = typeId,
                 TenantId = fx.TenantId,
                 Name = "Inactive",
-                SortOrder = 0,
                 IsActive = false,
             });
         await fx.Db.SaveChangesAsync();
@@ -159,7 +157,6 @@ public sealed class ProductServiceTests
                 Id = typeId,
                 TenantId = fx.TenantId,
                 Name = "Food",
-                SortOrder = 0,
                 IsActive = true,
             });
         await fx.Db.SaveChangesAsync();
@@ -192,9 +189,9 @@ public sealed class ProductServiceTests
         var sugarId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         fx.Db.IngredientCategories.Add(
-            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", SortOrder = 0, IsActive = true });
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", IsActive = true });
         fx.Db.Products.Add(
             new Product
             {
@@ -263,9 +260,9 @@ public sealed class ProductServiceTests
         var beerId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Drinks", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Drinks", IsActive = true });
         fx.Db.IngredientCategories.Add(
-            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Beverages", SortOrder = 0, IsActive = true });
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Beverages", IsActive = true });
         fx.Db.Ingredients.Add(
             new Ingredient
             {
@@ -309,7 +306,7 @@ public sealed class ProductServiceTests
         using var fx = new TenantDbFixture();
         var typeId = Guid.NewGuid();
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Drinks", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Drinks", IsActive = true });
         await fx.Db.SaveChangesAsync();
 
         var sut = CreateSut(fx);
@@ -331,7 +328,7 @@ public sealed class ProductServiceTests
         using var fx = new TenantDbFixture();
         var typeId = Guid.NewGuid();
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         await fx.Db.SaveChangesAsync();
 
         var sut = CreateSut(fx);
@@ -355,7 +352,7 @@ public sealed class ProductServiceTests
         var productId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         fx.Db.Products.Add(
             new Product
             {
@@ -385,9 +382,9 @@ public sealed class ProductServiceTests
         var beerId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Drinks", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Drinks", IsActive = true });
         fx.Db.IngredientCategories.Add(
-            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Beverages", SortOrder = 0, IsActive = true });
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Beverages", IsActive = true });
         fx.Db.Products.Add(
             new Product
             {
@@ -474,9 +471,9 @@ public sealed class ProductServiceTests
         var ingredientId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         fx.Db.IngredientCategories.Add(
-            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", SortOrder = 0, IsActive = true });
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", IsActive = true });
         fx.Db.Products.Add(
             new Product
             {
@@ -520,7 +517,7 @@ public sealed class ProductServiceTests
         var productId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         fx.Db.Products.Add(
             new Product
             {
@@ -553,7 +550,7 @@ public sealed class ProductServiceTests
         var productId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         fx.Db.Products.Add(
             new Product
             {
@@ -588,7 +585,7 @@ public sealed class ProductServiceTests
         var productId = Guid.NewGuid();
 
         fx.Db.ProductTypes.Add(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
         fx.Db.Products.Add(
             new Product
             {
@@ -627,10 +624,10 @@ public sealed class ProductServiceTests
         var drinkIngredientId = Guid.NewGuid();
 
         fx.Db.ProductTypes.AddRange(
-            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", SortOrder = 0, IsActive = true },
-            new ProductType { Id = promoTypeId, TenantId = fx.TenantId, Name = "Promociones", SortOrder = 1, IsActive = true });
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true },
+            new ProductType { Id = promoTypeId, TenantId = fx.TenantId, Name = "Promociones", IsActive = true });
         fx.Db.IngredientCategories.Add(
-            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", SortOrder = 0, IsActive = true });
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dry", IsActive = true });
         fx.Db.Ingredients.AddRange(
             new Ingredient
             {

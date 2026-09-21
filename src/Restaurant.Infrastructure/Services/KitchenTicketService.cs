@@ -1,9 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using QuestPDF.Infrastructure;
 using Restaurant.Application.Common.Interfaces;
-using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Sales.KitchenTickets;
 using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
@@ -20,7 +17,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
     private readonly IRepository<ProductBundleLine> _productBundleLines;
     private readonly IRepository<User> _users;
     private readonly ICurrentTenantContext _tenantContext;
-    private readonly string _absoluteRoot;
+    private readonly IGeneratedFileStorage _fileStorage;
 
     static KitchenTicketService()
     {
@@ -34,8 +31,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
         IRepository<ProductBundleLine> productBundleLines,
         IRepository<User> users,
         ICurrentTenantContext tenantContext,
-        IOptions<KitchenTicketOptions> options,
-        IHostEnvironment environment)
+        IGeneratedFileStorage fileStorage)
     {
         _products = products;
         _ingredients = ingredients;
@@ -43,12 +39,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
         _productBundleLines = productBundleLines;
         _users = users;
         _tenantContext = tenantContext;
-
-        var rootPath = options.Value.RootPath.Trim().TrimEnd('/', '\\');
-        _absoluteRoot = Path.IsPathRooted(rootPath)
-            ? rootPath
-            : Path.Combine(environment.ContentRootPath, rootPath);
-        Directory.CreateDirectory(_absoluteRoot);
+        _fileStorage = fileStorage;
     }
 
     public async Task<KitchenTicketModel> BuildTicketModelAsync(
@@ -139,7 +130,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
         };
     }
 
-    public Task<string?> GeneratePdfAsync(
+    public async Task<string?> GeneratePdfAsync(
         KitchenTicketModel model,
         Guid orderId,
         string printerStationCode,
@@ -148,21 +139,16 @@ public sealed class KitchenTicketService : IKitchenTicketService
         cancellationToken.ThrowIfCancellationRequested();
 
         if (model.Lines.Count == 0)
-            return Task.FromResult<string?>(null);
+            return null;
 
         var tenantFolder = _tenantContext.TenantId?.ToString("N") ?? "shared";
-        var tenantRoot = Path.Combine(_absoluteRoot, tenantFolder);
-        Directory.CreateDirectory(tenantRoot);
-
         var stationCode = SanitizeStationCode(printerStationCode);
-        var fileName = $"{orderId:N}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{stationCode}.pdf";
-        var absolutePath = Path.Combine(tenantRoot, fileName);
+        var kind = model.IsCancellation ? "cancel" : "send";
+        var fileName = $"{orderId:N}_{kind}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{stationCode}.pdf";
+        var relativePath = $"orders/{tenantFolder}/{fileName}";
 
         var pdfBytes = QuestPdfKitchenTicketDocument.BuildPdf(model);
-        File.WriteAllBytes(absolutePath, pdfBytes);
-
-        var relativePath = Path.Combine(tenantFolder, fileName).Replace('\\', '/');
-        return Task.FromResult<string?>(relativePath);
+        return await _fileStorage.SaveAsync(relativePath, pdfBytes, "application/pdf", cancellationToken);
     }
 
     private async Task<string> ResolveSentByNameAsync(CancellationToken cancellationToken)

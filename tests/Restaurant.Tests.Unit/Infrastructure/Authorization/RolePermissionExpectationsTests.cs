@@ -25,6 +25,8 @@ public sealed class RolePermissionExpectationsTests
         var permissions = Permissions(SystemRoles.Waitress);
 
         Assert.Contains(FeatureCodes.ServiceSalon, permissions);
+        Assert.Contains(FeatureCodes.ServiceRelocateTable, permissions);
+        Assert.DoesNotContain(FeatureCodes.ServiceCancelOrder, permissions);
         Assert.Contains(FeatureCodes.ReservationsManage, permissions);
         Assert.Contains(FeatureCodes.CustomersManage, permissions);
         Assert.DoesNotContain(FeatureCodes.CatalogProducts, permissions);
@@ -40,6 +42,7 @@ public sealed class RolePermissionExpectationsTests
         var permissions = Permissions(SystemRoles.Cashier);
 
         Assert.Contains(FeatureCodes.ServiceSalon, permissions);
+        Assert.DoesNotContain(FeatureCodes.ServiceCancelOrder, permissions);
         Assert.Contains(FeatureCodes.PaymentsCheckout, permissions);
         Assert.Contains(FeatureCodes.CashierShifts, permissions);
         Assert.Contains(FeatureCodes.ReportsSales, permissions);
@@ -56,6 +59,7 @@ public sealed class RolePermissionExpectationsTests
 
         Assert.Contains(FeatureCodes.DashboardConfigure, permissions);
         Assert.Contains(FeatureCodes.ServiceSalon, permissions);
+        Assert.Contains(FeatureCodes.ServiceCancelOrder, permissions);
         Assert.Contains(FeatureCodes.PaymentsCheckout, permissions);
         Assert.Contains(FeatureCodes.CashierShifts, permissions);
         Assert.Contains(FeatureCodes.TablesManage, permissions);

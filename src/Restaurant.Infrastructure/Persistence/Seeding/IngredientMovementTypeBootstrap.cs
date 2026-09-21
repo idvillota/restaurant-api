@@ -51,7 +51,6 @@ public static class IngredientMovementTypeBootstrap
                     Name = def.Name,
                     Description = def.Description,
                     IsInput = def.IsInput,
-                    SortOrder = def.SortOrder,
                     IsActive = true,
                 },
                 cancellationToken);

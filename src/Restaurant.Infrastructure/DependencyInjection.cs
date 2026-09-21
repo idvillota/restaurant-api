@@ -36,8 +36,14 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
-        services.Configure<KitchenTicketOptions>(configuration.GetSection(KitchenTicketOptions.SectionName));
-        services.Configure<SalesReceiptOptions>(configuration.GetSection(SalesReceiptOptions.SectionName));
+        services.Configure<GeneratedFileStorageOptions>(configuration.GetSection(GeneratedFileStorageOptions.SectionName));
+
+        var storageProvider = configuration
+            .GetSection(GeneratedFileStorageOptions.SectionName)["Provider"];
+        if (string.Equals(storageProvider, "AzureBlob", StringComparison.OrdinalIgnoreCase))
+            services.AddSingleton<IGeneratedFileStorage, AzureBlobGeneratedFileStorage>();
+        else
+            services.AddSingleton<IGeneratedFileStorage, LocalGeneratedFileStorage>();
         // Remove Gemini configuration - no longer used
         services.Configure<AzureOpenAiOptions>(configuration.GetSection(AzureOpenAiOptions.SectionName));
         services.AddHttpClient(nameof(StrategicAiReportService), client =>
@@ -52,13 +58,6 @@ public static class DependencyInjection
             var endpointLocal = azureSectionLocal.GetValue<string>(nameof(AzureOpenAiOptions.Endpoint));
             var apiKeyLocal = azureSectionLocal.GetValue<string>(nameof(AzureOpenAiOptions.ApiKey));
 
-            // WARNING: hardcoded fallback API key for Azure OpenAI as requested.
-            // Remove this before committing to a public repository.
-            var hardcodedAzureApiKeyFallback = "8Lo9YDIUFrANgqy8F58dWix4NF5ArBu2kampFj3aeGRz9UdX2UjdJQQJ99CFAC1i4TkXJ3w3AAABACOGnW5b";
-            if (string.IsNullOrWhiteSpace(apiKeyLocal))
-            {
-                apiKeyLocal = hardcodedAzureApiKeyFallback;
-            }
             if (!string.IsNullOrWhiteSpace(endpointLocal))
             {
                 // Use the endpoint as provided. Some environments (Foundry/Azure) include a path
@@ -73,11 +72,15 @@ public static class DependencyInjection
                 if (!client.DefaultRequestHeaders.Contains("api-key"))
                     client.DefaultRequestHeaders.Add("api-key", apiKeyLocal);
             }
-            // If ApiKey not provided here, it will be resolved at runtime from Key Vault by the service.
 
             client.Timeout = TimeSpan.FromMinutes(3);
         });
-        services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
+        var productImageProvider = configuration
+            .GetSection(ProductImageOptions.SectionName)["Provider"];
+        if (string.Equals(productImageProvider, "AzureBlob", StringComparison.OrdinalIgnoreCase))
+            services.AddSingleton<IProductImageStorage, AzureBlobProductImageStorage>();
+        else
+            services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IKitchenPrinterService, KitchenPrinterService>();
         services.AddScoped<IKitchenTicketService, KitchenTicketService>();
         services.AddScoped<ISalesReceiptService, SalesReceiptService>();

@@ -13,7 +13,7 @@ public sealed class ProductTypesControllerTests
     {
         var id = Guid.NewGuid();
         var mock = new Mock<IProductTypeService>();
-        mock.Setup(s => s.GetByIdAsync(id, default)).ReturnsAsync(new ProductTypeDto { Id = id, Name = "Food", SortOrder = 0, IsActive = true });
+        mock.Setup(s => s.GetByIdAsync(id, default)).ReturnsAsync(new ProductTypeDto { Id = id, Name = "Food", IsActive = true });
         var controller = new ProductTypesController(mock.Object);
 
         var result = await controller.GetById(id);

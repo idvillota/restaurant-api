@@ -20,7 +20,6 @@ public sealed class IngredientServiceTests
             Id = Guid.NewGuid(),
             TenantId = fx.TenantId,
             Name = "General",
-            SortOrder = 0,
             IsActive = true,
         };
         await fx.Db.IngredientCategories.AddAsync(cat);

@@ -26,7 +26,7 @@ public static class DashboardCatalog
             Category = "Reportes",
             RequiredPermission = FeatureCodes.ReportsSalesByDate,
             DefaultWidth = 4,
-            DefaultHeight = 2,
+            DefaultHeight = 3,
             MinWidth = 3,
             MinHeight = 2,
         },
@@ -78,8 +78,22 @@ public static class DashboardCatalog
             MinWidth = 3,
             MinHeight = 2,
         },
+        new()
+        {
+            WidgetType = "operational_sales_detail",
+            Name = "Ventas del día / turno",
+            Description = "Detalle de facturas del día operativo o del turno actual.",
+            Category = "Servicio",
+            RequiredPermission = FeatureCodes.CashierShifts,
+            DefaultWidth = 6,
+            DefaultHeight = 4,
+            MinWidth = 4,
+            MinHeight = 3,
+        },
     ];
 
     public static IReadOnlyDictionary<string, DashboardWidgetDefinitionDto> ByType { get; } =
         Widgets.ToDictionary(w => w.WidgetType, StringComparer.Ordinal);
+
+    public const string OperationalSalesDetailWidgetType = "operational_sales_detail";
 }

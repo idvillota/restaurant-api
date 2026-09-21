@@ -109,6 +109,7 @@ BEGIN
         ('f1000001-0001-4001-8001-000000000001', 'dashboard.view', 'Panel', 'General', 10, v_now),
         ('f1000021-0027-4027-8027-000000000021', 'dashboard.configure', 'Configurar panel', 'Administración', 11, v_now),
         ('f1000002-0002-4002-8002-000000000002', 'service.salon', 'Salón', 'Servicio', 20, v_now),
+        ('f1000022-0028-4028-8028-000000000022', 'service.relocate_table', 'Cambiar / fusionar mesa', 'Servicio', 25, v_now),
         ('f1000003-0003-4003-8003-000000000003', 'payments.checkout', 'Pagos', 'Servicio', 30, v_now),
         ('f1000004-0004-4004-8004-000000000004', 'reservations.manage', 'Reservas', 'Servicio', 40, v_now),
         ('f1000005-0005-4005-8005-000000000005', 'customers.manage', 'Clientes', 'Servicio', 50, v_now),
@@ -136,7 +137,7 @@ BEGIN
     ON CONFLICT ("Code") DO NOTHING;
 
     SELECT COUNT(*) INTO v_feature_count FROM "Features";
-    IF v_feature_count < 27 THEN
+    IF v_feature_count < 28 THEN
         RAISE EXCEPTION 'Features catalog incomplete (% rows). Run API once or fix seed above.', v_feature_count;
     END IF;
 
@@ -238,7 +239,7 @@ BEGIN
     SELECT gen_random_uuid(), v_tenant_id, v_role_manager_id, f."Id", v_now
     FROM "Features" f
     WHERE f."Code" IN (
-        'dashboard.view', 'dashboard.configure', 'service.salon', 'payments.checkout', 'cashier.shifts',
+        'dashboard.view', 'dashboard.configure', 'service.salon', 'service.relocate_table', 'payments.checkout', 'cashier.shifts',
         'reservations.manage', 'customers.manage', 'tables.manage',
         'catalog.products', 'catalog.product-types', 'catalog.ingredient-categories', 'catalog.ingredients',
         'inventory.ingredient-movement-types', 'inventory.ingredient-movements', 'catalog.public_menu_qr',
@@ -251,27 +252,27 @@ BEGIN
     SELECT gen_random_uuid(), v_tenant_id, v_role_waitress_id, f."Id", v_now
     FROM "Features" f
     WHERE f."Code" IN (
-        'dashboard.view', 'service.salon', 'reservations.manage', 'customers.manage', 'catalog.public_menu_qr'
+        'dashboard.view', 'service.salon', 'service.relocate_table', 'reservations.manage', 'customers.manage', 'catalog.public_menu_qr'
     );
 
     INSERT INTO "RoleFeatures" ("Id", "TenantId", "RoleId", "FeatureId", "CreatedAtUtc")
     SELECT gen_random_uuid(), v_tenant_id, v_role_cashier_id, f."Id", v_now
     FROM "Features" f
     WHERE f."Code" IN (
-        'dashboard.view', 'service.salon', 'payments.checkout', 'cashier.shifts',
+        'dashboard.view', 'service.salon', 'service.relocate_table', 'payments.checkout', 'cashier.shifts',
         'customers.manage', 'catalog.public_menu_qr', 'reports.sales', 'reports.sales_by_date'
     );
 
     -- -------------------------------------------------------------------------
     -- Ingredient movement types (5 defaults)
     -- -------------------------------------------------------------------------
-    INSERT INTO "IngredientMovementTypes" ("Id", "TenantId", "Name", "Description", "IsInput", "SortOrder", "IsActive", "CreatedAtUtc")
+    INSERT INTO "IngredientMovementTypes" ("Id", "TenantId", "Name", "Description", "IsInput", "IsActive", "CreatedAtUtc")
     VALUES
-        (gen_random_uuid(), v_tenant_id, 'Ingreso por regalo', 'Stock recibido sin costo de compra', true,  10, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Ajuste positivo',    'Corrección por conteo físico (más stock)', true,  20, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Salida por baja',    'Descarte intencional de producto', false, 30, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Salida por pérdida', 'Merma o deterioro no planificado', false, 40, true, v_now),
-        (gen_random_uuid(), v_tenant_id, 'Ajuste negativo',    'Corrección por conteo físico (menos stock)', false, 50, true, v_now);
+        (gen_random_uuid(), v_tenant_id, 'Ingreso por regalo', 'Stock recibido sin costo de compra', true,  true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Ajuste positivo',    'Corrección por conteo físico (más stock)', true,  true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Salida por baja',    'Descarte intencional de producto', false, true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Salida por pérdida', 'Merma o deterioro no planificado', false, true, v_now),
+        (gen_random_uuid(), v_tenant_id, 'Ajuste negativo',    'Corrección por conteo físico (menos stock)', false, true, v_now);
 
     -- -------------------------------------------------------------------------
     -- Default kitchen printer station
@@ -284,12 +285,12 @@ BEGIN
     -- CompositionType: 0 = Prepared
     -- IngredientUnit: 0 = Unit, 2 = Gram
     -- -------------------------------------------------------------------------
-    INSERT INTO "IngredientCategories" ("Id", "TenantId", "Name", "Description", "SortOrder", "IsActive", "CreatedAtUtc")
+    INSERT INTO "IngredientCategories" ("Id", "TenantId", "Name", "Description", "IsActive", "CreatedAtUtc")
     VALUES
-        (v_cat_verduras_id, v_tenant_id, 'Verduras',  'Categoría: verduras',  0, true, v_now),
-        (v_cat_lacteos_id,  v_tenant_id, 'Lácteos',   'Categoría: lácteos',   1, true, v_now),
-        (v_cat_frutas_id,   v_tenant_id, 'Frutas',    'Categoría: frutas',    2, true, v_now),
-        (v_cat_insumos_id,  v_tenant_id, 'Insumos',   'Categoría: insumos',   3, true, v_now);
+        (v_cat_verduras_id, v_tenant_id, 'Verduras',  'Categoría: verduras',  true, v_now),
+        (v_cat_lacteos_id,  v_tenant_id, 'Lácteos',   'Categoría: lácteos',   true, v_now),
+        (v_cat_frutas_id,   v_tenant_id, 'Frutas',    'Categoría: frutas',    true, v_now),
+        (v_cat_insumos_id,  v_tenant_id, 'Insumos',   'Categoría: insumos',   true, v_now);
 
     INSERT INTO "Ingredients" ("Id", "TenantId", "IngredientCategoryId", "Name", "Unit", "IsActive", "StockQuantity", "ReorderLevel", "UnitCost", "CreatedAtUtc")
     VALUES
@@ -298,18 +299,18 @@ BEGIN
         (v_ing_limon_id,   v_tenant_id, v_cat_frutas_id,   'Limón',            0, true, 200,   40,    500,  v_now),
         (v_ing_azucar_id,  v_tenant_id, v_cat_insumos_id,  'Azúcar',           2, true, 5000,  1000,  5,    v_now);
 
-    INSERT INTO "ProductTypes" ("Id", "TenantId", "Name", "Description", "SortOrder", "IsActive", "CreatedAtUtc")
+    INSERT INTO "ProductTypes" ("Id", "TenantId", "Name", "Description", "IsActive", "CreatedAtUtc")
     VALUES
-        (v_pt_platos_id,  v_tenant_id, 'Platos',  'Platos principales', 0, true, v_now),
-        (v_pt_bebidas_id, v_tenant_id, 'Bebidas', 'Bebidas',            1, true, v_now);
+        (v_pt_platos_id,  v_tenant_id, 'Platos',  'Platos principales', true, v_now),
+        (v_pt_bebidas_id, v_tenant_id, 'Bebidas', 'Bebidas',            true, v_now);
 
     INSERT INTO "Products" (
         "Id", "TenantId", "ProductTypeId", "CompositionType", "Name", "Description",
-        "Sku", "UnitPrice", "IsActive", "ImagePath", "CreatedAtUtc"
+        "UnitPrice", "IsActive", "ImagePath", "CreatedAtUtc"
     )
     VALUES
-        (v_prod_pizza_id,    v_tenant_id, v_pt_platos_id,  0, 'Pizza margarita',    'Pizza clásica con tomate y queso', 'PLT-001', 32000, true, v_image_pizza,    v_now),
-        (v_prod_limonada_id, v_tenant_id, v_pt_bebidas_id, 0, 'Limonada natural',   'Bebida refrescante',               'BEB-001', 8000,  true, v_image_limonada, v_now);
+        (v_prod_pizza_id,    v_tenant_id, v_pt_platos_id,  0, 'Pizza margarita',    'Pizza clásica con tomate y queso', 32000, true, v_image_pizza,    v_now),
+        (v_prod_limonada_id, v_tenant_id, v_pt_bebidas_id, 0, 'Limonada natural',   'Bebida refrescante',               8000,  true, v_image_limonada, v_now);
 
     INSERT INTO "ProductIngredients" ("Id", "TenantId", "ProductId", "IngredientId", "Quantity", "CreatedAtUtc")
     VALUES

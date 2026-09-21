@@ -1,9 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using QuestPDF.Infrastructure;
 using Restaurant.Application.Common.Interfaces;
-using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Sales.SalesReceipts;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
@@ -21,22 +18,16 @@ public sealed class SalesReceiptService : ISalesReceiptService
 
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
-    private readonly string _absoluteRoot;
+    private readonly IGeneratedFileStorage _fileStorage;
 
     public SalesReceiptService(
         ApplicationDbContext db,
         ICurrentTenantContext tenantContext,
-        IOptions<SalesReceiptOptions> options,
-        IHostEnvironment environment)
+        IGeneratedFileStorage fileStorage)
     {
         _db = db;
         _tenantContext = tenantContext;
-
-        var rootPath = options.Value.RootPath.Trim().TrimEnd('/', '\\');
-        _absoluteRoot = Path.IsPathRooted(rootPath)
-            ? rootPath
-            : Path.Combine(environment.ContentRootPath, rootPath);
-        Directory.CreateDirectory(_absoluteRoot);
+        _fileStorage = fileStorage;
     }
 
     public async Task<SalesReceiptModel> BuildModelAsync(
@@ -121,32 +112,34 @@ public sealed class SalesReceiptService : ISalesReceiptService
         };
     }
 
-    public Task<SalesReceiptFilesDto> GenerateFilesAsync(
+    public async Task<SalesReceiptFilesDto> GenerateFilesAsync(
         SalesReceiptModel model,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var tenantFolder = _tenantContext.TenantId?.ToString("N") ?? "shared";
-        var tenantRoot = Path.Combine(_absoluteRoot, tenantFolder);
-        Directory.CreateDirectory(tenantRoot);
-
         var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
         var safeInvoice = SanitizeFileToken(model.InvoiceDisplayNumber);
         var baseName = $"factura_{stamp}_{safeInvoice}_{Guid.NewGuid():N}";
 
-        var pdfPath = Path.Combine(tenantRoot, $"{baseName}.pdf");
-        var xmlPath = Path.Combine(tenantRoot, $"{baseName}.xml");
+        var pdfRelativePath = await _fileStorage.SaveAsync(
+            $"receipts/{tenantFolder}/{baseName}.pdf",
+            QuestPdfSalesReceiptDocument.BuildPdf(model),
+            "application/pdf",
+            cancellationToken);
 
-        File.WriteAllBytes(pdfPath, QuestPdfSalesReceiptDocument.BuildPdf(model));
-        File.WriteAllBytes(xmlPath, SalesReceiptXmlBuilder.BuildXml(model));
+        var xmlRelativePath = await _fileStorage.SaveAsync(
+            $"receipts/{tenantFolder}/{baseName}.xml",
+            SalesReceiptXmlBuilder.BuildXml(model),
+            "application/xml",
+            cancellationToken);
 
-        return Task.FromResult(
-            new SalesReceiptFilesDto
-            {
-                PdfRelativePath = Path.Combine(tenantFolder, $"{baseName}.pdf").Replace('\\', '/'),
-                XmlRelativePath = Path.Combine(tenantFolder, $"{baseName}.xml").Replace('\\', '/'),
-            });
+        return new SalesReceiptFilesDto
+        {
+            PdfRelativePath = pdfRelativePath,
+            XmlRelativePath = xmlRelativePath,
+        };
     }
 
     private static SalesReceiptTenantInfo MapTenant(TenantSettings settings) =>

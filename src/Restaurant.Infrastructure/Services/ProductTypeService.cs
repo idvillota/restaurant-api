@@ -52,7 +52,6 @@ public sealed class ProductTypeService : IProductTypeService
             Id = Guid.NewGuid(),
             Name = name,
             Description = dto.Description?.Trim(),
-            SortOrder = dto.SortOrder,
             IsActive = true,
         };
         await _productTypes.AddAsync(entity, cancellationToken);
@@ -72,7 +71,6 @@ public sealed class ProductTypeService : IProductTypeService
 
         entity.Name = name;
         entity.Description = dto.Description?.Trim();
-        entity.SortOrder = dto.SortOrder;
         entity.IsActive = dto.IsActive;
         _productTypes.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
