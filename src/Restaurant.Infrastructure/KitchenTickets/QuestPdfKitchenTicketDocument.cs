@@ -28,16 +28,32 @@ internal static class QuestPdfKitchenTicketDocument
 
                         column.Item().AlignCenter().Text($"MESA {ticket.TableCode}").Bold().FontSize(14);
 
+                        if (ticket.IsCancellation)
+                        {
+                            column.Item().AlignCenter().Text("*** ANULACIÓN ***").Bold().FontSize(12);
+                        }
+
                         if (!string.IsNullOrWhiteSpace(ticket.PrinterStationName))
                         {
                             column.Item().Text($"Estación: {ticket.PrinterStationName}").Bold().FontSize(9);
                         }
 
-                        column.Item().Text($"Mesero/a: {ticket.SentBy}");
+                        column.Item().Text(
+                            ticket.IsCancellation
+                                ? $"Solicitado por: {ticket.SentBy}"
+                                : $"Mesero/a: {ticket.SentBy}");
                         column.Item().Text($"Pedido: {ticket.OrderNumber}").FontSize(8);
                         column.Item()
-                            .Text($"Enviado: {sentLocal:dd/MM/yyyy HH:mm}")
+                            .Text(
+                                ticket.IsCancellation
+                                    ? $"Anulado: {sentLocal:dd/MM/yyyy HH:mm}"
+                                    : $"Enviado: {sentLocal:dd/MM/yyyy HH:mm}")
                             .FontSize(8);
+
+                        if (ticket.IsCancellation && !string.IsNullOrWhiteSpace(ticket.CancelReason))
+                        {
+                            column.Item().Text($"Motivo: {ticket.CancelReason}").Bold().FontSize(9);
+                        }
 
                         column.Item().PaddingTop(4).LineHorizontal(0.5f);
 

@@ -454,26 +454,26 @@ public static class DevelopmentDataSeeder
                 cancellationToken);
         }
 
-        var products = new (string Name, Guid TypeId, EProductType Kind, decimal Price, string? Sku)[]
+        var products = new (string Name, Guid TypeId, EProductType Kind, decimal Price)[]
         {
-            ("Pizza margarita", DevelopmentSeedIds.ProductTypeIds[0], EProductType.Prepared, 32000m, "PIZ-001"),
-            ("Penne arrabbiata", DevelopmentSeedIds.ProductTypeIds[1], EProductType.Prepared, 28000m, "PAS-001"),
-            ("Ensalada César", DevelopmentSeedIds.ProductTypeIds[2], EProductType.Prepared, 24000m, "SAL-001"),
-            ("Hamburguesa clásica", DevelopmentSeedIds.ProductTypeIds[3], EProductType.Prepared, 35000m, "BRG-001"),
-            ("Tiramisú", DevelopmentSeedIds.ProductTypeIds[4], EProductType.Prepared, 15000m, "DES-001"),
-            ("Cola", DevelopmentSeedIds.ProductTypeIds[5], EProductType.Resale, 6000m, "DRK-001"),
-            ("Agua con gas", DevelopmentSeedIds.ProductTypeIds[5], EProductType.Resale, 5000m, "DRK-002"),
-            ("Pan de ajo", DevelopmentSeedIds.ProductTypeIds[8], EProductType.Prepared, 12000m, "APP-001"),
-            ("Sopa del día", DevelopmentSeedIds.ProductTypeIds[9], EProductType.Prepared, 14000m, "SPC-001"),
-            ("Pizza pepperoni", DevelopmentSeedIds.ProductTypeIds[0], EProductType.Prepared, 36000m, "PIZ-002"),
-            ("Pollo a la parrilla", DevelopmentSeedIds.ProductTypeIds[9], EProductType.Prepared, 42000m, "SPC-002"),
-            ("Limonada de la casa", DevelopmentSeedIds.ProductTypeIds[5], EProductType.Prepared, 8000m, "DRK-003"),
-            ("Combo hamburguesa + cola", DevelopmentSeedIds.ProductTypeIds[10], EProductType.Bundle, 38000m, "PRO-001"),
+            ("Pizza margarita", DevelopmentSeedIds.ProductTypeIds[0], EProductType.Prepared, 32000m),
+            ("Penne arrabbiata", DevelopmentSeedIds.ProductTypeIds[1], EProductType.Prepared, 28000m),
+            ("Ensalada César", DevelopmentSeedIds.ProductTypeIds[2], EProductType.Prepared, 24000m),
+            ("Hamburguesa clásica", DevelopmentSeedIds.ProductTypeIds[3], EProductType.Prepared, 35000m),
+            ("Tiramisú", DevelopmentSeedIds.ProductTypeIds[4], EProductType.Prepared, 15000m),
+            ("Cola", DevelopmentSeedIds.ProductTypeIds[5], EProductType.Resale, 6000m),
+            ("Agua con gas", DevelopmentSeedIds.ProductTypeIds[5], EProductType.Resale, 5000m),
+            ("Pan de ajo", DevelopmentSeedIds.ProductTypeIds[8], EProductType.Prepared, 12000m),
+            ("Sopa del día", DevelopmentSeedIds.ProductTypeIds[9], EProductType.Prepared, 14000m),
+            ("Pizza pepperoni", DevelopmentSeedIds.ProductTypeIds[0], EProductType.Prepared, 36000m),
+            ("Pollo a la parrilla", DevelopmentSeedIds.ProductTypeIds[9], EProductType.Prepared, 42000m),
+            ("Limonada de la casa", DevelopmentSeedIds.ProductTypeIds[5], EProductType.Prepared, 8000m),
+            ("Combo hamburguesa + cola", DevelopmentSeedIds.ProductTypeIds[10], EProductType.Bundle, 38000m),
         };
 
         for (var i = 0; i < products.Length; i++)
         {
-            var (name, typeId, kind, price, sku) = products[i];
+            var (name, typeId, kind, price) = products[i];
             await db.Products.AddAsync(
                 new Product
                 {
@@ -483,7 +483,6 @@ public static class DevelopmentDataSeeder
                     CompositionType = kind,
                     Name = name,
                     Description = $"Plato del menú demo — {name}",
-                    Sku = sku,
                     UnitPrice = price,
                     IsActive = true,
                 },

@@ -308,25 +308,25 @@ public static class DevelopmentHistoricalDataSeeder
 
         var existingProducts = await db.Products.IgnoreQueryFilters()
             .Where(p => p.TenantId == tenantId)
-            .ToDictionaryAsync(p => p.Sku ?? p.Name, p => p, StringComparer.OrdinalIgnoreCase, cancellationToken);
+            .ToDictionaryAsync(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-        var newProducts = new (string Name, string TypeName, EProductType Kind, decimal Price, string Sku)[]
+        var newProducts = new (string Name, string TypeName, EProductType Kind, decimal Price)[]
         {
-            ("Pizza cuatro quesos", "Pizzas", EProductType.Prepared, 39000m, "PIZ-003"),
-            ("Lasagna boloñesa", "Pastas", EProductType.Prepared, 34000m, "PAS-002"),
-            ("Ensalada griega", "Ensaladas", EProductType.Prepared, 26000m, "SAL-002"),
-            ("Hamburguesa BBQ", "Hamburguesas", EProductType.Prepared, 38000m, "BRG-002"),
-            ("Brownie con helado", "Postres", EProductType.Prepared, 18000m, "DES-002"),
-            ("Café americano", "Refrescos", EProductType.Prepared, 7000m, "DRK-004"),
-            ("Mojito clásico", "Refrescos", EProductType.Prepared, 22000m, "DRK-005"),
-            ("Cerveza artesanal IPA", "Cerveza", EProductType.Resale, 12000m, "BEER-001"),
-            ("Copa de vino tinto", "Vino", EProductType.Prepared, 28000m, "WIN-001"),
-            ("Nachos con queso", "Entradas", EProductType.Prepared, 22000m, "APP-002"),
-            ("Alitas BBQ", "Entradas", EProductType.Prepared, 26000m, "APP-003"),
-            ("Risotto de hongos", "Especiales", EProductType.Prepared, 44000m, "SPC-003"),
-            ("Tarta de limón", "Postres", EProductType.Prepared, 16000m, "DES-003"),
-            ("Pasta carbonara", "Pastas", EProductType.Prepared, 45000m, "PAS-003"),
-            ("Combo pizza + cerveza", "Promociones", EProductType.Bundle, 42000m, "PRO-002"),
+            ("Pizza cuatro quesos", "Pizzas", EProductType.Prepared, 39000m),
+            ("Lasagna boloñesa", "Pastas", EProductType.Prepared, 34000m),
+            ("Ensalada griega", "Ensaladas", EProductType.Prepared, 26000m),
+            ("Hamburguesa BBQ", "Hamburguesas", EProductType.Prepared, 38000m),
+            ("Brownie con helado", "Postres", EProductType.Prepared, 18000m),
+            ("Café americano", "Refrescos", EProductType.Prepared, 7000m),
+            ("Mojito clásico", "Refrescos", EProductType.Prepared, 22000m),
+            ("Cerveza artesanal IPA", "Cerveza", EProductType.Resale, 12000m),
+            ("Copa de vino tinto", "Vino", EProductType.Prepared, 28000m),
+            ("Nachos con queso", "Entradas", EProductType.Prepared, 22000m),
+            ("Alitas BBQ", "Entradas", EProductType.Prepared, 26000m),
+            ("Risotto de hongos", "Especiales", EProductType.Prepared, 44000m),
+            ("Tarta de limón", "Postres", EProductType.Prepared, 16000m),
+            ("Pasta carbonara", "Pastas", EProductType.Prepared, 45000m),
+            ("Combo pizza + cerveza", "Promociones", EProductType.Bundle, 42000m),
         };
 
         var productIndex = 1;
@@ -335,12 +335,12 @@ public static class DevelopmentHistoricalDataSeeder
 
         foreach (var spec in newProducts)
         {
-            if (existingProducts.ContainsKey(spec.Sku))
+            if (existingProducts.ContainsKey(spec.Name))
             {
-                if (spec.Sku == "PIZ-003")
-                    comboPizza = existingProducts[spec.Sku];
-                if (spec.Sku == "BEER-001")
-                    comboBeer = existingProducts[spec.Sku];
+                if (spec.Name == "Pizza cuatro quesos")
+                    comboPizza = existingProducts[spec.Name];
+                if (spec.Name == "Cerveza artesanal IPA")
+                    comboBeer = existingProducts[spec.Name];
                 continue;
             }
 
@@ -355,22 +355,21 @@ public static class DevelopmentHistoricalDataSeeder
                 CompositionType = spec.Kind,
                 Name = spec.Name,
                 Description = $"Plato histórico demo — {spec.Name}",
-                Sku = spec.Sku,
                 UnitPrice = spec.Price,
                 IsActive = true,
             };
             await db.Products.AddAsync(product, cancellationToken);
-            existingProducts[spec.Sku] = product;
+            existingProducts[spec.Name] = product;
 
-            if (spec.Sku == "PIZ-003")
+            if (spec.Name == "Pizza cuatro quesos")
                 comboPizza = product;
-            if (spec.Sku == "BEER-001")
+            if (spec.Name == "Cerveza artesanal IPA")
                 comboBeer = product;
 
-            await AddRecipeLinesAsync(db, tenantId, product, spec.Sku, existingIngredients, productIndex, cancellationToken);
+            await AddRecipeLinesAsync(db, tenantId, product, existingIngredients, productIndex, cancellationToken);
         }
 
-        if (existingProducts.TryGetValue("PRO-002", out var combo) && comboPizza is not null && comboBeer is not null)
+        if (existingProducts.TryGetValue("Combo pizza + cerveza", out var combo) && comboPizza is not null && comboBeer is not null)
         {
             var hasBundle = await db.ProductBundleLines.IgnoreQueryFilters()
                 .AnyAsync(b => b.TenantId == tenantId && b.ProductId == combo.Id, cancellationToken);
@@ -416,29 +415,28 @@ public static class DevelopmentHistoricalDataSeeder
         ApplicationDbContext db,
         Guid tenantId,
         Product product,
-        string sku,
         Dictionary<string, Ingredient> ingredients,
         int productIndex,
         CancellationToken cancellationToken)
     {
         Guid Ing(string name) => ingredients[name].Id;
 
-        (string IngredientName, decimal Qty)[]? recipe = sku switch
+        (string IngredientName, decimal Qty)[]? recipe = product.Name switch
         {
-            "PIZ-003" => [("Masa de pizza", 280m), ("Mozzarella", 180m), ("Queso parmesano", 60m), ("Tomates", 120m)],
-            "PAS-002" => [("Pasta penne", 200m), ("Carne molida", 150m), ("Tomates", 100m), ("Queso parmesano", 40m)],
-            "SAL-002" => [("Lechuga romana", 120m), ("Tomates", 80m), ("Queso parmesano", 30m), ("Aceite de oliva", 15m)],
-            "BRG-002" => [("Carne molida", 170m), ("Pan de hamburguesa", 1m), ("Tocineta", 40m), ("Salsa BBQ", 25m)],
-            "DES-002" => [("Chocolate negro", 80m), ("Harina 00", 50m), ("Azúcar", 40m), ("Mozzarella", 30m)],
-            "DRK-004" => [("Café molido", 18m), ("Azúcar", 5m)],
-            "DRK-005" => [("Ron blanco", 60m), ("Menta fresca", 8m), ("Limón", 1m), ("Azúcar", 12m)],
-            "BEER-001" => [("Cerveza artesanal IPA 350 ml", 1m)],
-            "WIN-001" => [("Vino tinto copa", 150m)],
-            "APP-002" => [("Harina 00", 90m), ("Mozzarella", 100m), ("Tomates", 60m)],
-            "APP-003" => [("Pechuga de pollo", 220m), ("Salsa BBQ", 35m)],
-            "SPC-003" => [("Arroz arborio", 180m), ("Champiñones", 120m), ("Queso parmesano", 35m)],
-            "DES-003" => [("Harina 00", 70m), ("Limón", 2m), ("Azúcar", 55m)],
-            "PAS-003" => [("Pasta penne", 190m), ("Tocineta", 60m), ("Queso parmesano", 45m), ("Huevo", 1m)],
+            "Pizza cuatro quesos" => [("Masa de pizza", 280m), ("Mozzarella", 180m), ("Queso parmesano", 60m), ("Tomates", 120m)],
+            "Lasagna boloñesa" => [("Pasta penne", 200m), ("Carne molida", 150m), ("Tomates", 100m), ("Queso parmesano", 40m)],
+            "Ensalada griega" => [("Lechuga romana", 120m), ("Tomates", 80m), ("Queso parmesano", 30m), ("Aceite de oliva", 15m)],
+            "Hamburguesa BBQ" => [("Carne molida", 170m), ("Pan de hamburguesa", 1m), ("Tocineta", 40m), ("Salsa BBQ", 25m)],
+            "Brownie con helado" => [("Chocolate negro", 80m), ("Harina 00", 50m), ("Azúcar", 40m), ("Mozzarella", 30m)],
+            "Café americano" => [("Café molido", 18m), ("Azúcar", 5m)],
+            "Mojito clásico" => [("Ron blanco", 60m), ("Menta fresca", 8m), ("Limón", 1m), ("Azúcar", 12m)],
+            "Cerveza artesanal IPA" => [("Cerveza artesanal IPA 350 ml", 1m)],
+            "Copa de vino tinto" => [("Vino tinto copa", 150m)],
+            "Nachos con queso" => [("Harina 00", 90m), ("Mozzarella", 100m), ("Tomates", 60m)],
+            "Alitas BBQ" => [("Pechuga de pollo", 220m), ("Salsa BBQ", 35m)],
+            "Risotto de hongos" => [("Arroz arborio", 180m), ("Champiñones", 120m), ("Queso parmesano", 35m)],
+            "Tarta de limón" => [("Harina 00", 70m), ("Limón", 2m), ("Azúcar", 55m)],
+            "Pasta carbonara" => [("Pasta penne", 190m), ("Tocineta", 60m), ("Queso parmesano", 45m), ("Huevo", 1m)],
             _ => null,
         };
 

@@ -177,7 +177,6 @@ internal static class PagedEntityQueries
             query = query.Where(p =>
                 EF.Functions.ILike(p.Name, EfTextSearch.LikePattern(search)) ||
                 (p.Description != null && EF.Functions.ILike(p.Description, EfTextSearch.LikePattern(search))) ||
-                (p.Sku != null && EF.Functions.ILike(p.Sku, EfTextSearch.LikePattern(search))) ||
                 EF.Functions.ILike(p.ProductType.Name, EfTextSearch.LikePattern(search)));
         }
 
@@ -186,9 +185,6 @@ internal static class PagedEntityQueries
 
         if (q.FilterValue("description") is { } descFilter)
             query = query.Where(p => p.Description != null && EF.Functions.ILike(p.Description, EfTextSearch.LikePattern(descFilter)));
-
-        if (q.FilterValue("sku") is { } skuFilter)
-            query = query.Where(p => p.Sku != null && EF.Functions.ILike(p.Sku, EfTextSearch.LikePattern(skuFilter)));
 
         if (q.FilterValue("productTypeName") is { } typeName)
             query = query.Where(p => EF.Functions.ILike(p.ProductType.Name, EfTextSearch.LikePattern(typeName)));
@@ -470,7 +466,6 @@ internal static class PagedEntityQueries
         return (q.SortBy?.ToLowerInvariant() ?? "name") switch
         {
             "description" => desc ? query.OrderByDescending(p => p.Description) : query.OrderBy(p => p.Description),
-            "sku" => desc ? query.OrderByDescending(p => p.Sku) : query.OrderBy(p => p.Sku),
             "unitprice" => desc ? query.OrderByDescending(p => p.UnitPrice) : query.OrderBy(p => p.UnitPrice),
             "producttypename" => desc
                 ? query.OrderByDescending(p => p.ProductType.Name).ThenBy(p => p.Name)

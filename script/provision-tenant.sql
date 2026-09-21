@@ -306,11 +306,11 @@ BEGIN
 
     INSERT INTO "Products" (
         "Id", "TenantId", "ProductTypeId", "CompositionType", "Name", "Description",
-        "Sku", "UnitPrice", "IsActive", "ImagePath", "CreatedAtUtc"
+        "UnitPrice", "IsActive", "ImagePath", "CreatedAtUtc"
     )
     VALUES
-        (v_prod_pizza_id,    v_tenant_id, v_pt_platos_id,  0, 'Pizza margarita',    'Pizza clásica con tomate y queso', 'PLT-001', 32000, true, v_image_pizza,    v_now),
-        (v_prod_limonada_id, v_tenant_id, v_pt_bebidas_id, 0, 'Limonada natural',   'Bebida refrescante',               'BEB-001', 8000,  true, v_image_limonada, v_now);
+        (v_prod_pizza_id,    v_tenant_id, v_pt_platos_id,  0, 'Pizza margarita',    'Pizza clásica con tomate y queso', 32000, true, v_image_pizza,    v_now),
+        (v_prod_limonada_id, v_tenant_id, v_pt_bebidas_id, 0, 'Limonada natural',   'Bebida refrescante',               8000,  true, v_image_limonada, v_now);
 
     INSERT INTO "ProductIngredients" ("Id", "TenantId", "ProductId", "IngredientId", "Quantity", "CreatedAtUtc")
     VALUES

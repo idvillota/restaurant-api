@@ -143,7 +143,8 @@ public sealed class KitchenTicketService : IKitchenTicketService
 
         var tenantFolder = _tenantContext.TenantId?.ToString("N") ?? "shared";
         var stationCode = SanitizeStationCode(printerStationCode);
-        var fileName = $"{orderId:N}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{stationCode}.pdf";
+        var kind = model.IsCancellation ? "cancel" : "send";
+        var fileName = $"{orderId:N}_{kind}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{stationCode}.pdf";
         var relativePath = $"orders/{tenantFolder}/{fileName}";
 
         var pdfBytes = QuestPdfKitchenTicketDocument.BuildPdf(model);

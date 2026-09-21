@@ -128,6 +128,7 @@ public sealed class SalesOrderRelocateTests
             Mock.Of<IKitchenTicketService>(),
             Mock.Of<IKitchenPrinterService>(),
             day.Object,
+            fx.TenantContext,
             fx.Db);
     }
 

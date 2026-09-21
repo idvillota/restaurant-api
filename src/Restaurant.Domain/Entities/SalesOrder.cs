@@ -16,6 +16,12 @@ public class SalesOrder : EntityBase, ITenantScoped
     public decimal Total { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
 
+    /// <summary>User who logically voided the order (Status = Voided).</summary>
+    public Guid? VoidedByUserId { get; set; }
+
+    /// <summary>Reason code/label stored when the order was voided.</summary>
+    public string? VoidReason { get; set; }
+
     public DiningTable? DiningTable { get; set; }
     public Customer? Customer { get; set; }
     public ICollection<SalesOrderLine> Lines { get; set; } = new List<SalesOrderLine>();

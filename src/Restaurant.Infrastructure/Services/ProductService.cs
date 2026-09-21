@@ -79,10 +79,6 @@ public sealed class ProductService : IProductService
         if (await _products.Query().AnyAsync(p => p.IsActive && p.Name == name, cancellationToken))
             throw new InvalidOperationException("An active product with this name already exists.");
 
-        var sku = NormalizeSku(dto.Sku);
-        if (sku is not null && await _products.Query().AnyAsync(p => p.IsActive && p.Sku == sku, cancellationToken))
-            throw new InvalidOperationException("An active product with this SKU already exists.");
-
         var entity = new Product
         {
             Id = Guid.NewGuid(),
@@ -90,7 +86,6 @@ public sealed class ProductService : IProductService
             CompositionType = dto.CompositionType,
             Name = name,
             Description = NormalizeDescription(dto.Description),
-            Sku = sku,
             UnitPrice = dto.UnitPrice,
             IsActive = true,
         };
@@ -122,16 +117,11 @@ public sealed class ProductService : IProductService
         if (await _products.Query().AnyAsync(p => p.Id != id && p.IsActive && p.Name == name, cancellationToken))
             throw new InvalidOperationException("Another active product already uses this name.");
 
-        var sku = NormalizeSku(dto.Sku);
-        if (sku is not null && await _products.Query().AnyAsync(p => p.Id != id && p.IsActive && p.Sku == sku, cancellationToken))
-            throw new InvalidOperationException("Another active product already uses this SKU.");
-
         var compositionTypeChanged = entity.CompositionType != dto.CompositionType;
         entity.ProductTypeId = dto.ProductTypeId;
         entity.CompositionType = dto.CompositionType;
         entity.Name = name;
         entity.Description = NormalizeDescription(dto.Description);
-        entity.Sku = sku;
         entity.UnitPrice = dto.UnitPrice;
         entity.IsActive = dto.IsActive;
 
@@ -657,9 +647,6 @@ public sealed class ProductService : IProductService
         dto.ImageUrl = _productImages.GetPublicUrl(product.ImagePath);
         return dto;
     }
-
-    private static string? NormalizeSku(string? sku) =>
-        string.IsNullOrWhiteSpace(sku) ? null : sku.Trim();
 
     private static string? NormalizeDescription(string? description) =>
         string.IsNullOrWhiteSpace(description) ? null : description.Trim();
