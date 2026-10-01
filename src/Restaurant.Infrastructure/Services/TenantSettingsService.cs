@@ -46,6 +46,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.Country = dto.Country.Trim();
         settings.PostalCode = dto.PostalCode?.Trim();
         settings.Phone = dto.Phone?.Trim();
+        settings.PrinterMac = string.IsNullOrWhiteSpace(dto.PrinterMac) ? null : dto.PrinterMac.Trim();
         settings.DianResolutionNumber = dto.DianResolutionNumber?.Trim();
         settings.DianResolutionFrom = dto.DianResolutionFrom;
         settings.DianResolutionTo = dto.DianResolutionTo;
@@ -123,6 +124,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             Country = settings.Country,
             PostalCode = settings.PostalCode,
             Phone = settings.Phone,
+            PrinterMac = settings.PrinterMac,
             DianResolutionNumber = settings.DianResolutionNumber,
             DianResolutionFrom = settings.DianResolutionFrom,
             DianResolutionTo = settings.DianResolutionTo,

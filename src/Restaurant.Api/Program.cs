@@ -14,11 +14,14 @@ using Restaurant.Infrastructure;
 using Restaurant.Infrastructure.Identity;
 using Restaurant.Infrastructure.Persistence;
 using Restaurant.Infrastructure.Persistence.Seeding;
+using Restaurant.Api.MobileSync;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<MobileSaleChannel>();
+builder.Services.AddSingleton<IMobileSalePublisher>(sp => sp.GetRequiredService<MobileSaleChannel>());
 
 var jwtSection = builder.Configuration.GetSection(JwtSettings.SectionName);
 var jwtSettings = jwtSection.Get<JwtSettings>()
@@ -32,10 +35,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
+            RequireExpirationTime = false,
             ValidateIssuerSigningKey = true,
+
             ValidIssuer = jwtSettings.Issuer,
             ValidAudience = jwtSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey)),
+
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSettings.SigningKey)
+            ),
         };
     });
 
@@ -120,7 +128,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-if (isLocal)
+if (isLocal) ;
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
@@ -130,7 +138,7 @@ if (isLocal)
     });
 }
 
-if (!isLocal)
+if (!isLocal) ;
 {
     app.UseForwardedHeaders();
     app.UseHttpsRedirection();
@@ -155,6 +163,9 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseAuthorization();
+app.UseWebSockets();
+app.Map("/api/mobile-sync/stream", (HttpContext context, MobileSaleChannel channel, ICurrentTenantContext tenant) =>
+    channel.AcceptAsync(context, tenant));
 app.MapControllers();
 app.MapHealthChecks("/health");
 app.Run();
