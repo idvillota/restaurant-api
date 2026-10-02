@@ -1,3 +1,4 @@
+using DocumentFormat.OpenXml.Drawing.Charts;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
 using Restaurant.Application.Common.Interfaces;
@@ -6,6 +7,8 @@ using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.KitchenTickets;
+using System.Text;
+using System.Xml.Serialization;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -151,6 +154,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
         return await _fileStorage.SaveAsync(relativePath, pdfBytes, "application/pdf", cancellationToken);
     }
 
+
     private async Task<string> ResolveSentByNameAsync(CancellationToken cancellationToken)
     {
         if (_tenantContext.UserId is not { } userId)
@@ -247,7 +251,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
             .ToDictionary(g => g.Key, g => g.Select(x => x.IngredientId).ToHashSet());
     }
 
-    private static IReadOnlyList<string> ResolveExcludedNames(
+    private static List<string> ResolveExcludedNames(
         EProductType compositionType,
         List<Guid> requested,
         HashSet<Guid> recipeIngredientIds,
@@ -295,4 +299,35 @@ public sealed class KitchenTicketService : IKitchenTicketService
             .ToArray();
         return new string(chars);
     }
+
+    public async Task<string?> GenerateXmlAsync(KitchenTicketModel model, Guid orderId, string printerStationCode, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (model.Lines.Count == 0)
+            return null;
+
+        var tenantFolder = _tenantContext.TenantId?.ToString("N") ?? "shared";
+        var stationCode = SanitizeStationCode(printerStationCode);
+        var kind = model.IsCancellation ? "cancel" : "send";
+        var fileName = $"{orderId:N}_{kind}_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{stationCode}.xml";
+        var relativePath = $"orders/{tenantFolder}/{fileName}";
+
+        //var pdfBytes = QuestPdfKitchenTicketDocument.BuildPdf(model);
+        //return await _fileStorage.SaveAsync(relativePath, pdfBytes, "application/pdf", cancellationToken);
+
+        var serializer = new XmlSerializer(typeof(KitchenTicketModel));
+
+        using var writer = new StringWriter();
+
+        serializer.Serialize(writer, model);
+
+        string xml = writer.ToString();
+
+        byte[] xmlBytes = Encoding.UTF8.GetBytes(xml);
+
+        //return await _fileStorage.SaveAsync(relativePath, pdfBytes, "application/xml", cancellationToken);
+        return await _fileStorage.SaveAsync(relativePath, xmlBytes, "application/xml", cancellationToken);
+    }
+    
 }

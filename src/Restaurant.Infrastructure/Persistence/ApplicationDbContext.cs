@@ -45,6 +45,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
     public DbSet<SalesOrderLineExcludedIngredient> SalesOrderLineExcludedIngredients =>
         Set<SalesOrderLineExcludedIngredient>();
+    public DbSet<MobileSyncReceipt> MobileSyncReceipts => Set<MobileSyncReceipt>();
+    public DbSet<PrintJob> PrintJobs => Set<PrintJob>();
     public DbSet<TenantSettings> TenantSettings => Set<TenantSettings>();
     public DbSet<Bill> Bills => Set<Bill>();
     public DbSet<BillLine> BillLines => Set<BillLine>();
@@ -326,6 +328,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.Country).HasMaxLength(80);
             e.Property(x => x.PostalCode).HasMaxLength(20);
             e.Property(x => x.Phone).HasMaxLength(40);
+            e.Property(x => x.PrinterMac).HasMaxLength(17);
             e.Property(x => x.DianResolutionNumber).HasMaxLength(80);
             e.Property(x => x.InvoiceNumberPrefix).HasMaxLength(20);
             e.Property(x => x.DashboardLayoutJson);
@@ -359,11 +362,28 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.BusinessDate });
         });
 
+        modelBuilder.Entity<MobileSyncReceipt>(e =>
+        {
+            e.Property(x => x.DeviceId).HasMaxLength(128);
+            e.Property(x => x.LocalOrderId).HasMaxLength(64);
+            e.HasIndex(x => new { x.TenantId, x.DeviceId, x.LocalOrderId }).IsUnique();
+        });
+
         modelBuilder.Entity<StrategicAiReportCache>(e =>
         {
             e.Property(x => x.ReportType).HasMaxLength(64);
             e.Property(x => x.HtmlContent).HasColumnType("text");
             e.HasIndex(x => new { x.TenantId, x.ReportType, x.SalesStartDate, x.SalesEndDate, x.ForecastDays, x.CacheDate }).IsUnique();
+        });
+
+        modelBuilder.Entity<PrintJob>(e =>
+        {
+            e.Property(x => x.Kind).HasMaxLength(32).IsRequired();
+            e.Property(x => x.PayloadFormat).HasMaxLength(40).IsRequired();
+            e.Property(x => x.Payload).HasColumnType("text").IsRequired();
+            e.Property(x => x.Status).HasMaxLength(16).IsRequired();
+            e.Property(x => x.ErrorMessage).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.Status, x.CreatedAtUtc });
         });
 
         modelBuilder.Entity<Bill>(e =>
@@ -528,6 +548,9 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<Bill>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
+        modelBuilder.Entity<PrintJob>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
         modelBuilder.Entity<BillLine>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
@@ -550,6 +573,9 @@ public sealed class ApplicationDbContext : DbContext
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<StrategicAiReportCache>().HasQueryFilter(e =>
+            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<MobileSyncReceipt>().HasQueryFilter(e =>
             _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
     }
 

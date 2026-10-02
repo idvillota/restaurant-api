@@ -2,9 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
+using Restaurant.Application.Features.Sales.SalesReceipts;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Common;
+using System.Text;
 using Restaurant.Infrastructure.Persistence;
 using Restaurant.Infrastructure.SalesReceipts;
 
@@ -21,6 +23,8 @@ public sealed class BillService : IBillService
     private readonly IInventoryAvailabilityService _inventory;
     private readonly ICashierShiftService _cashierShifts;
     private readonly ISalesReceiptService _salesReceipts;
+    private readonly IMobileSalePublisher? _salePublisher;
+    private readonly IPrintJobQueue? _printJobs;
 
     public BillService(
         ApplicationDbContext db,
@@ -28,7 +32,9 @@ public sealed class BillService : IBillService
         IUnitOfWork unitOfWork,
         IInventoryAvailabilityService inventory,
         ICashierShiftService cashierShifts,
-        ISalesReceiptService salesReceipts)
+        ISalesReceiptService salesReceipts,
+        IMobileSalePublisher? salePublisher = null,
+        IPrintJobQueue? printJobs = null)
     {
         _db = db;
         _tenantContext = tenantContext;
@@ -36,6 +42,8 @@ public sealed class BillService : IBillService
         _inventory = inventory;
         _cashierShifts = cashierShifts;
         _salesReceipts = salesReceipts;
+        _salePublisher = salePublisher;
+        _printJobs = printJobs;
     }
 
     public async Task<IReadOnlyList<PayableTableGroupDto>> ListPayableByTableSearchAsync(
@@ -245,6 +253,7 @@ public sealed class BillService : IBillService
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await NotifyFreedTablesAsync(orders, cancellationToken);
 
         var receiptModel = await _salesReceipts.BuildModelAsync(bill, settings, cancellationToken);
         var receiptFiles = await _salesReceipts.GenerateFilesAsync(receiptModel, cancellationToken);
@@ -252,6 +261,7 @@ public sealed class BillService : IBillService
         bill.ReceiptXmlRelativePath = receiptFiles.XmlRelativePath;
         _db.Bills.Update(bill);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await EnqueueReceiptPrintAsync(receiptModel, cancellationToken);
 
         return new BillDto
         {
@@ -456,6 +466,65 @@ public sealed class BillService : IBillService
 
             ingredient.StockQuantity = InventoryCosting.SubtractStock(ingredient.StockQuantity, deduct);
             _db.Ingredients.Update(ingredient);
+        }
+    }
+
+    private async Task EnqueueReceiptPrintAsync(
+        SalesReceiptModel receipt,
+        CancellationToken cancellationToken)
+    {
+        if (_printJobs is null)
+            return;
+
+        try
+        {
+            var xml = Encoding.UTF8.GetString(SalesReceiptXmlBuilder.BuildXml(receipt));
+            await _printJobs.EnqueueAsync(
+                PrintJobKinds.Receipt,
+                PrintJobFormats.SalesReceiptXml,
+                xml,
+                cancellationToken);
+        }
+        catch (Exception)
+        {
+            // The bill is already stored. A print queue failure must not undo it.
+        }
+    }
+
+    private async Task NotifyFreedTablesAsync(
+        IReadOnlyList<SalesOrder> orders,
+        CancellationToken cancellationToken)
+    {
+        if (_salePublisher is null || _tenantContext.TenantId is not Guid tenantId)
+            return;
+
+        var tableIds = orders
+            .Where(order => order.DiningTableId.HasValue)
+            .Select(order => order.DiningTableId!.Value)
+            .Distinct()
+            .ToList();
+        if (tableIds.Count == 0)
+            return;
+
+        var stillOpen = await _db.SalesOrders.AsNoTracking()
+            .Where(order =>
+                order.DiningTableId != null &&
+                tableIds.Contains(order.DiningTableId.Value) &&
+                (order.Status == SalesOrderStatus.Draft || order.Status == SalesOrderStatus.Open))
+            .Select(order => order.DiningTableId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var freed = tableIds.Where(id => !stillOpen.Contains(id)).ToList();
+        if (freed.Count == 0)
+            return;
+
+        try
+        {
+            await _salePublisher.PublishTablesAvailableAsync(tenantId, freed, cancellationToken);
+        }
+        catch (Exception)
+        {
+            // The bill is already stored. Notifying a tablet must not fail the checkout.
         }
     }
 

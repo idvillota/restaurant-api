@@ -22,6 +22,9 @@ public class TenantSettings : ITenantScoped
     public string Country { get; set; } = "Colombia";
     public string? PostalCode { get; set; }
     public string? Phone { get; set; }
+
+    /// <summary>Bluetooth MAC of the thermal printer used by the service tablet.</summary>
+    public string? PrinterMac { get; set; }
     public string? DianResolutionNumber { get; set; }
     public int DianResolutionFrom { get; set; }
     public int DianResolutionTo { get; set; }

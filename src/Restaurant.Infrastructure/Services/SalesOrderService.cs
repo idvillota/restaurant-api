@@ -5,7 +5,9 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Application.Features.Sales.KitchenTickets;
 using Restaurant.Infrastructure.Common;
+using Restaurant.Infrastructure.KitchenTickets;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -26,6 +28,8 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IOperationalBusinessDayService _operationalDay;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly ApplicationDbContext _db;
+    private readonly IMobileSalePublisher? _salePublisher;
+    private readonly IPrintJobQueue? _printJobs;
 
     public SalesOrderService(
         IRepository<SalesOrder> orders,
@@ -41,7 +45,9 @@ public sealed class SalesOrderService : ISalesOrderService
         IKitchenPrinterService kitchenPrinters,
         IOperationalBusinessDayService operationalDay,
         ICurrentTenantContext tenantContext,
-        ApplicationDbContext db)
+        ApplicationDbContext db,
+        IMobileSalePublisher? salePublisher = null,
+        IPrintJobQueue? printJobs = null)
     {
         _orders = orders;
         _lines = lines;
@@ -57,6 +63,8 @@ public sealed class SalesOrderService : ISalesOrderService
         _operationalDay = operationalDay;
         _tenantContext = tenantContext;
         _db = db;
+        _salePublisher = salePublisher;
+        _printJobs = printJobs;
     }
 
     public async Task<IReadOnlyList<TableServiceSummaryDto>> ListTableSummariesAsync(
@@ -328,20 +336,26 @@ public sealed class SalesOrderService : ISalesOrderService
             ticketModel.PrinterStationCode = stationCode;
             ticketModel.PrinterStationName = group.StationName;
 
-            var ticketPath = await _kitchenTickets.GeneratePdfAsync(
+            var pdfTicketPath = await _kitchenTickets.GeneratePdfAsync(
                 ticketModel,
                 order.Id,
                 stationCode,
                 cancellationToken);
+            _ = await _kitchenTickets.GenerateXmlAsync(
+                ticketModel,
+                order.Id,
+                stationCode,
+                cancellationToken);
+            await EnqueueKitchenPrintAsync(ticketModel, cancellationToken);
 
-            if (ticketPath is not null)
+            if (pdfTicketPath is not null)
             {
                 kitchenTickets.Add(
                     new KitchenTicketFileDto
                     {
                         PrinterStationCode = stationCode,
                         PrinterStationName = group.StationName,
-                        RelativePath = ticketPath,
+                        RelativePath = pdfTicketPath,
                     });
             }
         }
@@ -349,6 +363,8 @@ public sealed class SalesOrderService : ISalesOrderService
         var orderDto = await GetByIdAsync(orderId, cancellationToken);
         if (orderDto is null)
             return null;
+
+        await PublishConfirmedSaleAsync(order, pendingLines, cancellationToken);
 
         return new ConfirmSalesOrderResultDto
         {
@@ -1043,5 +1059,60 @@ public sealed class SalesOrderService : ISalesOrderService
         if (hasOpenBill)
             throw new InvalidOperationException(
                 "No se puede cambiar de mesa mientras exista una cuenta abierta. Cierre o anule la cuenta primero.");
+    }
+
+    private async Task EnqueueKitchenPrintAsync(
+        KitchenTicketModel model,
+        CancellationToken cancellationToken)
+    {
+        if (_printJobs is null || model.Lines.Count == 0)
+            return;
+
+        try
+        {
+            await _printJobs.EnqueueAsync(
+                PrintJobKinds.Kitchen,
+                PrintJobFormats.KitchenTicketXml,
+                KitchenTicketPrintXml.Write(model),
+                cancellationToken);
+        }
+        catch (Exception)
+        {
+            // The comanda is already stored. A print queue failure must not undo it.
+        }
+    }
+
+    private async Task PublishConfirmedSaleAsync(
+        SalesOrder order,
+        IReadOnlyList<SalesOrderLine> lines,
+        CancellationToken cancellationToken)
+    {
+        if (_salePublisher is null || _tenantContext.TenantId is not Guid tenantId || lines.Count == 0)
+            return;
+
+        try
+        {
+            await _salePublisher.PublishAsync(
+                tenantId,
+                new MobileSaleNotice(
+                    order.Id,
+                    order.DiningTableId,
+                    order.DiningTable?.Code ?? string.Empty,
+                    "HOST",
+                    (order.UpdatedAtUtc ?? DateTime.UtcNow).ToString("O"),
+                    lines.Select(line => new MobileSaleLineNotice(
+                        line.Id,
+                        line.ProductId,
+                        line.Product?.Name ?? "Producto",
+                        line.Quantity,
+                        line.UnitPrice,
+                        line.Notes)).ToList()),
+                null,
+                cancellationToken);
+        }
+        catch (Exception)
+        {
+            // The browser sale is already stored. Notifying a tablet must not fail that request.
+        }
     }
 }

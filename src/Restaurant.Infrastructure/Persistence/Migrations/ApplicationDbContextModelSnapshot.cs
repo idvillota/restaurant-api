@@ -793,6 +793,46 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.ToTable("Invoices");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.MobileSyncReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("LineIds")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("LocalOrderId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("RemoteOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "DeviceId", "LocalOrderId")
+                        .IsUnique();
+
+                    b.ToTable("MobileSyncReceipts");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.Payment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -850,6 +890,54 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("CashierShiftId", "Status");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.PrintJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PayloadFormat")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Status", "CreatedAtUtc");
+
+                    b.ToTable("PrintJobs");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.PrinterStation", b =>
@@ -1698,6 +1786,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<string>("PostalCode")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<string>("PrinterMac")
+                        .HasMaxLength(17)
+                        .HasColumnType("character varying(17)");
 
                     b.Property<bool>("ShowOperationalSalesPanel")
                         .HasColumnType("boolean");

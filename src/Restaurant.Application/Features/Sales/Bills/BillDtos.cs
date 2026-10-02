@@ -17,6 +17,7 @@ public sealed class TenantSettingsDto
     public string Country { get; set; } = string.Empty;
     public string? PostalCode { get; set; }
     public string? Phone { get; set; }
+    public string? PrinterMac { get; set; }
     public string? DianResolutionNumber { get; set; }
     public int DianResolutionFrom { get; set; }
     public int DianResolutionTo { get; set; }
@@ -64,6 +65,9 @@ public sealed class UpdateTenantSettingsDto
 
     [MaxLength(40)]
     public string? Phone { get; set; }
+
+    [MaxLength(17)]
+    public string? PrinterMac { get; set; }
 
     [MaxLength(80)]
     public string? DianResolutionNumber { get; set; }

@@ -16,4 +16,10 @@ public interface IKitchenTicketService
         Guid orderId,
         string printerStationCode,
         CancellationToken cancellationToken = default);
+
+    Task<string?> GenerateXmlAsync(
+        KitchenTicketModel model,
+        Guid orderId,
+        string printerStationCode,
+        CancellationToken cancellationToken = default);
 }
