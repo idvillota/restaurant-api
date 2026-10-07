@@ -28,4 +28,13 @@ public interface IMobileSalePublisher
         Guid tenantId,
         IReadOnlyList<Guid> tableIds,
         CancellationToken cancellationToken = default);
+
+    Task PublishPrintJobAsync(
+        Guid tenantId,
+        Guid jobId,
+        string kind,
+        string payloadFormat,
+        string payload,
+        string? exceptDeviceId = null,
+        CancellationToken cancellationToken = default);
 }

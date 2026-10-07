@@ -6,9 +6,16 @@ public interface IPrintJobQueue
         string kind,
         string payloadFormat,
         string payload,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? exceptDeviceId = null);
 
     Task<IReadOnlyList<PrintJobTicket>> ListPendingAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PrintJobTicket>> ListPendingSinceAsync(
+        Guid tenantId,
+        DateTime createdSinceUtc,
+        CancellationToken cancellationToken = default,
+        int skip = 0);
 
     Task<bool> AcknowledgeAsync(
         Guid jobId,

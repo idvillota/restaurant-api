@@ -11,23 +11,29 @@ public sealed class PrintJobQueue : IPrintJobQueue
 
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IMobileSalePublisher _prints;
 
-    public PrintJobQueue(ApplicationDbContext db, ICurrentTenantContext tenantContext)
+    public PrintJobQueue(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IMobileSalePublisher prints)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _prints = prints;
     }
 
     public async Task EnqueueAsync(
         string kind,
         string payloadFormat,
         string payload,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? exceptDeviceId = null)
     {
         if (string.IsNullOrWhiteSpace(payload) || _tenantContext.TenantId is not Guid tenantId)
             return;
 
-        _db.PrintJobs.Add(new PrintJob
+        var job = new PrintJob
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
@@ -36,8 +42,25 @@ public sealed class PrintJobQueue : IPrintJobQueue
             Payload = payload,
             Status = PrintJob.StatusPending,
             CreatedAtUtc = DateTime.UtcNow,
-        });
+        };
+        _db.PrintJobs.Add(job);
         await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _prints.PublishPrintJobAsync(
+                tenantId,
+                job.Id,
+                job.Kind,
+                job.PayloadFormat,
+                job.Payload,
+                exceptDeviceId,
+                cancellationToken);
+        }
+        catch (Exception)
+        {
+            // The job is already stored. A missed push must not undo the comanda or the bill.
+        }
     }
 
     public async Task<IReadOnlyList<PrintJobTicket>> ListPendingAsync(CancellationToken cancellationToken = default)
@@ -45,6 +68,25 @@ public sealed class PrintJobQueue : IPrintJobQueue
         return await _db.PrintJobs.AsNoTracking()
             .Where(job => job.Status == PrintJob.StatusPending)
             .OrderBy(job => job.CreatedAtUtc)
+            .Take(PendingLimit)
+            .Select(job => new PrintJobTicket(job.Id, job.Kind, job.PayloadFormat, job.Payload))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PrintJobTicket>> ListPendingSinceAsync(
+        Guid tenantId,
+        DateTime createdSinceUtc,
+        CancellationToken cancellationToken = default,
+        int skip = 0)
+    {
+        return await _db.PrintJobs.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(job => job.TenantId == tenantId &&
+                          job.Status == PrintJob.StatusPending &&
+                          job.CreatedAtUtc >= createdSinceUtc)
+            .OrderBy(job => job.CreatedAtUtc)
+            .ThenBy(job => job.Id)
+            .Skip(skip < 0 ? 0 : skip)
             .Take(PendingLimit)
             .Select(job => new PrintJobTicket(job.Id, job.Kind, job.PayloadFormat, job.Payload))
             .ToListAsync(cancellationToken);
