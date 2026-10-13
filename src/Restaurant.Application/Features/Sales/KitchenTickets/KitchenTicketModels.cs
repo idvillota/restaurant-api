@@ -3,6 +3,7 @@ namespace Restaurant.Application.Features.Sales.KitchenTickets;
 public sealed class KitchenTicketLineModel
 {
     public string ProductName { get; set; } = string.Empty;
+    public string ProductTypeId { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public string? Notes { get; set; }
     public List<string> ExcludedIngredientNames { get; set; } = [];

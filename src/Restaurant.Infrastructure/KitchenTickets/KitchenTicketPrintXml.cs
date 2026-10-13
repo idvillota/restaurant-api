@@ -27,6 +27,7 @@ internal static class KitchenTicketPrintXml
                 model.Lines.Select(line => new XElement(
                     "Line",
                     Text("ProductName", line.ProductName),
+                    Text("ProductTypeId", line.ProductTypeId ?? string.Empty),
                     Text("Quantity", line.Quantity.ToString(culture)),
                     Text("Notes", line.Notes ?? string.Empty),
                     new XElement(
