@@ -173,6 +173,11 @@ public sealed class FinalizeCheckoutDto : CheckoutPreviewDto
 
     [MinLength(1)]
     public List<CheckoutPaymentLineDto> Payments { get; set; } = [];
+
+    /// <summary>
+    /// Web checkout omits this and still prints. Mobile "charge without invoice" sends false.
+    /// </summary>
+    public bool PrintReceipt { get; set; } = true;
 }
 
 public sealed class BillDto

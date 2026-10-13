@@ -111,6 +111,7 @@ public sealed class MobileSyncService : IMobileSyncService
                     {
                         SalesOrderIds = openIds,
                         TipAmount = request.TipAmount,
+                        PrintReceipt = request.PrintReceipt,
                         Payments =
                         [
                             new CheckoutPaymentLineDto
@@ -307,7 +308,7 @@ public sealed class MobileSyncService : IMobileSyncService
             // The lines are already stored. Another tablet can catch up with pending-sales.
         }
 
-        await EnqueueAddedKitchenTicketAsync(order, request, prepared, cancellationToken);
+        await EnqueueAddedKitchenTicketAsync(order, request, prepared, deviceId, cancellationToken);
 
         return new MobileSyncBatchResult
         {
@@ -321,6 +322,7 @@ public sealed class MobileSyncService : IMobileSyncService
         SalesOrder order,
         MobileSyncBatchOrder request,
         IReadOnlyList<(Product Product, decimal Quantity, string? Notes)> prepared,
+        string deviceId,
         CancellationToken cancellationToken)
     {
         if (_printJobs is null || _kitchenTickets is null || prepared.Count == 0)
@@ -344,7 +346,8 @@ public sealed class MobileSyncService : IMobileSyncService
                 PrintJobKinds.Kitchen,
                 PrintJobFormats.KitchenTicketXml,
                 KitchenTicketPrintXml.Write(model),
-                cancellationToken);
+                cancellationToken,
+                deviceId);
         }
         catch (Exception)
         {

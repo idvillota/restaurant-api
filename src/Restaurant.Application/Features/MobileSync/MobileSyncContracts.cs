@@ -75,6 +75,7 @@ public sealed class MobileSyncPaymentRequest
     public List<Guid> RemoteIds { get; set; } = [];
     public string PaymentMethod { get; set; } = "Cash";
     public decimal TipAmount { get; set; }
+    public bool PrintReceipt { get; set; }
 }
 
 public sealed class MobileSyncPaymentResponse
