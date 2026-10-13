@@ -111,6 +111,7 @@ public sealed class MobileSyncService : IMobileSyncService
                     {
                         SalesOrderIds = openIds,
                         TipAmount = request.TipAmount,
+                        PrintReceipt = request.PrintReceipt,
                         Payments =
                         [
                             new CheckoutPaymentLineDto

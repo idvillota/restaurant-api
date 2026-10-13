@@ -261,7 +261,8 @@ public sealed class BillService : IBillService
         bill.ReceiptXmlRelativePath = receiptFiles.XmlRelativePath;
         _db.Bills.Update(bill);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-        await EnqueueReceiptPrintAsync(receiptModel, cancellationToken);
+        if (dto.PrintReceipt)
+            await EnqueueReceiptPrintAsync(receiptModel, cancellationToken);
 
         return new BillDto
         {
