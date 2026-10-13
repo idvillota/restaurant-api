@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -168,6 +169,7 @@ public sealed class MobileSaleChannel : IMobileSalePublisher
     {
         string? type;
         var fresh = false;
+        DateTime? phoneSince = null;
         try
         {
             using var document = JsonDocument.Parse(text);
@@ -178,6 +180,19 @@ public sealed class MobileSaleChannel : IMobileSalePublisher
                 freshProperty.ValueKind == JsonValueKind.True)
             {
                 fresh = true;
+            }
+
+            if (document.RootElement.TryGetProperty("since", out var sinceProperty) &&
+                sinceProperty.ValueKind == JsonValueKind.String &&
+                DateTime.TryParse(
+                    sinceProperty.GetString(),
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
+                    out var parsed))
+            {
+                phoneSince = parsed.Kind == DateTimeKind.Utc
+                    ? parsed
+                    : DateTime.SpecifyKind(parsed.ToUniversalTime(), DateTimeKind.Utc);
             }
         }
         catch (JsonException)
@@ -195,11 +210,10 @@ public sealed class MobileSaleChannel : IMobileSalePublisher
         if (type != "printReady")
             return;
 
-        var since = fresh
-            ? _printingSince[key] = DateTime.UtcNow
-            : _printingSince.GetOrAdd(key, _ => DateTime.UtcNow);
+        var since = RememberQueueStart(key, fresh, phoneSince);
         try
         {
+            await AcknowledgePrinterAsync(tenantId, deviceId, cancellationToken);
             await DeliverPendingAsync(tenantId, deviceId, since, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -286,6 +300,47 @@ public sealed class MobileSaleChannel : IMobileSalePublisher
             payloadFormat,
             payload,
         }, JsonOptions));
+    }
+
+    private DateTime RememberQueueStart(string key, bool fresh, DateTime? phoneSinceUtc)
+    {
+        var requested = ResolveQueueStart(phoneSinceUtc);
+        if (!fresh && _printingSince.TryGetValue(key, out var existing))
+            return existing;
+
+        _printingSince[key] = requested;
+        return requested;
+    }
+
+    private static DateTime ResolveQueueStart(DateTime? phoneSinceUtc)
+    {
+        var now = DateTime.UtcNow;
+        if (phoneSinceUtc is not DateTime requested)
+            return now;
+        if (requested > now)
+            return now;
+        // A gateway can stay on Conectando for much longer than a couple of minutes.
+        // Only a clock that is wildly behind falls back to the server time.
+        if (now - requested > TimeSpan.FromHours(12))
+            return now;
+        return requested;
+    }
+
+    private async Task AcknowledgePrinterAsync(
+        Guid tenantId,
+        string deviceId,
+        CancellationToken cancellationToken)
+    {
+        if (!_sockets.TryGetValue(tenantId, out var devices) ||
+            !devices.TryGetValue(deviceId, out var socket) ||
+            socket.State != WebSocketState.Open)
+        {
+            return;
+        }
+
+        var target = new ConcurrentDictionary<string, WebSocket> { [deviceId] = socket };
+        var payload = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { type = "printReadyAck" }, JsonOptions));
+        await SendAsync(target, payload, null, cancellationToken, TimeSpan.FromSeconds(2));
     }
 
     private static string ReadyKey(Guid tenantId, string deviceId) => tenantId.ToString("N") + "|" + deviceId;
