@@ -117,6 +117,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
                 new KitchenTicketLineModel
                 {
                     ProductName = product.Name,
+                    ProductTypeId = product.ProductTypeId.ToString(),
                     Quantity = lineDto.Quantity,
                     Notes = NormalizeNotes(lineDto.Notes),
                     ExcludedIngredientNames = excludedNames,
@@ -214,6 +215,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
                 new KitchenTicketLineModel
                 {
                     ProductName = $"{bundleProduct.Name} · {component.Name}",
+                    ProductTypeId = component.ProductTypeId.ToString(),
                     Quantity = lineDto.Quantity * componentQuantity,
                     Notes = notes,
                     ExcludedIngredientNames = [],
@@ -226,6 +228,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
                 new KitchenTicketLineModel
                 {
                     ProductName = bundleProduct.Name,
+                    ProductTypeId = bundleProduct.ProductTypeId.ToString(),
                     Quantity = lineDto.Quantity,
                     Notes = notes,
                     ExcludedIngredientNames = [],
