@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesOrderService, SalesOrderService>();
         services.AddScoped<IMobileSyncService, MobileSyncService>();
         services.AddScoped<IBillService, BillService>();
+        services.AddScoped<IBreBQrService, BreBQrService>();
         services.AddScoped<IPrintJobQueue, PrintJobQueue>();
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
         services.AddScoped<IDashboardService, DashboardService>();

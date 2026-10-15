@@ -26,6 +26,10 @@ public sealed class TenantSettingsDto
     public decimal ImpoconsumoPercent { get; set; }
     /// <summary>Show dashboard panel with bill-level sales for today / current shift.</summary>
     public bool ShowOperationalSalesPanel { get; set; } = true;
+
+    public string? BreBKey { get; set; }
+
+    public int? BreBKeyType { get; set; }
 }
 
 public sealed class UpdateTenantSettingsDto
@@ -85,6 +89,11 @@ public sealed class UpdateTenantSettingsDto
     public decimal ImpoconsumoPercent { get; set; } = 8m;
 
     public bool ShowOperationalSalesPanel { get; set; } = true;
+
+    [MaxLength(40)]
+    public string? BreBKey { get; set; }
+
+    public int? BreBKeyType { get; set; }
 }
 
 public sealed class PayableTableGroupDto
@@ -202,4 +211,15 @@ public sealed class BillDto
     public string? ReceiptPdfRelativePath { get; set; }
     public string? ReceiptXmlRelativePath { get; set; }
     public IReadOnlyList<Guid> SalesOrderIds { get; set; } = [];
+}
+
+public sealed class BreBQrRequestDto
+{
+    [Range(0.01, 9999999999.99)]
+    public decimal Amount { get; set; }
+}
+
+public sealed class BreBQrDto
+{
+    public string Payload { get; set; } = string.Empty;
 }

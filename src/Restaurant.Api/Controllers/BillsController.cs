@@ -14,15 +14,18 @@ namespace Restaurant.Api.Controllers;
 public sealed class BillsController : ControllerBase
 {
     private readonly IBillService _service;
+    private readonly IBreBQrService _breBQr;
     private readonly ApplicationDbContext _db;
     private readonly IGeneratedFileStorage _fileStorage;
 
     public BillsController(
         IBillService service,
+        IBreBQrService breBQr,
         ApplicationDbContext db,
         IGeneratedFileStorage fileStorage)
     {
         _service = service;
+        _breBQr = breBQr;
         _db = db;
         _fileStorage = fileStorage;
     }
@@ -44,6 +47,24 @@ public sealed class BillsController : ControllerBase
         try
         {
             return Ok(await _service.PreviewCheckoutAsync(dto, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("breb-qr")]
+    public async Task<ActionResult<BreBQrDto>> CreateBreBQr(
+        [FromBody] BreBQrRequestDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            return Ok(await _breBQr.CreateAsync(dto.Amount, cancellationToken));
         }
         catch (InvalidOperationException ex)
         {
