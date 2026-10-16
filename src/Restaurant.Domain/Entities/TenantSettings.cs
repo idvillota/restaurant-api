@@ -1,4 +1,5 @@
 using Restaurant.Domain.Common;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Domain.Entities;
 
@@ -22,6 +23,11 @@ public class TenantSettings : ITenantScoped
     public string Country { get; set; } = "Colombia";
     public string? PostalCode { get; set; }
     public string? Phone { get; set; }
+
+    /// <summary>Bre-B key shown as a QR when a checkout line is a transfer. Empty keeps the current transfer flow.</summary>
+    public string? BreBKey { get; set; }
+
+    public BreBKeyType? BreBKeyType { get; set; }
 
     /// <summary>Bluetooth MAC of the thermal printer used by the service tablet.</summary>
     public string? PrinterMac { get; set; }

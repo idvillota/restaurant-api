@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -53,6 +54,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.InvoiceNumberPrefix = dto.InvoiceNumberPrefix?.Trim();
         settings.ImpoconsumoPercent = dto.ImpoconsumoPercent;
         settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
+        ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
 
@@ -132,5 +134,24 @@ public sealed class TenantSettingsService : ITenantSettingsService
             InvoiceNumberPrefix = settings.InvoiceNumberPrefix,
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
             ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
+            BreBKey = settings.BreBKey,
+            BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };
+
+    private static void ApplyBreBKey(TenantSettings settings, UpdateTenantSettingsDto dto)
+    {
+        var key = string.IsNullOrWhiteSpace(dto.BreBKey) ? null : dto.BreBKey.Trim();
+        if (key is null)
+        {
+            settings.BreBKey = null;
+            settings.BreBKeyType = null;
+            return;
+        }
+
+        if (dto.BreBKeyType is not { } rawType || !Enum.IsDefined(typeof(BreBKeyType), rawType))
+            throw new InvalidOperationException("Elige el tipo de la llave Bre-B.");
+
+        settings.BreBKey = key;
+        settings.BreBKeyType = (BreBKeyType)rawType;
+    }
 }
