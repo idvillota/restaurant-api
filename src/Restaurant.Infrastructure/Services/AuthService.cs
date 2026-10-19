@@ -98,6 +98,9 @@ public sealed class AuthService : IAuthService
             RoleId = adminRole.Id,
         });
 
+        // Set tenant before persistence so fail-closed filters apply to follow-up setup.
+        _tenantContext.TenantId = tenant.Id;
+
         await tenants.AddAsync(tenant, cancellationToken);
         await users.AddAsync(user, cancellationToken);
         await rolesRepo.AddRangeAsync(roles, cancellationToken);
@@ -107,8 +110,6 @@ public sealed class AuthService : IAuthService
         await IngredientMovementTypeBootstrap.EnsureForTenantAsync(_db, tenant.Id, cancellationToken);
         await _kitchenPrinters.EnsureDefaultStationAsync(tenant.Id, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
-
-        _tenantContext.TenantId = tenant.Id;
 
         await _rolePermissions.UpdateRolePermissionsAsync(
             adminRole.Id,
@@ -144,15 +145,16 @@ public sealed class AuthService : IAuthService
     public async Task<AuthResponseDto> LoginAsync(LoginDto dto, CancellationToken cancellationToken = default)
     {
         var users = _unitOfWork.Repository<User>();
-        var tenantUsersRepo = _unitOfWork.Repository<TenantUser>();
 
         var normalizedEmail = NormalizeEmail(dto.Email);
         var user = await users.Query().AsNoTracking().FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
         if (user is null || !_passwordHasher.Verify(dto.Password, user.PasswordHash))
             throw new UnauthorizedAccessException("Invalid credentials.");
 
-        var memberships = await tenantUsersRepo.Query()
+        // Login has no tenant context yet — must ignore global tenant filters.
+        var memberships = await _db.TenantUsers
             .AsNoTracking()
+            .IgnoreQueryFilters()
             .Include(tu => tu.Tenant)
             .Include(tu => tu.TenantUserRoles).ThenInclude(tur => tur.Role)
             .Where(tu => tu.UserId == user.Id && tu.IsActive && tu.Tenant.IsActive)

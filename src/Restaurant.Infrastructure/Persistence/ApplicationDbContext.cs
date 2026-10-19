@@ -466,118 +466,118 @@ public sealed class ApplicationDbContext : DbContext
     private void ApplyTenantFilters(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantUser>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Role>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<RoleFeature>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<TenantUserRole>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Employee>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductType>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<PrinterStation>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductTypePrinterMapping>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Product>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<IngredientCategory>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Ingredient>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<IngredientMovementType>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<IngredientMovementDocument>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<IngredientMovement>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductIngredient>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductBundleLine>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Provider>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Purchase>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<PurchaseLine>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<DiningTable>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Customer>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Reservation>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ReservationTable>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrder>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrderLine>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrderLineExcludedIngredient>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<TenantSettings>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Bill>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<PrintJob>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<BillLine>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<BillSalesOrder>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Invoice>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Payment>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<CashierShift>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<DailyClosure>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<CashMovement>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<StrategicAiReportCache>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<MobileSyncReceipt>().HasQueryFilter(e =>
-            _currentTenant.TenantId == null || e.TenantId == _currentTenant.TenantId);
+            e.TenantId == _currentTenant.TenantId);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

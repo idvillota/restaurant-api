@@ -80,6 +80,73 @@ public sealed class PurchaseServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_when_inventory_disabled_persists_purchase_without_stock_change()
+    {
+        using var fx = new TenantDbFixture();
+        var providerId = Guid.NewGuid();
+        var ingredientId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, InventoryEnabled = false });
+        fx.Db.IngredientCategories.Add(
+            new IngredientCategory
+            {
+                Id = categoryId,
+                TenantId = fx.TenantId,
+                Name = "Dry",
+                IsActive = true,
+            });
+        fx.Db.Providers.Add(
+            new Provider
+            {
+                Id = providerId,
+                TenantId = fx.TenantId,
+                Name = "Supplier A",
+                IsActive = true,
+            });
+        fx.Db.Ingredients.Add(
+            new Ingredient
+            {
+                Id = ingredientId,
+                TenantId = fx.TenantId,
+                IngredientCategoryId = categoryId,
+                Name = "Flour",
+                Unit = IngredientUnit.Kilogram,
+                StockQuantity = 10m,
+                UnitCost = 2m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var created = await sut.CreateAsync(
+            new CreatePurchaseDto
+            {
+                ProviderId = providerId,
+                BillNumber = "INV-NO-STOCK",
+                PurchasedAtUtc = DateTime.UtcNow,
+                TaxAmount = 0m,
+                Lines =
+                [
+                    new CreatePurchaseLineDto
+                    {
+                        IngredientId = ingredientId,
+                        Quantity = 10m,
+                        UnitPrice = 4m,
+                    },
+                ],
+            });
+
+        Assert.Equal("INV-NO-STOCK", created.BillNumber);
+        Assert.Equal(40m, created.Total);
+
+        var ingredient = await fx.Db.Ingredients.FindAsync(ingredientId);
+        Assert.Equal(10m, ingredient!.StockQuantity);
+        Assert.Equal(2m, ingredient.UnitCost);
+    }
+
+    [Fact]
     public async Task CreateAsync_throws_when_duplicate_ingredient_lines()
     {
         using var fx = new TenantDbFixture();
@@ -322,6 +389,7 @@ public sealed class PurchaseServiceTests
             fx.Repository<PurchaseLine>(),
             fx.Repository<Provider>(),
             fx.Repository<Ingredient>(),
+            fx.Db,
             fx.UnitOfWork,
             fx.Mapper);
 }

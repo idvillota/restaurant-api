@@ -54,6 +54,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.InvoiceNumberPrefix = dto.InvoiceNumberPrefix?.Trim();
         settings.ImpoconsumoPercent = dto.ImpoconsumoPercent;
         settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
+        settings.InventoryEnabled = dto.InventoryEnabled;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
@@ -79,6 +80,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             TaxRegime = "Régimen Simplificado",
             Country = "Colombia",
             ShowOperationalSalesPanel = true,
+            InventoryEnabled = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -134,6 +136,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             InvoiceNumberPrefix = settings.InvoiceNumberPrefix,
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
             ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
+            InventoryEnabled = settings.InventoryEnabled,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

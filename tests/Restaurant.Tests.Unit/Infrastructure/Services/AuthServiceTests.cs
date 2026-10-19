@@ -48,8 +48,8 @@ public sealed class AuthServiceTests
                 .Returns("test-token");
         }
 
-        var tenantContext = new Restaurant.Infrastructure.Common.CurrentTenantContext();
-        IRolePermissionService rolePermissions = new RolePermissionService(fx.Db, tenantContext);
+        // Must share the DbContext tenant context so fail-closed filters match AuthService updates.
+        IRolePermissionService rolePermissions = new RolePermissionService(fx.Db, fx.TenantContext);
         var kitchenPrinters = new Mock<IKitchenPrinterService>();
         kitchenPrinters
             .Setup(s => s.EnsureDefaultStationAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -64,7 +64,7 @@ public sealed class AuthServiceTests
             new BcryptPasswordHasher(),
             jwt.Object,
             rolePermissions,
-            tenantContext,
+            fx.TenantContext,
             kitchenPrinters.Object,
             platform);
     }
@@ -169,7 +169,11 @@ public sealed class AuthServiceTests
         };
         await fx.Db.Tenants.AddAsync(tenantB);
 
-        var user = await fx.Db.Users.FirstAsync(u => u.Email == "multi@example.com");
+        // Register left TenantContext on Cafe Norte; SaveChanges stamps Added rows with that id.
+        fx.TenantContext.TenantId = tenantB.Id;
+
+        var user = await fx.Db.Users.IgnoreQueryFilters()
+            .FirstAsync(u => u.Email == "multi@example.com");
         var role = new Role
         {
             Id = Guid.NewGuid(),

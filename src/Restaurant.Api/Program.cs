@@ -128,7 +128,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-if (isLocal) ;
+if (isLocal)
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
@@ -138,7 +138,7 @@ if (isLocal) ;
     });
 }
 
-if (!isLocal) ;
+if (!isLocal)
 {
     app.UseForwardedHeaders();
     app.UseHttpsRedirection();
