@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 // Azure OpenAI integration uses HttpClient; avoid direct dependency on Azure SDK in DI file.
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Features.MobileSync;
 using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Identity;
 using Restaurant.Infrastructure.Persistence;
@@ -97,7 +98,10 @@ public static class DependencyInjection
         services.AddScoped<IIngredientMovementDocumentService, IngredientMovementDocumentService>();
         services.AddScoped<IPurchaseService, PurchaseService>();
         services.AddScoped<ISalesOrderService, SalesOrderService>();
+        services.AddScoped<IMobileSyncService, MobileSyncService>();
         services.AddScoped<IBillService, BillService>();
+        services.AddScoped<IBreBQrService, BreBQrService>();
+        services.AddScoped<IPrintJobQueue, PrintJobQueue>();
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IOperationalBusinessDayService, OperationalBusinessDayService>();
@@ -108,6 +112,8 @@ public static class DependencyInjection
         // Register Azure-based strategic AI report service implementation.
         // This application uses Azure OpenAI for all strategic report generation.
         services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
+        // Print service centraliza la lógica de resolución y lectura de documentos generados.
+        services.AddScoped<IPrintService, PrintService>();
         services.AddScoped<IStrategicAnalyticsService, StrategicAnalyticsService>();
         services.AddScoped<IStrategicAiInsightService, StrategicAiInsightService>();
         services.AddScoped<IOperationalReportsService, OperationalReportsService>();

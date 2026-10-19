@@ -109,6 +109,7 @@ public sealed class DailyShiftRollupDto
     public decimal TotalSales { get; set; }
     public decimal CashSales { get; set; }
     public decimal CardSales { get; set; }
+    public decimal TransferSales { get; set; }
     public decimal? CountedCash { get; set; }
     public decimal? CashOverShort { get; set; }
 }

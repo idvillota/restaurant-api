@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -46,12 +47,15 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.Country = dto.Country.Trim();
         settings.PostalCode = dto.PostalCode?.Trim();
         settings.Phone = dto.Phone?.Trim();
+        settings.PrinterMac = string.IsNullOrWhiteSpace(dto.PrinterMac) ? null : dto.PrinterMac.Trim();
         settings.DianResolutionNumber = dto.DianResolutionNumber?.Trim();
         settings.DianResolutionFrom = dto.DianResolutionFrom;
         settings.DianResolutionTo = dto.DianResolutionTo;
         settings.InvoiceNumberPrefix = dto.InvoiceNumberPrefix?.Trim();
         settings.ImpoconsumoPercent = dto.ImpoconsumoPercent;
         settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
+        settings.InventoryEnabled = dto.InventoryEnabled;
+        ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
 
@@ -76,6 +80,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             TaxRegime = "Régimen Simplificado",
             Country = "Colombia",
             ShowOperationalSalesPanel = true,
+            InventoryEnabled = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -123,6 +128,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             Country = settings.Country,
             PostalCode = settings.PostalCode,
             Phone = settings.Phone,
+            PrinterMac = settings.PrinterMac,
             DianResolutionNumber = settings.DianResolutionNumber,
             DianResolutionFrom = settings.DianResolutionFrom,
             DianResolutionTo = settings.DianResolutionTo,
@@ -130,5 +136,25 @@ public sealed class TenantSettingsService : ITenantSettingsService
             InvoiceNumberPrefix = settings.InvoiceNumberPrefix,
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
             ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
+            InventoryEnabled = settings.InventoryEnabled,
+            BreBKey = settings.BreBKey,
+            BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };
+
+    private static void ApplyBreBKey(TenantSettings settings, UpdateTenantSettingsDto dto)
+    {
+        var key = string.IsNullOrWhiteSpace(dto.BreBKey) ? null : dto.BreBKey.Trim();
+        if (key is null)
+        {
+            settings.BreBKey = null;
+            settings.BreBKeyType = null;
+            return;
+        }
+
+        if (dto.BreBKeyType is not { } rawType || !Enum.IsDefined(typeof(BreBKeyType), rawType))
+            throw new InvalidOperationException("Elige el tipo de la llave Bre-B.");
+
+        settings.BreBKey = key;
+        settings.BreBKeyType = (BreBKeyType)rawType;
+    }
 }

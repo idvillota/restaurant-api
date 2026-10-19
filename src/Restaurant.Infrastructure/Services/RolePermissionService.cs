@@ -70,7 +70,10 @@ public sealed class RolePermissionService : IRolePermissionService
     {
         EnsureTenant();
 
-        var role = await _db.Roles.FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
+        var tenantId = _tenantContext.TenantId!.Value;
+        var role = await _db.Roles
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.Id == roleId && r.TenantId == tenantId, cancellationToken)
             ?? throw new InvalidOperationException("Role was not found.");
 
         if (!SystemRoles.All.Contains(role.Name))
@@ -85,10 +88,12 @@ public sealed class RolePermissionService : IRolePermissionService
         if (features.Count != requested.Count)
             throw new InvalidOperationException("One or more feature codes are invalid.");
 
-        var existing = await _db.RoleFeatures.Where(rf => rf.RoleId == roleId).ToListAsync(cancellationToken);
+        var existing = await _db.RoleFeatures
+            .IgnoreQueryFilters()
+            .Where(rf => rf.RoleId == roleId && rf.TenantId == tenantId)
+            .ToListAsync(cancellationToken);
         _db.RoleFeatures.RemoveRange(existing);
 
-        var tenantId = _tenantContext.TenantId!.Value;
         var roleFeatures = features.Select(feature => new RoleFeature
         {
             Id = Guid.NewGuid(),

@@ -3,9 +3,10 @@ namespace Restaurant.Application.Features.Sales.KitchenTickets;
 public sealed class KitchenTicketLineModel
 {
     public string ProductName { get; set; } = string.Empty;
+    public string ProductTypeId { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public string? Notes { get; set; }
-    public IReadOnlyList<string> ExcludedIngredientNames { get; set; } = [];
+    public List<string> ExcludedIngredientNames { get; set; } = [];
 }
 
 public sealed class KitchenTicketModel
@@ -16,7 +17,7 @@ public sealed class KitchenTicketModel
     public DateTime SentAtUtc { get; set; }
     public string? PrinterStationName { get; set; }
     public string? PrinterStationCode { get; set; }
-    public IReadOnlyList<KitchenTicketLineModel> Lines { get; set; } = [];
+    public List<KitchenTicketLineModel> Lines { get; set; } = [];
 
     /// <summary>When true, ticket is an anulación (cancel) comanda rather than a send.</summary>
     public bool IsCancellation { get; set; }

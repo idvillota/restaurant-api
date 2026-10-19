@@ -218,6 +218,7 @@ public sealed class DailyClosureService : IDailyClosureService
                 TotalSales = shiftPayments.Sum(p => p.Amount),
                 CashSales = shiftPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount),
                 CardSales = shiftPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount),
+                TransferSales = shiftPayments.Where(p => p.Method == PaymentMethod.Transfer).Sum(p => p.Amount),
                 CountedCash = shift.CountedCash,
                 CashOverShort = shift.CountedCash - shift.ExpectedCash,
             };

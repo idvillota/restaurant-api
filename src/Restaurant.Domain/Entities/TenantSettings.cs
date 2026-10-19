@@ -1,4 +1,5 @@
 using Restaurant.Domain.Common;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Domain.Entities;
 
@@ -22,6 +23,14 @@ public class TenantSettings : ITenantScoped
     public string Country { get; set; } = "Colombia";
     public string? PostalCode { get; set; }
     public string? Phone { get; set; }
+
+    /// <summary>Bre-B key shown as a QR when a checkout line is a transfer. Empty keeps the current transfer flow.</summary>
+    public string? BreBKey { get; set; }
+
+    public BreBKeyType? BreBKeyType { get; set; }
+
+    /// <summary>Bluetooth MAC of the thermal printer used by the service tablet.</summary>
+    public string? PrinterMac { get; set; }
     public string? DianResolutionNumber { get; set; }
     public int DianResolutionFrom { get; set; }
     public int DianResolutionTo { get; set; }
@@ -37,6 +46,12 @@ public class TenantSettings : ITenantScoped
     /// (bills for today / current shift). Default true for new tenants.
     /// </summary>
     public bool ShowOperationalSalesPanel { get; set; } = true;
+
+    /// <summary>
+    /// When true, Resale/Prepared products use ingredients for stock and cost.
+    /// When false, catalog is sell-only (recipes optional). Default true for existing tenants.
+    /// </summary>
+    public bool InventoryEnabled { get; set; } = true;
 
     public Tenant Tenant { get; set; } = null!;
 }

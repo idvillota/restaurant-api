@@ -156,6 +156,7 @@ public sealed class DashboardService : IDashboardService
             TaxRegime = "Régimen Simplificado",
             Country = "Colombia",
             ShowOperationalSalesPanel = true,
+            InventoryEnabled = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);

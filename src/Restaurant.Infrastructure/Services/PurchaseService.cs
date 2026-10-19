@@ -6,6 +6,7 @@ using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Procurement.Purchases;
 using Restaurant.Domain.Entities;
 using Restaurant.Infrastructure.Common;
+using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -15,6 +16,7 @@ public sealed class PurchaseService : IPurchaseService
     private readonly IRepository<PurchaseLine> _purchaseLines;
     private readonly IRepository<Provider> _providers;
     private readonly IRepository<Ingredient> _ingredients;
+    private readonly ApplicationDbContext _db;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
 
@@ -23,6 +25,7 @@ public sealed class PurchaseService : IPurchaseService
         IRepository<PurchaseLine> purchaseLines,
         IRepository<Provider> providers,
         IRepository<Ingredient> ingredients,
+        ApplicationDbContext db,
         IUnitOfWork unitOfWork,
         IMapper mapper)
     {
@@ -30,6 +33,7 @@ public sealed class PurchaseService : IPurchaseService
         _purchaseLines = purchaseLines;
         _providers = providers;
         _ingredients = ingredients;
+        _db = db;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
     }
@@ -165,23 +169,37 @@ public sealed class PurchaseService : IPurchaseService
         await _purchases.AddAsync(purchase, cancellationToken);
         await _purchaseLines.AddRangeAsync(lines, cancellationToken);
 
-        foreach (var line in lines)
+        // Inventory off: still persist the supplier invoice; do not touch stock or unit cost.
+        if (await IsInventoryEnabledAsync(cancellationToken))
         {
-            var ingredient = ingredientById[line.IngredientId];
-            var previousQuantity = ingredient.StockQuantity;
-            var previousUnitCost = ingredient.UnitCost;
-            ingredient.UnitCost = InventoryCosting.ComputeWeightedAverageUnitCost(
-                previousQuantity,
-                previousUnitCost,
-                line.Quantity,
-                line.UnitPrice);
-            ingredient.StockQuantity = InventoryCosting.AddStock(previousQuantity, line.Quantity);
-            _ingredients.Update(ingredient);
+            foreach (var line in lines)
+            {
+                var ingredient = ingredientById[line.IngredientId];
+                var previousQuantity = ingredient.StockQuantity;
+                var previousUnitCost = ingredient.UnitCost;
+                ingredient.UnitCost = InventoryCosting.ComputeWeightedAverageUnitCost(
+                    previousQuantity,
+                    previousUnitCost,
+                    line.Quantity,
+                    line.UnitPrice);
+                ingredient.StockQuantity = InventoryCosting.AddStock(previousQuantity, line.Quantity);
+                _ingredients.Update(ingredient);
+            }
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return (await GetByIdAsync(purchaseId, cancellationToken))!;
+    }
+
+    private async Task<bool> IsInventoryEnabledAsync(CancellationToken cancellationToken)
+    {
+        var enabled = await _db.TenantSettings.AsNoTracking()
+            .Select(s => (bool?)s.InventoryEnabled)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Missing settings row → inventory on (same default as ProductService / checkout).
+        return enabled ?? true;
     }
 
     public async Task<PurchaseDto?> UpdatePaymentDateAsync(

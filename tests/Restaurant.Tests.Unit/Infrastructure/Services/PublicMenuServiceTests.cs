@@ -81,7 +81,7 @@ public sealed class PublicMenuServiceTests
             Options.Create(new ProductImageOptions()),
             new FakeHostEnvironment());
 
-        var sut = new PublicMenuService(fx.Db, imageStorage);
+        var sut = new PublicMenuService(fx.Db, fx.TenantContext, imageStorage);
 
         var menu = await sut.GetByTenantSlugAsync("demo-bistro");
 
@@ -103,7 +103,7 @@ public sealed class PublicMenuServiceTests
         var imageStorage = new LocalProductImageStorage(
             Options.Create(new ProductImageOptions()),
             new FakeHostEnvironment());
-        var sut = new PublicMenuService(fx.Db, imageStorage);
+        var sut = new PublicMenuService(fx.Db, fx.TenantContext, imageStorage);
 
         var menu = await sut.GetByTenantSlugAsync("missing-tenant");
 

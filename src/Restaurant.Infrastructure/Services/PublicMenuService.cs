@@ -8,11 +8,16 @@ namespace Restaurant.Infrastructure.Services;
 public sealed class PublicMenuService : IPublicMenuService
 {
     private readonly ApplicationDbContext _db;
+    private readonly ICurrentTenantContext _tenantContext;
     private readonly IProductImageStorage _productImages;
 
-    public PublicMenuService(ApplicationDbContext db, IProductImageStorage productImages)
+    public PublicMenuService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IProductImageStorage productImages)
     {
         _db = db;
+        _tenantContext = tenantContext;
         _productImages = productImages;
     }
 
@@ -27,6 +32,9 @@ public sealed class PublicMenuService : IPublicMenuService
 
         if (tenant is null)
             return null;
+
+        // Anonymous public menu has no JWT tenant — set context so fail-closed filters apply.
+        _tenantContext.TenantId = tenant.Id;
 
         var categories = await _db.ProductTypes.AsNoTracking()
             .Where(pt => pt.TenantId == tenant.Id && pt.IsActive)

@@ -17,6 +17,7 @@ public sealed class TenantSettingsDto
     public string Country { get; set; } = string.Empty;
     public string? PostalCode { get; set; }
     public string? Phone { get; set; }
+    public string? PrinterMac { get; set; }
     public string? DianResolutionNumber { get; set; }
     public int DianResolutionFrom { get; set; }
     public int DianResolutionTo { get; set; }
@@ -25,6 +26,13 @@ public sealed class TenantSettingsDto
     public decimal ImpoconsumoPercent { get; set; }
     /// <summary>Show dashboard panel with bill-level sales for today / current shift.</summary>
     public bool ShowOperationalSalesPanel { get; set; } = true;
+
+    /// <summary>When true, products use ingredients for inventory/cost. Default true.</summary>
+    public bool InventoryEnabled { get; set; } = true;
+
+    public string? BreBKey { get; set; }
+
+    public int? BreBKeyType { get; set; }
 }
 
 public sealed class UpdateTenantSettingsDto
@@ -65,6 +73,9 @@ public sealed class UpdateTenantSettingsDto
     [MaxLength(40)]
     public string? Phone { get; set; }
 
+    [MaxLength(17)]
+    public string? PrinterMac { get; set; }
+
     [MaxLength(80)]
     public string? DianResolutionNumber { get; set; }
 
@@ -81,6 +92,13 @@ public sealed class UpdateTenantSettingsDto
     public decimal ImpoconsumoPercent { get; set; } = 8m;
 
     public bool ShowOperationalSalesPanel { get; set; } = true;
+
+    public bool InventoryEnabled { get; set; } = true;
+
+    [MaxLength(40)]
+    public string? BreBKey { get; set; }
+
+    public int? BreBKeyType { get; set; }
 }
 
 public sealed class PayableTableGroupDto
@@ -112,6 +130,9 @@ public sealed class PayableOrderLineDto
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>Ingredient exclusions for display grouping (same product + notes + exclusions).</summary>
+    public List<Guid> ExcludedIngredientIds { get; set; } = [];
 }
 
 public sealed class CheckoutCategoryTotalDto
@@ -169,6 +190,11 @@ public sealed class FinalizeCheckoutDto : CheckoutPreviewDto
 
     [MinLength(1)]
     public List<CheckoutPaymentLineDto> Payments { get; set; } = [];
+
+    /// <summary>
+    /// Web checkout omits this and still prints. Mobile "charge without invoice" sends false.
+    /// </summary>
+    public bool PrintReceipt { get; set; } = true;
 }
 
 public sealed class BillDto
@@ -193,4 +219,15 @@ public sealed class BillDto
     public string? ReceiptPdfRelativePath { get; set; }
     public string? ReceiptXmlRelativePath { get; set; }
     public IReadOnlyList<Guid> SalesOrderIds { get; set; } = [];
+}
+
+public sealed class BreBQrRequestDto
+{
+    [Range(0.01, 9999999999.99)]
+    public decimal Amount { get; set; }
+}
+
+public sealed class BreBQrDto
+{
+    public string Payload { get; set; } = string.Empty;
 }

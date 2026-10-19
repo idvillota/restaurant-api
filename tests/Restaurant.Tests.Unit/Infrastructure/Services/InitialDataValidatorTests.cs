@@ -56,6 +56,17 @@ public sealed class InitialDataValidatorTests
     }
 
     [Fact]
+    public void Validate_EmptyIngredientsSheet_IsAllowed_WhenNoRecipes()
+    {
+        var workbook = SampleWorkbook();
+        workbook.Ingredients.Clear();
+        workbook.Recipes.Clear();
+
+        var errors = InitialDataValidator.Validate(workbook, slugAlreadyExists: false);
+        Assert.Empty(errors);
+    }
+
+    [Fact]
     public void BuildTemplate_ContainsRequiredSheets()
     {
         var bytes = InitialDataExcelParser.BuildTemplate();

@@ -19,6 +19,9 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         StockAvailabilityCheckDto dto,
         CancellationToken cancellationToken = default)
     {
+        if (!await IsInventoryEnabledAsync(cancellationToken))
+            return new StockAvailabilityResultDto { IsAvailable = true };
+
         var requirements = new Dictionary<Guid, decimal>();
         await AddDemandFromOpenOrdersAsync(requirements, dto.SalesOrderId, cancellationToken);
         await AddDemandFromLineDtosAsync(requirements, dto.Lines, cancellationToken);
@@ -54,9 +57,21 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         IReadOnlyList<SalesOrder> orders,
         CancellationToken cancellationToken = default)
     {
+        if (!await IsInventoryEnabledAsync(cancellationToken))
+            return new StockAvailabilityResultDto { IsAvailable = true };
+
         var requirements = new Dictionary<Guid, decimal>();
         await AddDemandFromOrderEntitiesAsync(requirements, orders, cancellationToken);
         return await BuildResultAsync(requirements, cancellationToken);
+    }
+
+    private async Task<bool> IsInventoryEnabledAsync(CancellationToken cancellationToken)
+    {
+        var enabled = await _db.TenantSettings.AsNoTracking()
+            .Select(s => (bool?)s.InventoryEnabled)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return enabled ?? true;
     }
 
     public void EnsureAvailable(StockAvailabilityResultDto result)

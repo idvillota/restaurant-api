@@ -75,7 +75,7 @@ public sealed class AzureBlobGeneratedFileStorage : IGeneratedFileStorage
             return _container;
 
         lock (_gate)
-        {
+         {
             if (_container is not null)
                 return _container;
 
