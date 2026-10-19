@@ -19,6 +19,7 @@ public sealed class ProductServiceTests
             fx.Repository<ProductBundleLine>(),
             fx.Repository<Ingredient>(),
             fx.TenantContext,
+            fx.Db,
             images,
             fx.UnitOfWork,
             fx.Mapper);
@@ -320,6 +321,90 @@ public sealed class ProductServiceTests
                     CompositionType = EProductType.Resale,
                     UnitPrice = 6m,
                 }));
+    }
+
+    [Fact]
+    public async Task CreateAsync_resale_without_ingredient_succeeds_when_inventory_disabled()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Drinks", IsActive = true });
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, InventoryEnabled = false });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var created = await sut.CreateAsync(
+            new CreateProductDto
+            {
+                ProductTypeId = typeId,
+                Name = "Beer pint",
+                CompositionType = EProductType.Resale,
+                UnitPrice = 6m,
+            });
+
+        Assert.Equal(EProductType.Resale, created.CompositionType);
+        Assert.Equal(0m, created.CostPrice);
+
+        var recipe = await sut.GetRecipeAsync(created.Id);
+        Assert.NotNull(recipe);
+        Assert.Empty(recipe!.Lines);
+    }
+
+    [Fact]
+    public async Task SetRecipeAsync_allows_empty_when_inventory_disabled()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var ingredientId = Guid.NewGuid();
+
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Cake",
+                CompositionType = EProductType.Prepared,
+                UnitPrice = 20m,
+                IsActive = true,
+            });
+        fx.Db.IngredientCategories.Add(
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Dairy", IsActive = true });
+        fx.Db.Ingredients.Add(
+            new Ingredient
+            {
+                Id = ingredientId,
+                TenantId = fx.TenantId,
+                IngredientCategoryId = categoryId,
+                Name = "Milk",
+                Unit = IngredientUnit.Liter,
+                UnitCost = 3m,
+                IsActive = true,
+            });
+        fx.Db.ProductIngredients.Add(
+            new ProductIngredient
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                ProductId = productId,
+                IngredientId = ingredientId,
+                Quantity = 0.5m,
+            });
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, InventoryEnabled = false });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var recipe = await sut.SetRecipeAsync(productId, new SetProductRecipeDto { Lines = [] });
+
+        Assert.NotNull(recipe);
+        Assert.Empty(recipe!.Lines);
     }
 
     [Fact]

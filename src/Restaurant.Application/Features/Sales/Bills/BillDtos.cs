@@ -27,6 +27,9 @@ public sealed class TenantSettingsDto
     /// <summary>Show dashboard panel with bill-level sales for today / current shift.</summary>
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
+    /// <summary>When true, products use ingredients for inventory/cost. Default true.</summary>
+    public bool InventoryEnabled { get; set; } = true;
+
     public string? BreBKey { get; set; }
 
     public int? BreBKeyType { get; set; }
@@ -90,6 +93,8 @@ public sealed class UpdateTenantSettingsDto
 
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
+    public bool InventoryEnabled { get; set; } = true;
+
     [MaxLength(40)]
     public string? BreBKey { get; set; }
 
@@ -125,6 +130,9 @@ public sealed class PayableOrderLineDto
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>Ingredient exclusions for display grouping (same product + notes + exclusions).</summary>
+    public List<Guid> ExcludedIngredientIds { get; set; } = [];
 }
 
 public sealed class CheckoutCategoryTotalDto

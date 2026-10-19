@@ -133,8 +133,8 @@ internal static class InitialDataValidator
 
     private static void ValidateIngredients(List<IngredientRow> rows, List<TenantInitialDataErrorDto> errors)
     {
-        if (rows.Count == 0)
-            errors.Add(Err(InitialDataSheetNames.Ingredients, null, null, "Debe incluir al menos un ingrediente."));
+        // Empty ingredients sheet is allowed (sell-only tenants / inventory off).
+        // Recipes that reference missing codes still fail in ValidateRecipes.
 
         var codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)

@@ -1798,6 +1798,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasMaxLength(17)
                         .HasColumnType("character varying(17)");
 
+                    b.Property<bool>("InventoryEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ShowOperationalSalesPanel")
                         .HasColumnType("boolean");
 

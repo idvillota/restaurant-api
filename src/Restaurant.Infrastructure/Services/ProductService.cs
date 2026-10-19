@@ -7,6 +7,7 @@ using Restaurant.Application.Features.Catalog.Products;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Common;
+using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
 
@@ -18,6 +19,7 @@ public sealed class ProductService : IProductService
     private readonly IRepository<ProductBundleLine> _productBundleLines;
     private readonly IRepository<Ingredient> _ingredients;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly ApplicationDbContext _db;
     private readonly IProductImageStorage _productImages;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
@@ -29,6 +31,7 @@ public sealed class ProductService : IProductService
         IRepository<ProductBundleLine> productBundleLines,
         IRepository<Ingredient> ingredients,
         ICurrentTenantContext tenantContext,
+        ApplicationDbContext db,
         IProductImageStorage productImages,
         IUnitOfWork unitOfWork,
         IMapper mapper)
@@ -39,6 +42,7 @@ public sealed class ProductService : IProductService
         _productBundleLines = productBundleLines;
         _ingredients = ingredients;
         _tenantContext = tenantContext;
+        _db = db;
         _productImages = productImages;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
@@ -232,6 +236,16 @@ public sealed class ProductService : IProductService
             throw new InvalidOperationException("Los combos usan productos incluidos, no una receta de ingredientes.");
 
         var items = dto.Lines ?? [];
+        if (items.Count == 0)
+        {
+            if (await IsInventoryEnabledAsync(cancellationToken))
+                throw new InvalidOperationException("A product must have at least one ingredient.");
+
+            await ClearRecipeLinesAsync(productId, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return await GetRecipeAsync(productId, cancellationToken);
+        }
+
         await ReplaceRecipeLinesAsync(productId, product.CompositionType, items, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return await GetRecipeAsync(productId, cancellationToken);
@@ -283,7 +297,13 @@ public sealed class ProductService : IProductService
             return;
 
         if (resaleIngredientId is null || resaleIngredientId == Guid.Empty)
-            throw new InvalidOperationException("Resale products require an ingredient.");
+        {
+            if (await IsInventoryEnabledAsync(cancellationToken))
+                throw new InvalidOperationException("Resale products require an ingredient.");
+
+            // Inventory off: recipe optional; leave any existing link untouched.
+            return;
+        }
 
         var lines = new List<SetProductRecipeLineDto>
         {
@@ -291,6 +311,18 @@ public sealed class ProductService : IProductService
         };
 
         await ReplaceRecipeLinesAsync(productId, compositionType, lines, cancellationToken);
+    }
+
+    private async Task<bool> IsInventoryEnabledAsync(CancellationToken cancellationToken)
+    {
+        var tenantId = ResolveTenantId();
+        var enabled = await _db.TenantSettings.AsNoTracking()
+            .Where(s => s.TenantId == tenantId)
+            .Select(s => (bool?)s.InventoryEnabled)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Missing settings row → treat as inventory on (safe default for existing tenants).
+        return enabled ?? true;
     }
 
     private async Task ApplyBundleFromDtoAsync(

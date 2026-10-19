@@ -73,6 +73,9 @@ public sealed class BillService : IBillService
                     l.UnitPrice,
                     l.LineTotal,
                     l.Notes,
+                    ExcludedIngredientIds = l.ExcludedIngredients
+                        .Select(e => e.IngredientId)
+                        .ToList(),
                 }).ToList(),
             })
             .ToListAsync(cancellationToken);
@@ -105,6 +108,7 @@ public sealed class BillService : IBillService
                             UnitPrice = l.UnitPrice,
                             LineTotal = l.LineTotal,
                             Notes = l.Notes,
+                            ExcludedIngredientIds = l.ExcludedIngredientIds,
                         }).ToList(),
                     }).ToList(),
                 };
@@ -439,6 +443,12 @@ public sealed class BillService : IBillService
 
     private async Task DeductInventoryForOrderAsync(SalesOrder order, CancellationToken cancellationToken)
     {
+        var inventoryEnabled = await _db.TenantSettings.AsNoTracking()
+            .Select(s => (bool?)s.InventoryEnabled)
+            .FirstOrDefaultAsync(cancellationToken) ?? true;
+        if (!inventoryEnabled)
+            return;
+
         var distinctLines = order.Lines
             .GroupBy(l => l.Id)
             .Select(g => g.First())
@@ -688,6 +698,7 @@ public sealed class BillService : IBillService
                 UnitPrice = l.UnitPrice,
                 LineTotal = l.LineTotal,
                 Notes = l.Notes,
+                ExcludedIngredientIds = l.ExcludedIngredients.Select(e => e.IngredientId).ToList(),
             }).ToList(),
         };
     }
@@ -710,6 +721,7 @@ public sealed class BillService : IBillService
                 UnitPrice = l.UnitPrice,
                 LineTotal = l.LineTotal,
                 Notes = l.Notes,
+                ExcludedIngredientIds = l.ExcludedIngredients.Select(e => e.IngredientId).ToList(),
             });
 
     private async Task<string> GenerateBillNumberAsync(CancellationToken cancellationToken)

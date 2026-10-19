@@ -47,5 +47,11 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
+    /// <summary>
+    /// When true, Resale/Prepared products use ingredients for stock and cost.
+    /// When false, catalog is sell-only (recipes optional). Default true for existing tenants.
+    /// </summary>
+    public bool InventoryEnabled { get; set; } = true;
+
     public Tenant Tenant { get; set; } = null!;
 }
