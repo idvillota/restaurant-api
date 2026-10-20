@@ -325,7 +325,7 @@ public sealed class MobileSyncService : IMobileSyncService
         string deviceId,
         CancellationToken cancellationToken)
     {
-        if (_printJobs is null || _kitchenTickets is null || prepared.Count == 0)
+        if (request.KitchenTicketPrinted || _printJobs is null || _kitchenTickets is null || prepared.Count == 0)
             return;
 
         try
