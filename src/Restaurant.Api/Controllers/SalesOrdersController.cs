@@ -3,6 +3,7 @@ using Restaurant.Api.Authorization;
 using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.SalesOrders;
+using Restaurant.Infrastructure.Authorization;
 
 namespace Restaurant.Api.Controllers;
 
@@ -221,6 +222,23 @@ public sealed class SalesOrdersController : ControllerBase
 
         try
         {
+            var existing = await _service.GetByIdAsync(id, cancellationToken);
+            if (existing is null)
+                return NotFound();
+
+            // Empty open order: only tenant Administrator may void to free the table.
+            var hasActiveLines = existing.Lines.Any(l => l.Quantity > 0);
+            if (!hasActiveLines && !UserIsTenantAdministrator())
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    new
+                    {
+                        message =
+                            "Solo un administrador puede liberar una mesa con pedido vacío.",
+                    });
+            }
+
             var result = await _service.VoidOrderAsync(id, dto, cancellationToken);
             return result is null ? NotFound() : Ok(result);
         }
@@ -234,5 +252,10 @@ public sealed class SalesOrdersController : ControllerBase
                 StatusCodes.Status500InternalServerError,
                 new { message = $"No se pudo anular el pedido (PDF/almacenamiento): {ex.Message}" });
         }
+    }
+
+    private bool UserIsTenantAdministrator()
+    {
+        return User.IsInRole(SystemRoles.Administrator) || User.IsInRole(SystemRoles.Owner);
     }
 }

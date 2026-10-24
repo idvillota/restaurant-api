@@ -20,6 +20,13 @@ public sealed class MobileSyncBatchOrder
     public string? TableCode { get; set; }
     public string? WaiterName { get; set; }
     public long OpenedAtUtc { get; set; }
+
+    /// <summary>
+    /// The uploading device already printed this kitchen ticket.
+    /// Absent or false still enqueues a kitchen print.
+    /// </summary>
+    public bool KitchenTicketPrinted { get; set; }
+
     public List<MobileSyncBatchLine> Lines { get; set; } = [];
 }
 

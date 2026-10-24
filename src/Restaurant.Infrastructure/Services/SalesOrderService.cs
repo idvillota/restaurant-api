@@ -346,7 +346,6 @@ public sealed class SalesOrderService : ISalesOrderService
                 order.Id,
                 stationCode,
                 cancellationToken);
-            await EnqueueKitchenPrintAsync(ticketModel, cancellationToken);
 
             if (pdfTicketPath is not null)
             {
@@ -359,6 +358,9 @@ public sealed class SalesOrderService : ISalesOrderService
                     });
             }
         }
+
+        var printModel = await _kitchenTickets.BuildTicketModelAsync(order, batchDtos, cancellationToken);
+        await EnqueueKitchenPrintAsync(printModel, cancellationToken);
 
         var orderDto = await GetByIdAsync(orderId, cancellationToken);
         if (orderDto is null)
