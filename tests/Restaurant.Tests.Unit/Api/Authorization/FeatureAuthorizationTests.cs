@@ -43,6 +43,7 @@ public sealed class FeatureAuthorizationTests
 
     [Theory]
     [InlineData(typeof(BillsController), FeatureCodes.PaymentsCheckout)]
+    [InlineData(typeof(PrintController), FeatureCodes.PaymentsCheckout)]
     [InlineData(typeof(SalesOrdersController), FeatureCodes.ServiceSalon)]
     [InlineData(typeof(TenantUsersController), FeatureCodes.OrganizationTeam)]
     [InlineData(typeof(RolePermissionsController), FeatureCodes.OrganizationRoles)]

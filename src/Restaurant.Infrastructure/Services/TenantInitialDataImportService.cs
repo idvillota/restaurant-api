@@ -18,9 +18,9 @@ public sealed class TenantInitialDataImportService : ITenantInitialDataImportSer
 {
     private static readonly (string Email, string DisplayName, string Role)[] StarterUsers =
     [
-        ("idvillota@gmail.com", "Administrador", SystemRoles.Administrator),
-        ("gerente@gmail.com", "Gerente", SystemRoles.Manager),
-        ("mesera@gmail.com", "Mesera", SystemRoles.Waitress),
+        ("idvillota@gmail.com", "Administrator Gral.", SystemRoles.Administrator),
+        ("gerente@gmail.com", "Administrator", SystemRoles.Manager),
+        ("mesera@gmail.com", "Mesero", SystemRoles.Waitress),
         ("cajero@gmail.com", "Cajero", SystemRoles.Cashier),
     ];
 

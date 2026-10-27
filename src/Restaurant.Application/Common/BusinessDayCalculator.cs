@@ -2,6 +2,15 @@ namespace Restaurant.Application.Common;
 
 public static class BusinessDayCalculator
 {
+    public static DateOnly ResolveCalendarDate(DateTime utcNow, string? timeZoneId)
+    {
+        var tz = ResolveTimeZone(timeZoneId);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(utcNow, DateTimeKind.Utc),
+            tz);
+        return DateOnly.FromDateTime(local);
+    }
+
     public static DateOnly ResolveBusinessDate(DateTime utcNow, string? timeZoneId, int cutoffHour)
     {
         var hour = Math.Clamp(cutoffHour, 0, 23);

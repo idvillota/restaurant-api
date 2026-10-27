@@ -61,14 +61,21 @@ public sealed class LocalGeneratedFileStorage : IGeneratedFileStorage
         return Task.FromResult<GeneratedFileContent?>(new GeneratedFileContent(stream, contentType));
     }
 
-    private static string NormalizeRelativePath(string relativePath) =>
-        relativePath.Replace('\\', '/').TrimStart('/');
+    private static string NormalizeRelativePath(string relativePath)
+    {
+        var normalized = relativePath.Replace('\\', '/').TrimStart('/');
+        if (normalized.Contains("..", StringComparison.Ordinal))
+            throw new InvalidOperationException("Invalid file path.");
+        return normalized;
+    }
 
     private string GetSafeAbsolutePath(string normalizedRelativePath)
     {
         var combined = Path.GetFullPath(
             Path.Combine(_absoluteRoot, normalizedRelativePath.Replace('/', Path.DirectorySeparatorChar)));
         var rootFull = Path.GetFullPath(_absoluteRoot);
+        if (!rootFull.EndsWith(Path.DirectorySeparatorChar))
+            rootFull += Path.DirectorySeparatorChar;
         if (!combined.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Invalid file path.");
 

@@ -14,6 +14,14 @@ public sealed class BusinessDayCalculatorTests
     }
 
     [Fact]
+    public void ResolveCalendarDate_uses_local_calendar_day_without_cutoff()
+    {
+        var utc = new DateTime(2026, 5, 24, 2, 30, 0, DateTimeKind.Utc);
+        var date = BusinessDayCalculator.ResolveCalendarDate(utc, "America/Bogota");
+        Assert.Equal(new DateOnly(2026, 5, 23), date);
+    }
+
+    [Fact]
     public void ResolveBusinessDate_after_cutoff_uses_same_calendar_day()
     {
         // 2026-05-24 10:00 UTC = 2026-05-24 05:00 in America/Bogota

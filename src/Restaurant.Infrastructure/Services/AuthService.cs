@@ -136,7 +136,8 @@ public sealed class AuthService : IAuthService
             Email = user.Email,
             Roles = new[] { SystemRoles.Administrator },
             Permissions = permissions,
-            IsPlatformAdmin = IsPlatformAdminEmail(user.Email),
+            IsPlatformAdmin = IsPlatformAdminEmail(user.Email) &&
+                SystemRoles.IsGeneralAdministrator([SystemRoles.Administrator]),
             BrandTheme = UserPreferences.NormalizeBrandTheme(tenantUser.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(tenantUser.ColorScheme),
         };
@@ -207,7 +208,8 @@ public sealed class AuthService : IAuthService
             Email = user.Email,
             Roles = roles,
             Permissions = permissions,
-            IsPlatformAdmin = IsPlatformAdminEmail(user.Email),
+            IsPlatformAdmin = IsPlatformAdminEmail(user.Email) &&
+                SystemRoles.IsGeneralAdministrator(roles),
             BrandTheme = UserPreferences.NormalizeBrandTheme(membership.BrandTheme),
             ColorScheme = UserPreferences.NormalizeColorScheme(membership.ColorScheme),
         };

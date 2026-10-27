@@ -115,6 +115,11 @@ public sealed class AzureBlobGeneratedFileStorage : IGeneratedFileStorage
         _containerEnsured = true;
     }
 
-    private static string NormalizeBlobName(string relativePath) =>
-        relativePath.Replace('\\', '/').TrimStart('/');
+    private static string NormalizeBlobName(string relativePath)
+    {
+        var name = relativePath.Replace('\\', '/').TrimStart('/');
+        if (name.Contains("..", StringComparison.Ordinal))
+            throw new InvalidOperationException("Invalid file path.");
+        return name;
+    }
 }

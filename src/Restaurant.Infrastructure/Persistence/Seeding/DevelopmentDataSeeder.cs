@@ -162,7 +162,7 @@ public static class DevelopmentDataSeeder
                     Email = DevelopmentSeedIds.ManagerEmail,
                     NormalizedEmail = DevelopmentSeedIds.ManagerEmail.ToUpperInvariant(),
                     PasswordHash = passwordHasher.Hash(DevelopmentSeedIds.AdminPassword),
-                    DisplayName = "Gerente demo",
+                    DisplayName = "Administrator demo",
                 },
                 new User
                 {
@@ -170,7 +170,7 @@ public static class DevelopmentDataSeeder
                     Email = DevelopmentSeedIds.WaitressEmail,
                     NormalizedEmail = DevelopmentSeedIds.WaitressEmail.ToUpperInvariant(),
                     PasswordHash = passwordHasher.Hash(DevelopmentSeedIds.AdminPassword),
-                    DisplayName = "Mesera demo",
+                    DisplayName = "Mesero demo",
                 },
                 new User
                 {
@@ -288,14 +288,14 @@ public static class DevelopmentDataSeeder
             (
                 DevelopmentSeedIds.ManagerUserId,
                 DevelopmentSeedIds.ManagerEmail,
-                "Gerente demo",
+                "Administrator demo",
                 DevelopmentSeedIds.ManagerTenantUserId,
                 SystemRoles.Manager,
                 Guid.Parse("a1000012-0018-4018-8018-000000000012")),
             (
                 DevelopmentSeedIds.WaitressUserId,
                 DevelopmentSeedIds.WaitressEmail,
-                "Mesera demo",
+                "Mesero demo",
                 DevelopmentSeedIds.WaitressTenantUserId,
                 SystemRoles.Waitress,
                 Guid.Parse("a1000013-0019-4019-8019-000000000013")),
@@ -758,6 +758,8 @@ public static class DevelopmentDataSeeder
                     Email = email,
                     Phone = phone,
                     TaxId = taxId,
+                    BirthMonth = i == 1 ? 5 : null,
+                    BirthDay = i == 1 ? 14 : null,
                     IsActive = true,
                 },
                 cancellationToken);

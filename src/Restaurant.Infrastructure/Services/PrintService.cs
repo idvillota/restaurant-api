@@ -27,18 +27,11 @@ public sealed class PrintService : IPrintService
     public async Task<GeneratedFileContent?> GetDocumentAsync(
         Guid id,
         PrintFileType type,
-        string? overridePath,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var tenantId = _tenant.TenantId ?? throw new InvalidOperationException("No se pudo determinar el tenant activo.");
-
-        if (!string.IsNullOrWhiteSpace(overridePath))
-        {
-            _logger.LogInformation("PrintService: using override path for tenant {Tenant} id {Id}", tenantId, id);
-            return await _fileStorage.OpenReadAsync(overridePath, cancellationToken);
-        }
 
         string? relativePath = null;
         switch (type)
