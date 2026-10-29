@@ -13,10 +13,12 @@ public class CashMovement : EntityBase, ITenantScoped
     public PaymentMethod? Method { get; set; }
     public string Description { get; set; } = string.Empty;
     public Guid? PurchaseId { get; set; }
+    public Guid? ProviderId { get; set; }
     public Guid CreatedByUserId { get; set; }
     public DateTime OccurredAtUtc { get; set; }
 
     public CashierShift? CashierShift { get; set; }
     public Purchase? Purchase { get; set; }
+    public Provider? Provider { get; set; }
     public User CreatedByUser { get; set; } = null!;
 }

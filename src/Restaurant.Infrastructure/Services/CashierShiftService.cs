@@ -210,6 +210,22 @@ public sealed class CashierShiftService : ICashierShiftService
                 throw new InvalidOperationException("Purchase was not found.");
         }
 
+        Guid? providerId = null;
+        string? providerName = null;
+        if (dto.MovementType == CashMovementType.ProviderPayment)
+        {
+            if (dto.ProviderId is not { } selectedProviderId)
+                throw new InvalidOperationException("A provider is required for provider payments.");
+
+            var provider = await _db.Providers.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == selectedProviderId && p.IsActive, cancellationToken);
+            if (provider is null)
+                throw new InvalidOperationException("Provider was not found or is inactive.");
+
+            providerId = provider.Id;
+            providerName = provider.Name;
+        }
+
         var movement = new CashMovement
         {
             Id = Guid.NewGuid(),
@@ -221,6 +237,7 @@ public sealed class CashierShiftService : ICashierShiftService
             Method = dto.Method,
             Description = dto.Description.Trim(),
             PurchaseId = dto.PurchaseId,
+            ProviderId = providerId,
             CreatedByUserId = userId,
             OccurredAtUtc = DateTime.UtcNow,
         };
@@ -228,7 +245,18 @@ public sealed class CashierShiftService : ICashierShiftService
         await _db.CashMovements.AddAsync(movement, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
 
-        return MapMovement(movement);
+        return MapMovement(movement, providerName);
+    }
+
+    public async Task<IReadOnlyList<CashierProviderOptionDto>> ListActiveProvidersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        _ = ResolveTenantId();
+        return await _db.Providers.AsNoTracking()
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.Name)
+            .Select(p => new CashierProviderOptionDto { Id = p.Id, Name = p.Name })
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<(Guid ShiftId, Guid UserId)> RequireOpenShiftAsync(CancellationToken cancellationToken = default)
@@ -279,6 +307,7 @@ public sealed class CashierShiftService : ICashierShiftService
 
         var outflows = await _db.CashMovements
             .AsNoTracking()
+            .Include(m => m.Provider)
             .Where(m => m.CashierShiftId == shift.Id && CashMovementKinds.OutflowTypes.Contains(m.MovementType))
             .OrderBy(m => m.OccurredAtUtc)
             .ToListAsync(cancellationToken);
@@ -309,7 +338,7 @@ public sealed class CashierShiftService : ICashierShiftService
             BillCount = billCount,
             TotalsByMethod = totalsByMethod,
             Payments = payments,
-            CashOutflows = outflows.Select(MapMovement).ToList(),
+            CashOutflows = outflows.Select(m => MapMovement(m)).ToList(),
             CashOutflowTotal = cashOutflowTotal,
         };
     }
@@ -348,7 +377,7 @@ public sealed class CashierShiftService : ICashierShiftService
                 : null,
         };
 
-    private static CashMovementDto MapMovement(CashMovement movement) =>
+    private static CashMovementDto MapMovement(CashMovement movement, string? providerName = null) =>
         new()
         {
             Id = movement.Id,
@@ -357,6 +386,8 @@ public sealed class CashierShiftService : ICashierShiftService
             Method = movement.Method,
             Description = movement.Description,
             PurchaseId = movement.PurchaseId,
+            ProviderId = movement.ProviderId,
+            ProviderName = providerName ?? movement.Provider?.Name,
             OccurredAtUtc = movement.OccurredAtUtc,
         };
 

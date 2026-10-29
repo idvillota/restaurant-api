@@ -60,6 +60,8 @@ public sealed class CashMovementDto
     public PaymentMethod? Method { get; set; }
     public string Description { get; set; } = string.Empty;
     public Guid? PurchaseId { get; set; }
+    public Guid? ProviderId { get; set; }
+    public string? ProviderName { get; set; }
     public DateTime OccurredAtUtc { get; set; }
 }
 
@@ -88,7 +90,15 @@ public sealed class CreateCashMovementDto
 
     public Guid? PurchaseId { get; set; }
 
+    public Guid? ProviderId { get; set; }
+
     public Guid? CashierShiftId { get; set; }
+}
+
+public sealed class CashierProviderOptionDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
 }
 
 public sealed class DailyClosureSummaryDto

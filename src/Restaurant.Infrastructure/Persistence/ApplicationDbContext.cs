@@ -357,6 +357,7 @@ public sealed class ApplicationDbContext : DbContext
         {
             e.HasOne(x => x.CashierShift).WithMany(x => x.CashMovements).HasForeignKey(x => x.CashierShiftId);
             e.HasOne(x => x.Purchase).WithMany().HasForeignKey(x => x.PurchaseId);
+            e.HasOne(x => x.Provider).WithMany().HasForeignKey(x => x.ProviderId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId);
             e.Property(x => x.Amount).HasPrecision(18, 2);
             e.Property(x => x.Description).HasMaxLength(300);

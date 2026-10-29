@@ -199,6 +199,7 @@ public sealed class DailyClosureService : IDailyClosureService
 
         var outflows = await _db.CashMovements
             .AsNoTracking()
+            .Include(m => m.Provider)
             .Where(m => m.TenantId == tenantId && m.BusinessDate == businessDate && CashMovementKinds.OutflowTypes.Contains(m.MovementType))
             .OrderBy(m => m.OccurredAtUtc)
             .ToListAsync(cancellationToken);
@@ -250,6 +251,8 @@ public sealed class DailyClosureService : IDailyClosureService
                 Method = m.Method,
                 Description = m.Description,
                 PurchaseId = m.PurchaseId,
+                ProviderId = m.ProviderId,
+                ProviderName = m.Provider?.Name,
                 OccurredAtUtc = m.OccurredAtUtc,
             }).ToList(),
             Payments = payments,

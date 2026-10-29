@@ -248,6 +248,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PurchaseId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProviderId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -261,6 +264,8 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("PurchaseId");
+
+                    b.HasIndex("ProviderId");
 
                     b.HasIndex("TenantId", "BusinessDate");
 
@@ -2002,9 +2007,16 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PurchaseId");
 
+                    b.HasOne("Restaurant.Domain.Entities.Provider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CashierShift");
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("Provider");
 
                     b.Navigation("Purchase");
                 });
