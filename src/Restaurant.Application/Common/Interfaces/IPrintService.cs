@@ -17,6 +17,5 @@ public interface IPrintService
     Task<GeneratedFileContent?> GetDocumentAsync(
         Guid id,
         PrintFileType type,
-        string? overridePath,
         CancellationToken cancellationToken = default);
 }

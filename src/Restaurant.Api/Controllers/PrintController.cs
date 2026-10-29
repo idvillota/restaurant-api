@@ -1,39 +1,34 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using Restaurant.Api.Authorization;
+using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
-using Restaurant.Infrastructure.Persistence;
 
-namespace Restaurant.Api.Controllers
+namespace Restaurant.Api.Controllers;
+
+[ApiController]
+[RequireFeature(FeatureCodes.PaymentsCheckout)]
+[Route("api/[controller]")]
+public sealed class PrintController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class PrintController : Controller
+    private readonly IPrintService _printService;
+
+    public PrintController(IPrintService printService)
     {
-        private readonly IPrintService _printService;
+        _printService = printService;
+    }
 
-        public PrintController(IPrintService printService)
-        {
-            _printService = printService;
-        }
+    [HttpGet("{type}/{id:guid}")]
+    public async Task<IActionResult> DownloadXml(string type, Guid id, CancellationToken cancellationToken)
+    {
+        if (!Enum.TryParse<PrintFileType>(type, true, out var fileType) ||
+            (fileType != PrintFileType.Factura && fileType != PrintFileType.Comanda))
+            return BadRequest("Tipo inválido. Use 'factura' o 'comanda'.");
 
-        [HttpGet("{type}/{id:guid}")]
-        [Authorize] // aplicar política/feature según convenga
-        public async Task<IActionResult> DownloadXml(string type, Guid id, [FromQuery] string? path, CancellationToken cancellationToken)
-        {
-            // 1. validar tipo
-            if (!string.Equals(type, "factura", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(type, "comanda", StringComparison.OrdinalIgnoreCase))
-                return BadRequest("Tipo inválido. Use 'factura' o 'comanda'.");
+        var content = await _printService.GetDocumentAsync(id, fileType, cancellationToken);
+        if (content is null || content.Stream is null)
+            return NotFound();
 
-            if (!Enum.TryParse<PrintFileType>(type, true, out var fileType))
-                return BadRequest("Tipo inválido. Use 'factura' o 'comanda'.");
-
-            var content = await _printService.GetDocumentAsync(id, fileType, path, cancellationToken);
-            if (content is null || content.Stream is null)
-                return NotFound();
-
-            var fileName = Path.GetFileName(path ?? $"document-{id}.xml") ?? $"{type}-{id}.xml";
-            return File(content.Stream, content.ContentType ?? "application/xml", fileName, enableRangeProcessing: false);
-        }
+        var fileName = $"{type}-{id}.xml";
+        return File(content.Stream, content.ContentType ?? "application/xml", fileName, enableRangeProcessing: false);
     }
 }

@@ -35,7 +35,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
-            RequireExpirationTime = false,
+            RequireExpirationTime = true,
             ValidateIssuerSigningKey = true,
 
             ValidIssuer = jwtSettings.Issuer,
@@ -92,6 +92,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+builder.Services.AddAuthRateLimiting(builder.Configuration);
+
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>(tags: ["db", "ready"]);
 
@@ -146,6 +148,7 @@ if (!isLocal)
 }
 
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 

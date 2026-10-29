@@ -15,4 +15,11 @@ public static class SystemRoles
 
     public static IReadOnlyList<string> All { get; } =
         [Administrator, Manager, Waitress, Cashier];
+
+    /// <summary>Administrator Gral. (and legacy Owner). Not Manager (“Administrator”).</summary>
+    public static bool IsGeneralAdministrator(IEnumerable<string>? roleNames) =>
+        roleNames is not null &&
+        roleNames.Any(name =>
+            string.Equals(name, Administrator, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(name, Owner, StringComparison.OrdinalIgnoreCase));
 }

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Restaurant.Application.Common;
 using Restaurant.Application.Common.Models;
+using Restaurant.Application.Features.Crm.Customers;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 
@@ -367,6 +369,16 @@ internal static class PagedEntityQueries
             ListQueryHelpers.TryParseBool(activeRaw, out var isActive))
             query = query.Where(c => c.IsActive == isActive);
 
+        if (UpcomingBirthdayWindow.TryDays(q.FilterValue("birthday"), out var birthdayDays))
+        {
+            var today = BusinessDayCalculator.ResolveCalendarDate(DateTime.UtcNow, "America/Bogota");
+            var keys = UpcomingBirthdayWindow.MonthDayKeys(today, birthdayDays);
+            query = query.Where(c =>
+                c.BirthMonth != null &&
+                c.BirthDay != null &&
+                keys.Contains(c.BirthMonth.Value * 100 + c.BirthDay.Value));
+        }
+
         return ApplyCustomerSort(query, q);
     }
 
@@ -540,6 +552,9 @@ internal static class PagedEntityQueries
             "email" => desc ? query.OrderByDescending(c => c.Email) : query.OrderBy(c => c.Email),
             "phone" => desc ? query.OrderByDescending(c => c.Phone) : query.OrderBy(c => c.Phone),
             "taxid" => desc ? query.OrderByDescending(c => c.TaxId) : query.OrderBy(c => c.TaxId),
+            "birthday" => desc
+                ? query.OrderByDescending(c => c.BirthMonth).ThenByDescending(c => c.BirthDay)
+                : query.OrderBy(c => c.BirthMonth).ThenBy(c => c.BirthDay),
             "isactive" => desc ? query.OrderByDescending(c => c.IsActive) : query.OrderBy(c => c.IsActive),
             _ => desc ? query.OrderByDescending(c => c.Name) : query.OrderBy(c => c.Name),
         };

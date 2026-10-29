@@ -349,6 +349,12 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<string>("TaxId")
                         .HasColumnType("text");
 
+                    b.Property<int?>("BirthDay")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("BirthMonth")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 

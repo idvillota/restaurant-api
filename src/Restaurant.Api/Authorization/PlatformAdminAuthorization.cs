@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Restaurant.Application.Common.Options;
+using Restaurant.Infrastructure.Authorization;
 
 namespace Restaurant.Api.Authorization;
 
@@ -38,9 +39,15 @@ public sealed class PlatformAdminAuthorizationHandler : AuthorizationHandler<Pla
             return Task.CompletedTask;
 
         var allowed = _options.AdminEmails ?? [];
-        if (allowed.Any(a => string.Equals(a.Trim(), email.Trim(), StringComparison.OrdinalIgnoreCase)))
-            context.Succeed(requirement);
+        var emailAllowed = allowed.Any(a =>
+            string.Equals(a.Trim(), email.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (!emailAllowed)
+            return Task.CompletedTask;
 
+        if (!SystemRoles.IsGeneralAdministrator(context.User.FindAll(ClaimTypes.Role).Select(c => c.Value)))
+            return Task.CompletedTask;
+
+        context.Succeed(requirement);
         return Task.CompletedTask;
     }
 

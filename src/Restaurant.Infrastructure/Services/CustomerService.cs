@@ -43,6 +43,10 @@ public sealed class CustomerService : ICustomerService
 
     public async Task<CustomerDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default)
     {
+        var month = dto.BirthMonth;
+        var day = dto.BirthDay;
+        CustomerBirthday.Normalize(ref month, ref day);
+
         var entity = new Customer
         {
             Id = Guid.NewGuid(),
@@ -50,6 +54,8 @@ public sealed class CustomerService : ICustomerService
             Email = dto.Email?.Trim(),
             Phone = dto.Phone?.Trim(),
             TaxId = dto.TaxId?.Trim(),
+            BirthMonth = month,
+            BirthDay = day,
             IsActive = true,
         };
         await _customers.AddAsync(entity, cancellationToken);
@@ -67,6 +73,11 @@ public sealed class CustomerService : ICustomerService
         entity.Email = dto.Email?.Trim();
         entity.Phone = dto.Phone?.Trim();
         entity.TaxId = dto.TaxId?.Trim();
+        var month = dto.BirthMonth;
+        var day = dto.BirthDay;
+        CustomerBirthday.Normalize(ref month, ref day);
+        entity.BirthMonth = month;
+        entity.BirthDay = day;
         entity.IsActive = dto.IsActive;
         _customers.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
