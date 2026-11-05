@@ -53,5 +53,11 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool InventoryEnabled { get; set; } = true;
 
+    /// <summary>
+    /// When true, a blank purchase bill number is replaced with COMPRA-yyyyMMdd-0001.
+    /// When false (default), the provider invoice number is required.
+    /// </summary>
+    public bool AutoGeneratePurchaseBillNumbers { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }

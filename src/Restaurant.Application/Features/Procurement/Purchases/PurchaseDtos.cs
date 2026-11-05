@@ -60,9 +60,8 @@ public sealed class CreatePurchaseDto
     [Required]
     public Guid ProviderId { get; set; }
 
-    [Required]
     [MaxLength(80)]
-    public string BillNumber { get; set; } = string.Empty;
+    public string? BillNumber { get; set; }
 
     public DateTime? PurchasedAtUtc { get; set; }
 

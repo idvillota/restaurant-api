@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Models;
 using Restaurant.Application.Features.Catalog.Products;
 using Restaurant.Domain.Entities;
@@ -67,6 +68,109 @@ public sealed class ProductServiceTests
         Assert.Equal("Food", list.Items[0].ProductTypeName);
         Assert.Equal(EProductType.Prepared, list.Items[0].CompositionType);
         Assert.True(list.Items[0].IsActive);
+    }
+
+    [Fact]
+    public async Task GetMenuAsync_returns_all_active_products_beyond_list_page_size()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Pastelería", IsActive = true });
+
+        for (var i = 0; i < 101; i++)
+        {
+            fx.Db.Products.Add(
+                new Product
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = fx.TenantId,
+                    ProductTypeId = typeId,
+                    Name = $"Cake {i:D3}",
+                    UnitPrice = 1m,
+                    IsActive = true,
+                });
+        }
+
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Hidden inactive",
+                UnitPrice = 1m,
+                IsActive = false,
+            });
+
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var paged = await sut.ListAsync(new ListQuery { Page = 1, PageSize = 100 });
+        var menu = await sut.GetMenuAsync();
+
+        Assert.Equal(100, paged.Items.Count);
+        Assert.Equal(101, paged.TotalCount);
+        Assert.Equal(101, menu.Products.Count);
+        Assert.Equal("Cake 000", menu.Products[0].Name);
+        Assert.Equal("Cake 100", menu.Products[^1].Name);
+        Assert.DoesNotContain(menu.Products, p => p.Name == "Hidden inactive");
+    }
+
+    [Fact]
+    public async Task GetMenuAsync_excludes_other_tenants_and_inactive_types()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        var inactiveTypeId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        var otherTypeId = Guid.NewGuid();
+
+        fx.Db.ProductTypes.AddRange(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true },
+            new ProductType { Id = inactiveTypeId, TenantId = fx.TenantId, Name = "Old", IsActive = false },
+            new ProductType { Id = otherTypeId, TenantId = otherTenantId, Name = "Other", IsActive = true });
+        fx.Db.Products.AddRange(
+            new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Visible",
+                UnitPrice = 1m,
+                IsActive = true,
+            },
+            new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                ProductTypeId = inactiveTypeId,
+                Name = "Retired type",
+                UnitPrice = 1m,
+                IsActive = true,
+            },
+            new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = otherTenantId,
+                ProductTypeId = otherTypeId,
+                Name = "Foreign",
+                UnitPrice = 1m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var foreign = await fx.Db.Products.IgnoreQueryFilters().SingleAsync(p => p.Name == "Foreign");
+        foreign.TenantId = otherTenantId;
+        var otherType = await fx.Db.ProductTypes.IgnoreQueryFilters().SingleAsync(t => t.Id == otherTypeId);
+        otherType.TenantId = otherTenantId;
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var menu = await sut.GetMenuAsync();
+
+        Assert.Single(menu.Products);
+        Assert.Equal("Visible", menu.Products[0].Name);
     }
 
     [Fact]

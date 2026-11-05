@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Restaurant.Api.Authorization;
 using Restaurant.Api.Controllers;
@@ -133,6 +134,17 @@ public sealed class FeatureAuthorizationTests
         Assert.True((await evaluator.AuthorizeAsync(cashier, policy!)).Succeeded);
         Assert.True((await evaluator.AuthorizeAsync(shiftManager, policy!)).Succeeded);
         Assert.False((await evaluator.AuthorizeAsync(denied, policy!)).Succeeded);
+    }
+
+    [Fact]
+    public void ProductsController_menu_uses_salon_catalog_read()
+    {
+        var method = typeof(ProductsController).GetMethod(nameof(ProductsController.GetMenu));
+        Assert.NotNull(method);
+        var attribute = method!.GetCustomAttribute<RequireSalonCatalogProductsReadAttribute>();
+        Assert.NotNull(attribute);
+        Assert.Equal(FeatureAuthorizationPolicies.SalonCatalogProductsRead, attribute!.Policy);
+        Assert.Equal("menu", method.GetCustomAttribute<HttpGetAttribute>()?.Template);
     }
 
     [Fact]

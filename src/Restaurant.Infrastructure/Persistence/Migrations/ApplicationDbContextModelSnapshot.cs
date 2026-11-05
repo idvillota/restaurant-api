@@ -1740,6 +1740,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<bool>("AutoGeneratePurchaseBillNumbers")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("BreBKey")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");

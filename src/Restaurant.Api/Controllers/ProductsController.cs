@@ -23,6 +23,20 @@ public sealed class ProductsController : ControllerBase
         CancellationToken cancellationToken = default) =>
         Ok(await _products.ListAsync(query, cancellationToken));
 
+    [HttpGet("menu")]
+    [RequireSalonCatalogProductsRead]
+    public async Task<ActionResult<ProductMenuDto>> GetMenu(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return Ok(await _products.GetMenuAsync(cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("{id:guid}")]
     [RequireSalonCatalogProductsRead]
     public async Task<ActionResult<ProductListItemDto>> GetById(Guid id, CancellationToken cancellationToken = default)

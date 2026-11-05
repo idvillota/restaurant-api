@@ -55,6 +55,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.ImpoconsumoPercent = dto.ImpoconsumoPercent;
         settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
         settings.InventoryEnabled = dto.InventoryEnabled;
+        settings.AutoGeneratePurchaseBillNumbers = dto.AutoGeneratePurchaseBillNumbers;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
@@ -81,6 +82,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             Country = "Colombia",
             ShowOperationalSalesPanel = true,
             InventoryEnabled = true,
+            AutoGeneratePurchaseBillNumbers = false,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -137,6 +139,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
             ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
             InventoryEnabled = settings.InventoryEnabled,
+            AutoGeneratePurchaseBillNumbers = settings.AutoGeneratePurchaseBillNumbers,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

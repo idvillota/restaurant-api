@@ -30,6 +30,9 @@ public sealed class TenantSettingsDto
     /// <summary>When true, products use ingredients for inventory/cost. Default true.</summary>
     public bool InventoryEnabled { get; set; } = true;
 
+    /// <summary>When true, blank purchase bill numbers are auto-assigned. Default false.</summary>
+    public bool AutoGeneratePurchaseBillNumbers { get; set; }
+
     public string? BreBKey { get; set; }
 
     public int? BreBKeyType { get; set; }
@@ -94,6 +97,8 @@ public sealed class UpdateTenantSettingsDto
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
     public bool InventoryEnabled { get; set; } = true;
+
+    public bool AutoGeneratePurchaseBillNumbers { get; set; }
 
     [MaxLength(40)]
     public string? BreBKey { get; set; }

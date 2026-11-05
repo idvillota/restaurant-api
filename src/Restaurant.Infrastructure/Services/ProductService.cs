@@ -64,6 +64,26 @@ public sealed class ProductService : IProductService
             },
             cancellationToken);
 
+    public async Task<ProductMenuDto> GetMenuAsync(CancellationToken cancellationToken = default)
+    {
+        var tenantId = ResolveTenantId();
+
+        var products = await _products.Query()
+            .AsNoTracking()
+            .Include(p => p.ProductType)
+            .Where(p => p.TenantId == tenantId && p.IsActive)
+            .OrderBy(p => p.Name)
+            .ToListAsync(cancellationToken);
+
+        return new ProductMenuDto
+        {
+            Products = products
+                .Where(p => p.ProductType is { IsActive: true })
+                .Select(p => MapProduct(p, costPrice: 0m))
+                .ToList(),
+        };
+    }
+
     public async Task<ProductListItemDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var entity = await _products.Query().AsNoTracking().Include(p => p.ProductType).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
