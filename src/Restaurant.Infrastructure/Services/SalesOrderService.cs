@@ -327,40 +327,11 @@ public sealed class SalesOrderService : ISalesOrderService
         _orders.Update(order);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var groups = await _kitchenPrinters.GroupBatchByStationAsync(batchDtos, cancellationToken);
-        var kitchenTickets = new List<KitchenTicketFileDto>();
-
-        foreach (var (stationCode, group) in groups.OrderBy(g => g.Key, StringComparer.Ordinal))
-        {
-            var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, group.Lines, cancellationToken);
-            ticketModel.PrinterStationCode = stationCode;
-            ticketModel.PrinterStationName = group.StationName;
-
-            var pdfTicketPath = await _kitchenTickets.GeneratePdfAsync(
-                ticketModel,
-                order.Id,
-                stationCode,
-                cancellationToken);
-            _ = await _kitchenTickets.GenerateXmlAsync(
-                ticketModel,
-                order.Id,
-                stationCode,
-                cancellationToken);
-
-            if (pdfTicketPath is not null)
-            {
-                kitchenTickets.Add(
-                    new KitchenTicketFileDto
-                    {
-                        PrinterStationCode = stationCode,
-                        PrinterStationName = group.StationName,
-                        RelativePath = pdfTicketPath,
-                    });
-            }
-        }
-
-        var printModel = await _kitchenTickets.BuildTicketModelAsync(order, batchDtos, cancellationToken);
-        await EnqueueKitchenPrintAsync(printModel, cancellationToken);
+        var kitchenTickets = await GenerateConfirmKitchenTicketsAsync(
+            order,
+            batchDtos,
+            dto.PrintKitchen,
+            cancellationToken);
 
         var orderDto = await GetByIdAsync(orderId, cancellationToken);
         if (orderDto is null)
@@ -610,7 +581,12 @@ public sealed class SalesOrderService : ISalesOrderService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var kitchenTickets = await GenerateCancellationTicketsAsync(order, kitchenBatch, reasonLabel, cancellationToken);
+        var kitchenTickets = await GenerateCancellationTicketsAsync(
+            order,
+            kitchenBatch,
+            reasonLabel,
+            dto.PrintKitchen,
+            cancellationToken);
         var orderDto = await GetByIdAsync(orderId, cancellationToken);
         if (orderDto is null)
             return null;
@@ -692,7 +668,12 @@ public sealed class SalesOrderService : ISalesOrderService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var kitchenTickets = await GenerateCancellationTicketsAsync(order, kitchenBatch, reasonLabel, cancellationToken);
+        var kitchenTickets = await GenerateCancellationTicketsAsync(
+            order,
+            kitchenBatch,
+            reasonLabel,
+            dto.PrintKitchen,
+            cancellationToken);
         var orderDto = await GetByIdAsync(orderId, cancellationToken);
         if (orderDto is null)
             return null;
@@ -986,13 +967,63 @@ public sealed class SalesOrderService : ISalesOrderService
             SetTableAvailable(table);
     }
 
+    private async Task<List<KitchenTicketFileDto>> GenerateConfirmKitchenTicketsAsync(
+        SalesOrder order,
+        List<AddSalesOrderLineDto> batchDtos,
+        bool? printKitchen,
+        CancellationToken cancellationToken)
+    {
+        if (!await ShouldGenerateKitchenTicketsAsync(printKitchen, cancellationToken))
+            return [];
+
+        var groups = await _kitchenPrinters.GroupBatchByStationAsync(batchDtos, cancellationToken);
+        var kitchenTickets = new List<KitchenTicketFileDto>();
+
+        foreach (var (stationCode, group) in groups.OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            var ticketModel = await _kitchenTickets.BuildTicketModelAsync(order, group.Lines, cancellationToken);
+            ticketModel.PrinterStationCode = stationCode;
+            ticketModel.PrinterStationName = group.StationName;
+
+            var pdfTicketPath = await _kitchenTickets.GeneratePdfAsync(
+                ticketModel,
+                order.Id,
+                stationCode,
+                cancellationToken);
+            _ = await _kitchenTickets.GenerateXmlAsync(
+                ticketModel,
+                order.Id,
+                stationCode,
+                cancellationToken);
+
+            if (pdfTicketPath is not null)
+            {
+                kitchenTickets.Add(
+                    new KitchenTicketFileDto
+                    {
+                        PrinterStationCode = stationCode,
+                        PrinterStationName = group.StationName,
+                        RelativePath = pdfTicketPath,
+                    });
+            }
+        }
+
+        var printModel = await _kitchenTickets.BuildTicketModelAsync(order, batchDtos, cancellationToken);
+        await EnqueueKitchenPrintAsync(printModel, cancellationToken);
+        return kitchenTickets;
+    }
+
     private async Task<List<KitchenTicketFileDto>> GenerateCancellationTicketsAsync(
         SalesOrder order,
         IReadOnlyList<AddSalesOrderLineDto> kitchenBatch,
         string reasonLabel,
+        bool? printKitchen,
         CancellationToken cancellationToken)
     {
         if (kitchenBatch.Count == 0)
+            return [];
+
+        if (!await ShouldGenerateKitchenTicketsAsync(printKitchen, cancellationToken))
             return [];
 
         var groups = await _kitchenPrinters.GroupBatchByStationAsync(kitchenBatch, cancellationToken);
@@ -1061,6 +1092,21 @@ public sealed class SalesOrderService : ISalesOrderService
         if (hasOpenBill)
             throw new InvalidOperationException(
                 "No se puede cambiar de mesa mientras exista una cuenta abierta. Cierre o anule la cuenta primero.");
+    }
+
+    private async Task<bool> ShouldGenerateKitchenTicketsAsync(
+        bool? printKitchen,
+        CancellationToken cancellationToken)
+    {
+        var raw = await _db.TenantSettings.AsNoTracking()
+            .Select(s => (int?)s.KitchenTicketPrintMode)
+            .FirstOrDefaultAsync(cancellationToken) ?? (int)KitchenTicketPrintMode.Always;
+
+        var mode = Enum.IsDefined(typeof(KitchenTicketPrintMode), raw)
+            ? (KitchenTicketPrintMode)raw
+            : KitchenTicketPrintMode.Always;
+
+        return KitchenTicketPrintDecision.ShouldGenerateTickets(mode, printKitchen);
     }
 
     private async Task EnqueueKitchenPrintAsync(

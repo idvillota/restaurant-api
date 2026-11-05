@@ -115,5 +115,39 @@ public sealed class CashierShiftServiceTests
             ProviderId = providerId,
         });
         Assert.Null(petty.ProviderId);
+        Assert.True(petty.IsCashDrawerPayment);
+    }
+
+    [Fact]
+    public async Task Shift_report_lists_informational_outflow_but_excludes_it_from_cash_total()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
+        var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
+
+        await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.PettyCash,
+            Amount = 30m,
+            Description = "Sale de caja",
+        });
+        await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.OtherOutflow,
+            Amount = 80m,
+            Description = "Solo informativo",
+            IsCashDrawerPayment = false,
+        });
+
+        var report = await sut.GetShiftReportAsync(shift.Id);
+
+        Assert.Equal(2, report.CashOutflows.Count);
+        Assert.Equal(30m, report.CashOutflowTotal);
+        Assert.Contains(report.CashOutflows, m => m.Description == "Solo informativo" && !m.IsCashDrawerPayment);
     }
 }

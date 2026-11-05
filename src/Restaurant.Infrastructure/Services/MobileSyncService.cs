@@ -328,6 +328,16 @@ public sealed class MobileSyncService : IMobileSyncService
         if (request.KitchenTicketPrinted || _printJobs is null || _kitchenTickets is null || prepared.Count == 0)
             return;
 
+        var printModeRaw = await _db.TenantSettings.AsNoTracking()
+            .Select(s => (int?)s.KitchenTicketPrintMode)
+            .FirstOrDefaultAsync(cancellationToken) ?? (int)KitchenTicketPrintMode.Always;
+        var printMode = Enum.IsDefined(typeof(KitchenTicketPrintMode), printModeRaw)
+            ? (KitchenTicketPrintMode)printModeRaw
+            : KitchenTicketPrintMode.Always;
+        // Ask has no mobile dialog yet — same as Always so paper kitchens stay loud.
+        if (!KitchenTicketPrintDecision.ShouldGenerateTickets(printMode, requested: true))
+            return;
+
         try
         {
             var batch = prepared.Select(line => new AddSalesOrderLineDto

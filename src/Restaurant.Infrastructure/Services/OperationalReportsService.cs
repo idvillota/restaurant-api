@@ -234,11 +234,11 @@ public sealed class OperationalReportsService : IOperationalReportsService
                 m.TenantId == tenantId
                 && m.BusinessDate >= startDate
                 && m.BusinessDate <= endDate)
-            .Select(m => new { m.BusinessDate, m.Amount, m.MovementType })
+            .Select(m => new { m.BusinessDate, m.Amount, m.MovementType, m.IsCashDrawerPayment })
             .ToListAsync(cancellationToken);
 
         var outflowsByDate = cashMovementsInRange
-            .Where(m => CashMovementKinds.IsOutflow(m.MovementType))
+            .Where(m => CashMovementKinds.IsOutflow(m.MovementType) && m.IsCashDrawerPayment)
             .GroupBy(m => m.BusinessDate)
             .ToDictionary(
                 g => g.Key,

@@ -361,6 +361,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId);
             e.Property(x => x.Amount).HasPrecision(18, 2);
             e.Property(x => x.Description).HasMaxLength(300);
+            e.Property(x => x.IsCashDrawerPayment).HasDefaultValue(true);
             e.HasIndex(x => new { x.TenantId, x.BusinessDate });
         });
 

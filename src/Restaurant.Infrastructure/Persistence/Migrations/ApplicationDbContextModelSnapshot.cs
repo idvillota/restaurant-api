@@ -225,6 +225,11 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CashierShiftId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsCashDrawerPayment")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1814,6 +1819,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("InventoryEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("KitchenTicketPrintMode")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("ShowOperationalSalesPanel")
                         .HasColumnType("boolean");

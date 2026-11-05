@@ -62,6 +62,8 @@ public sealed class CashMovementDto
     public Guid? PurchaseId { get; set; }
     public Guid? ProviderId { get; set; }
     public string? ProviderName { get; set; }
+    /// <summary>False = listed on reports only; omitted/true counts toward cash totals.</summary>
+    public bool IsCashDrawerPayment { get; set; } = true;
     public DateTime OccurredAtUtc { get; set; }
 }
 
@@ -93,6 +95,9 @@ public sealed class CreateCashMovementDto
     public Guid? ProviderId { get; set; }
 
     public Guid? CashierShiftId { get; set; }
+
+    /// <summary>Omitted defaults to true so older clients keep counting the outflow.</summary>
+    public bool IsCashDrawerPayment { get; set; } = true;
 }
 
 public sealed class CashierProviderOptionDto

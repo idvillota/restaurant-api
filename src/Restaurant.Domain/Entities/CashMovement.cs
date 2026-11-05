@@ -14,6 +14,13 @@ public class CashMovement : EntityBase, ITenantScoped
     public string Description { get; set; } = string.Empty;
     public Guid? PurchaseId { get; set; }
     public Guid? ProviderId { get; set; }
+
+    /// <summary>
+    /// When true (default), cash left the drawer and the amount counts in shift/day cash totals.
+    /// When false, the movement is listed on reports as informational only.
+    /// </summary>
+    public bool IsCashDrawerPayment { get; set; } = true;
+
     public Guid CreatedByUserId { get; set; }
     public DateTime OccurredAtUtc { get; set; }
 

@@ -59,5 +59,11 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool AutoGeneratePurchaseBillNumbers { get; set; }
 
+    /// <summary>
+    /// When Always (default), kitchen sends generate PDF/XML and a print job.
+    /// Never skips files and jobs. Ask uses the client printKitchen flag.
+    /// </summary>
+    public KitchenTicketPrintMode KitchenTicketPrintMode { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }

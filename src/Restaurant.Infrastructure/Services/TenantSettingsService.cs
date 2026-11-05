@@ -56,6 +56,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
         settings.InventoryEnabled = dto.InventoryEnabled;
         settings.AutoGeneratePurchaseBillNumbers = dto.AutoGeneratePurchaseBillNumbers;
+        settings.KitchenTicketPrintMode = NormalizePrintMode(dto.KitchenTicketPrintMode);
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
@@ -83,6 +84,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             ShowOperationalSalesPanel = true,
             InventoryEnabled = true,
             AutoGeneratePurchaseBillNumbers = false,
+            KitchenTicketPrintMode = KitchenTicketPrintMode.Always,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -140,6 +142,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
             InventoryEnabled = settings.InventoryEnabled,
             AutoGeneratePurchaseBillNumbers = settings.AutoGeneratePurchaseBillNumbers,
+            KitchenTicketPrintMode = (int)settings.KitchenTicketPrintMode,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };
@@ -160,4 +163,9 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.BreBKey = key;
         settings.BreBKeyType = (BreBKeyType)rawType;
     }
+
+    private static KitchenTicketPrintMode NormalizePrintMode(int raw) =>
+        Enum.IsDefined(typeof(KitchenTicketPrintMode), raw)
+            ? (KitchenTicketPrintMode)raw
+            : KitchenTicketPrintMode.Always;
 }

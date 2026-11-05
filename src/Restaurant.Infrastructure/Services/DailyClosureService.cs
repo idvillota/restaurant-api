@@ -229,7 +229,7 @@ public sealed class DailyClosureService : IDailyClosureService
         var totalCard = payments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount);
         var totalTransfer = payments.Where(p => p.Method == PaymentMethod.Transfer).Sum(p => p.Amount);
         var totalOther = payments.Where(p => p.Method == PaymentMethod.Other).Sum(p => p.Amount);
-        var totalOutflows = outflows.Sum(m => m.Amount);
+        var totalOutflows = outflows.Where(m => m.IsCashDrawerPayment).Sum(m => m.Amount);
 
         return new DailyClosureReportDto
         {
@@ -253,6 +253,7 @@ public sealed class DailyClosureService : IDailyClosureService
                 PurchaseId = m.PurchaseId,
                 ProviderId = m.ProviderId,
                 ProviderName = m.Provider?.Name,
+                IsCashDrawerPayment = m.IsCashDrawerPayment,
                 OccurredAtUtc = m.OccurredAtUtc,
             }).ToList(),
             Payments = payments,

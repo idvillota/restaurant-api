@@ -225,4 +225,48 @@ public sealed class OperationalReportsServiceTests
         Assert.Equal(1, row.CashOutflowCount);
         Assert.Equal(row.TotalSales - row.TotalPurchases - 25000m, row.NetResult);
     }
+
+    [Fact]
+    public async Task GetDailySummaryReport_excludes_informational_outflows_from_totals()
+    {
+        using var fx = new TenantDbFixture();
+        var hasher = new BcryptPasswordHasher();
+        await DevelopmentDataSeeder.SeedAsync(fx.Db, hasher, NullLogger.Instance, fx.TenantContext);
+        fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
+
+        var businessDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-13));
+        fx.Db.CashMovements.AddRange(
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = DevelopmentSeedIds.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.PettyCash,
+                Amount = 15000m,
+                Description = "Caja",
+                IsCashDrawerPayment = true,
+                CreatedByUserId = DevelopmentSeedIds.AdminUserId,
+                OccurredAtUtc = DateTime.UtcNow,
+            },
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = DevelopmentSeedIds.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.OtherOutflow,
+                Amount = 40000m,
+                Description = "Informativo",
+                IsCashDrawerPayment = false,
+                CreatedByUserId = DevelopmentSeedIds.AdminUserId,
+                OccurredAtUtc = DateTime.UtcNow,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
+        var report = await sut.GetDailySummaryReportAsync(businessDate, businessDate);
+        var row = Assert.Single(report.Rows, r => r.Date == businessDate);
+
+        Assert.Equal(15000m, row.TotalCashOutflows);
+        Assert.Equal(1, row.CashOutflowCount);
+    }
 }

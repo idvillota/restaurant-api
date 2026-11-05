@@ -238,6 +238,7 @@ public sealed class CashierShiftService : ICashierShiftService
             Description = dto.Description.Trim(),
             PurchaseId = dto.PurchaseId,
             ProviderId = providerId,
+            IsCashDrawerPayment = dto.IsCashDrawerPayment,
             CreatedByUserId = userId,
             OccurredAtUtc = DateTime.UtcNow,
         };
@@ -325,7 +326,7 @@ public sealed class CashierShiftService : ICashierShiftService
 
         var billCount = payments.Select(p => p.BillId).Distinct().Count();
         var totalSales = payments.Sum(p => p.Amount);
-        var cashOutflowTotal = outflows.Sum(m => m.Amount);
+        var cashOutflowTotal = outflows.Where(m => m.IsCashDrawerPayment).Sum(m => m.Amount);
 
         var summary = MapSummary(shift);
         if (summary.ExpectedCash is not null && summary.CountedCash is not null)
@@ -388,6 +389,7 @@ public sealed class CashierShiftService : ICashierShiftService
             PurchaseId = movement.PurchaseId,
             ProviderId = movement.ProviderId,
             ProviderName = providerName ?? movement.Provider?.Name,
+            IsCashDrawerPayment = movement.IsCashDrawerPayment,
             OccurredAtUtc = movement.OccurredAtUtc,
         };
 
