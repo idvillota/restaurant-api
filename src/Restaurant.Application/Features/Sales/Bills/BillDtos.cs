@@ -30,6 +30,15 @@ public sealed class TenantSettingsDto
     /// <summary>When true, products use ingredients for inventory/cost. Default true.</summary>
     public bool InventoryEnabled { get; set; } = true;
 
+    /// <summary>When true, blank purchase bill numbers are auto-assigned. Default false.</summary>
+    public bool AutoGeneratePurchaseBillNumbers { get; set; }
+
+    /// <summary>0 Always (default), 1 Never, 2 Ask.</summary>
+    public int KitchenTicketPrintMode { get; set; }
+
+    /// <summary>When true, cierre splits Vitrina Café out of general ventas.</summary>
+    public bool SeparateVitrinaCafeSales { get; set; }
+
     public string? BreBKey { get; set; }
 
     public int? BreBKeyType { get; set; }
@@ -94,6 +103,13 @@ public sealed class UpdateTenantSettingsDto
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
     public bool InventoryEnabled { get; set; } = true;
+
+    public bool AutoGeneratePurchaseBillNumbers { get; set; }
+
+    [Range(0, 2)]
+    public int KitchenTicketPrintMode { get; set; }
+
+    public bool SeparateVitrinaCafeSales { get; set; }
 
     [MaxLength(40)]
     public string? BreBKey { get; set; }

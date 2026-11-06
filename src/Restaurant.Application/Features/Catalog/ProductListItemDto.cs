@@ -16,3 +16,8 @@ public sealed class ProductListItemDto
     public string? ImageUrl { get; set; }
     public bool IsActive { get; set; }
 }
+
+public sealed class ProductMenuDto
+{
+    public IReadOnlyList<ProductListItemDto> Products { get; set; } = [];
+}

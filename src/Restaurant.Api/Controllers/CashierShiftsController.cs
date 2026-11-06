@@ -39,6 +39,12 @@ public sealed class CashierShiftsController : ControllerBase
         CancellationToken cancellationToken) =>
         OkResult(_service.ListShiftsAsync(businessDate, cancellationToken));
 
+    [HttpGet("providers")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
+    public Task<ActionResult<IReadOnlyList<CashierProviderOptionDto>>> ListProviders(
+        CancellationToken cancellationToken) =>
+        OkResult(_service.ListActiveProvidersAsync(cancellationToken));
+
     [HttpGet("day-summary")]
     [RequireFeature(FeatureCodes.CashierShifts)]
     public async Task<ActionResult<DailyClosureReportDto>> GetDaySummary(

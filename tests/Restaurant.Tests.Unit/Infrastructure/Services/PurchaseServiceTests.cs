@@ -383,6 +383,123 @@ public sealed class PurchaseServiceTests
         Assert.Equal(newPayment, updated.PaymentDateUtc);
     }
 
+    [Fact]
+    public async Task CreateAsync_throws_when_bill_number_blank_and_auto_generate_off()
+    {
+        using var fx = new TenantDbFixture();
+        var (providerId, ingredientId) = await SeedPurchaseGraphAsync(fx);
+
+        var sut = CreateSut(fx);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.CreateAsync(MinimalCreateDto(providerId, ingredientId, billNumber: "  ")));
+
+        Assert.Equal("Bill number is required.", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateAsync_generates_compra_number_when_blank_and_flag_on()
+    {
+        using var fx = new TenantDbFixture();
+        var (providerId, ingredientId) = await SeedPurchaseGraphAsync(fx);
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, AutoGeneratePurchaseBillNumbers = true });
+        await fx.Db.SaveChangesAsync();
+
+        var purchasedAt = new DateTime(2026, 11, 3, 15, 0, 0, DateTimeKind.Utc);
+        var sut = CreateSut(fx);
+        var created = await sut.CreateAsync(
+            MinimalCreateDto(providerId, ingredientId, billNumber: null, purchasedAt));
+
+        Assert.Equal("COMPRA-20261103-0001", created.BillNumber);
+    }
+
+    [Fact]
+    public async Task CreateAsync_increments_generated_compra_number_same_day()
+    {
+        using var fx = new TenantDbFixture();
+        var (providerId, ingredientId) = await SeedPurchaseGraphAsync(fx);
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, AutoGeneratePurchaseBillNumbers = true });
+        await fx.Db.SaveChangesAsync();
+
+        var purchasedAt = new DateTime(2026, 11, 3, 15, 0, 0, DateTimeKind.Utc);
+        var sut = CreateSut(fx);
+        var first = await sut.CreateAsync(
+            MinimalCreateDto(providerId, ingredientId, billNumber: null, purchasedAt));
+        var second = await sut.CreateAsync(
+            MinimalCreateDto(providerId, ingredientId, billNumber: "", purchasedAt));
+
+        Assert.Equal("COMPRA-20261103-0001", first.BillNumber);
+        Assert.Equal("COMPRA-20261103-0002", second.BillNumber);
+    }
+
+    [Fact]
+    public async Task CreateAsync_keeps_typed_bill_number_when_auto_generate_on()
+    {
+        using var fx = new TenantDbFixture();
+        var (providerId, ingredientId) = await SeedPurchaseGraphAsync(fx);
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, AutoGeneratePurchaseBillNumbers = true });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var created = await sut.CreateAsync(
+            MinimalCreateDto(providerId, ingredientId, billNumber: "FAC-99"));
+
+        Assert.Equal("FAC-99", created.BillNumber);
+    }
+
+    private static CreatePurchaseDto MinimalCreateDto(
+        Guid providerId,
+        Guid ingredientId,
+        string? billNumber,
+        DateTime? purchasedAt = null) =>
+        new()
+        {
+            ProviderId = providerId,
+            BillNumber = billNumber,
+            PurchasedAtUtc = purchasedAt ?? DateTime.UtcNow,
+            Lines =
+            [
+                new CreatePurchaseLineDto { IngredientId = ingredientId, Quantity = 1m, UnitPrice = 1m },
+            ],
+        };
+
+    private static async Task<(Guid ProviderId, Guid IngredientId)> SeedPurchaseGraphAsync(TenantDbFixture fx)
+    {
+        var providerId = Guid.NewGuid();
+        var ingredientId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        fx.Db.IngredientCategories.Add(
+            new IngredientCategory
+            {
+                Id = categoryId,
+                TenantId = fx.TenantId,
+                Name = "Dry",
+                IsActive = true,
+            });
+        fx.Db.Providers.Add(
+            new Provider
+            {
+                Id = providerId,
+                TenantId = fx.TenantId,
+                Name = "Supplier A",
+                IsActive = true,
+            });
+        fx.Db.Ingredients.Add(
+            new Ingredient
+            {
+                Id = ingredientId,
+                TenantId = fx.TenantId,
+                IngredientCategoryId = categoryId,
+                Name = "Flour",
+                Unit = IngredientUnit.Kilogram,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+        return (providerId, ingredientId);
+    }
+
     private static PurchaseService CreateSut(TenantDbFixture fx) =>
         new(
             fx.Repository<Purchase>(),

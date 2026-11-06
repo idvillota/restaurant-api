@@ -53,5 +53,23 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool InventoryEnabled { get; set; } = true;
 
+    /// <summary>
+    /// When true, a blank purchase bill number is replaced with COMPRA-yyyyMMdd-0001.
+    /// When false (default), the provider invoice number is required.
+    /// </summary>
+    public bool AutoGeneratePurchaseBillNumbers { get; set; }
+
+    /// <summary>
+    /// When Always (default), kitchen sends generate PDF/XML and a print job.
+    /// Never skips files and jobs. Ask uses the client printKitchen flag.
+    /// </summary>
+    public KitchenTicketPrintMode KitchenTicketPrintMode { get; set; }
+
+    /// <summary>
+    /// When true, cierre lists Vitrina Café apart from general ventas.
+    /// Default false; enable per tenant (Nuestro Café).
+    /// </summary>
+    public bool SeparateVitrinaCafeSales { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }
