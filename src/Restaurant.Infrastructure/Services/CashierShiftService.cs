@@ -4,6 +4,7 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Cashier;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Domain.Sales;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -325,7 +326,23 @@ public sealed class CashierShiftService : ICashierShiftService
             .ToList();
 
         var billCount = payments.Select(p => p.BillId).Distinct().Count();
-        var totalSales = payments.Sum(p => p.Amount);
+        var collected = payments.Sum(p => p.Amount);
+        var separateVitrina = await VitrinaCafeBillTotals.IsSeparateEnabledAsync(_db, cancellationToken);
+        decimal totalSales;
+        decimal vitrinaCafeSales;
+        if (separateVitrina)
+        {
+            var vitrinaLineTotal = await VitrinaCafeBillTotals.SumForBillsAsync(
+                _db,
+                payments.Select(p => p.BillId).Distinct().ToList(),
+                cancellationToken);
+            (totalSales, vitrinaCafeSales) = VitrinaCafeProductType.SplitCollected(collected, vitrinaLineTotal);
+        }
+        else
+        {
+            totalSales = collected;
+            vitrinaCafeSales = 0m;
+        }
         var cashOutflowTotal = outflows.Where(m => m.IsCashDrawerPayment).Sum(m => m.Amount);
 
         var summary = MapSummary(shift);
@@ -336,6 +353,8 @@ public sealed class CashierShiftService : ICashierShiftService
         {
             Shift = summary,
             TotalSales = totalSales,
+            VitrinaCafeSales = vitrinaCafeSales,
+            SeparateVitrinaCafeSales = separateVitrina,
             BillCount = billCount,
             TotalsByMethod = totalsByMethod,
             Payments = payments,

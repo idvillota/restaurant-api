@@ -1826,6 +1826,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<bool>("ShowOperationalSalesPanel")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("SeparateVitrinaCafeSales")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("TaxId")
                         .IsRequired()
                         .HasMaxLength(40)

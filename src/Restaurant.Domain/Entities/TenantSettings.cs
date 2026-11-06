@@ -65,5 +65,11 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public KitchenTicketPrintMode KitchenTicketPrintMode { get; set; }
 
+    /// <summary>
+    /// When true, cierre lists Vitrina Café apart from general ventas.
+    /// Default false; enable per tenant (Nuestro Café).
+    /// </summary>
+    public bool SeparateVitrinaCafeSales { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }

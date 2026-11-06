@@ -57,6 +57,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.InventoryEnabled = dto.InventoryEnabled;
         settings.AutoGeneratePurchaseBillNumbers = dto.AutoGeneratePurchaseBillNumbers;
         settings.KitchenTicketPrintMode = NormalizePrintMode(dto.KitchenTicketPrintMode);
+        settings.SeparateVitrinaCafeSales = dto.SeparateVitrinaCafeSales;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
@@ -85,6 +86,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             InventoryEnabled = true,
             AutoGeneratePurchaseBillNumbers = false,
             KitchenTicketPrintMode = KitchenTicketPrintMode.Always,
+            SeparateVitrinaCafeSales = false,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -143,6 +145,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             InventoryEnabled = settings.InventoryEnabled,
             AutoGeneratePurchaseBillNumbers = settings.AutoGeneratePurchaseBillNumbers,
             KitchenTicketPrintMode = (int)settings.KitchenTicketPrintMode,
+            SeparateVitrinaCafeSales = settings.SeparateVitrinaCafeSales,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

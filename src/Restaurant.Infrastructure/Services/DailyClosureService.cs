@@ -4,6 +4,7 @@ using Restaurant.Application.Common;
 using Restaurant.Application.Features.Cashier;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Domain.Sales;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -205,10 +206,33 @@ public sealed class DailyClosureService : IDailyClosureService
             .ToListAsync(cancellationToken);
 
         var paymentsByShift = paymentRows.ToLookup(p => p.ShiftId);
+        var separateVitrina = await VitrinaCafeBillTotals.IsSeparateEnabledAsync(_db, cancellationToken);
+        var vitrinaByBill = separateVitrina
+            ? await VitrinaCafeBillTotals.SumByBillAsync(
+                _db,
+                paymentRows.Select(p => p.BillId).Distinct().ToList(),
+                cancellationToken)
+            : [];
 
         var shiftRollups = shifts.Select(shift =>
         {
             var shiftPayments = paymentsByShift[shift.Id].ToList();
+            var collected = shiftPayments.Sum(p => p.Amount);
+            decimal generalSales;
+            decimal vitrinaSales;
+            if (separateVitrina)
+            {
+                var vitrina = shiftPayments
+                    .Select(p => p.BillId)
+                    .Distinct()
+                    .Sum(billId => vitrinaByBill.GetValueOrDefault(billId));
+                (generalSales, vitrinaSales) = VitrinaCafeProductType.SplitCollected(collected, vitrina);
+            }
+            else
+            {
+                generalSales = collected;
+                vitrinaSales = 0m;
+            }
             return new DailyShiftRollupDto
             {
                 ShiftId = shift.Id,
@@ -216,7 +240,8 @@ public sealed class DailyClosureService : IDailyClosureService
                 OpenedAtUtc = shift.OpenedAtUtc,
                 ClosedAtUtc = shift.ClosedAtUtc,
                 Status = shift.Status,
-                TotalSales = shiftPayments.Sum(p => p.Amount),
+                TotalSales = generalSales,
+                VitrinaCafeSales = vitrinaSales,
                 CashSales = shiftPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount),
                 CardSales = shiftPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount),
                 TransferSales = shiftPayments.Where(p => p.Method == PaymentMethod.Transfer).Sum(p => p.Amount),
@@ -230,11 +255,25 @@ public sealed class DailyClosureService : IDailyClosureService
         var totalTransfer = payments.Where(p => p.Method == PaymentMethod.Transfer).Sum(p => p.Amount);
         var totalOther = payments.Where(p => p.Method == PaymentMethod.Other).Sum(p => p.Amount);
         var totalOutflows = outflows.Where(m => m.IsCashDrawerPayment).Sum(m => m.Amount);
+        var collected = payments.Sum(p => p.Amount);
+        decimal totalSales;
+        decimal vitrinaCafeSales;
+        if (separateVitrina)
+            (totalSales, vitrinaCafeSales) = VitrinaCafeProductType.SplitCollected(
+                collected,
+                vitrinaByBill.Values.Sum());
+        else
+        {
+            totalSales = collected;
+            vitrinaCafeSales = 0m;
+        }
 
         return new DailyClosureReportDto
         {
             Closure = closureSummary,
-            TotalSales = payments.Sum(p => p.Amount),
+            TotalSales = totalSales,
+            VitrinaCafeSales = vitrinaCafeSales,
+            SeparateVitrinaCafeSales = separateVitrina,
             BillCount = payments.Select(p => p.BillId).Distinct().Count(),
             TotalCashIn = totalCash,
             TotalCard = totalCard,

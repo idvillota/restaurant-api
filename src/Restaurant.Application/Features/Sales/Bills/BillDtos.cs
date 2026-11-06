@@ -36,6 +36,9 @@ public sealed class TenantSettingsDto
     /// <summary>0 Always (default), 1 Never, 2 Ask.</summary>
     public int KitchenTicketPrintMode { get; set; }
 
+    /// <summary>When true, cierre splits Vitrina Café out of general ventas.</summary>
+    public bool SeparateVitrinaCafeSales { get; set; }
+
     public string? BreBKey { get; set; }
 
     public int? BreBKeyType { get; set; }
@@ -105,6 +108,8 @@ public sealed class UpdateTenantSettingsDto
 
     [Range(0, 2)]
     public int KitchenTicketPrintMode { get; set; }
+
+    public bool SeparateVitrinaCafeSales { get; set; }
 
     [MaxLength(40)]
     public string? BreBKey { get; set; }
