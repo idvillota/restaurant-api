@@ -87,10 +87,6 @@ public sealed class PurchaseService : IPurchaseService
 
     public async Task<PurchaseDto> CreateAsync(CreatePurchaseDto dto, CancellationToken cancellationToken = default)
     {
-        var billNumber = dto.BillNumber.Trim();
-        if (billNumber.Length == 0)
-            throw new InvalidOperationException("Bill number is required.");
-
         if (dto.Lines.Count == 0)
             throw new InvalidOperationException("At least one line item is required.");
 
@@ -104,9 +100,6 @@ public sealed class PurchaseService : IPurchaseService
         if (provider is null || !provider.IsActive)
             throw new InvalidOperationException("Provider was not found or is inactive.");
 
-        if (await _purchases.Query().AnyAsync(p => p.BillNumber == billNumber, cancellationToken))
-            throw new InvalidOperationException("A purchase with this bill number already exists.");
-
         var ingredientIds = dto.Lines.Select(l => l.IngredientId).ToList();
         var ingredients = await _ingredients.Query()
             .Where(i => ingredientIds.Contains(i.Id))
@@ -117,6 +110,12 @@ public sealed class PurchaseService : IPurchaseService
 
         if (ingredients.Any(i => !i.IsActive))
             throw new InvalidOperationException("All ingredients must be active.");
+
+        var purchasedAt = NormalizeUtc(dto.PurchasedAtUtc ?? DateTime.UtcNow);
+        var billNumber = await ResolveBillNumberAsync(dto.BillNumber, purchasedAt, cancellationToken);
+
+        if (await _purchases.Query().AnyAsync(p => p.BillNumber == billNumber, cancellationToken))
+            throw new InvalidOperationException("A purchase with this bill number already exists.");
 
         var ingredientById = ingredients.ToDictionary(i => i.Id);
         var purchaseId = Guid.NewGuid();
@@ -150,7 +149,6 @@ public sealed class PurchaseService : IPurchaseService
         var taxAmount = decimal.Round(dto.TaxAmount, 2, MidpointRounding.AwayFromZero);
         var total = subtotal + taxAmount;
 
-        var purchasedAt = NormalizeUtc(dto.PurchasedAtUtc ?? DateTime.UtcNow);
         var paymentAt = NormalizeUtc(dto.PaymentDateUtc ?? purchasedAt);
 
         var purchase = new Purchase
@@ -200,6 +198,57 @@ public sealed class PurchaseService : IPurchaseService
 
         // Missing settings row → inventory on (same default as ProductService / checkout).
         return enabled ?? true;
+    }
+
+    private async Task<string> ResolveBillNumberAsync(
+        string? raw,
+        DateTime purchasedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var trimmed = raw?.Trim() ?? string.Empty;
+        if (trimmed.Length > 0)
+            return trimmed;
+
+        var autoGenerate = await _db.TenantSettings.AsNoTracking()
+            .Select(s => (bool?)s.AutoGeneratePurchaseBillNumbers)
+            .FirstOrDefaultAsync(cancellationToken) ?? false;
+
+        if (!autoGenerate)
+            throw new InvalidOperationException("Bill number is required.");
+
+        return await GeneratePurchaseBillNumberAsync(purchasedAtUtc, cancellationToken);
+    }
+
+    private async Task<string> GeneratePurchaseBillNumberAsync(
+        DateTime purchasedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var dayPrefix = $"COMPRA-{purchasedAtUtc:yyyyMMdd}-";
+        var latestNumber = await _purchases.Query()
+            .AsNoTracking()
+            .Where(p => p.BillNumber.StartsWith(dayPrefix))
+            .OrderByDescending(p => p.BillNumber)
+            .Select(p => p.BillNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var next = 1;
+        if (latestNumber is not null
+            && latestNumber.Length > dayPrefix.Length
+            && int.TryParse(latestNumber[dayPrefix.Length..], out var parsed)
+            && parsed >= 1)
+        {
+            next = parsed + 1;
+        }
+
+        string candidate;
+        do
+        {
+            candidate = $"{dayPrefix}{next:D4}";
+            next++;
+        }
+        while (await _purchases.Query().AnyAsync(p => p.BillNumber == candidate, cancellationToken));
+
+        return candidate;
     }
 
     public async Task<PurchaseDto?> UpdatePaymentDateAsync(

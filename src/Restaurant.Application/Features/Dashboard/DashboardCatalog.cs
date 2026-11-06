@@ -22,7 +22,7 @@ public static class DashboardCatalog
         {
             WidgetType = "sales_kpis",
             Name = "Ventas del período",
-            Description = "Totales de ventas, compras y resultado neto.",
+            Description = "Totales de ventas, compras, egresos y resultado neto.",
             Category = "Reportes",
             RequiredPermission = FeatureCodes.ReportsSalesByDate,
             DefaultWidth = 4,
@@ -34,7 +34,7 @@ public static class DashboardCatalog
         {
             WidgetType = "sales_trend",
             Name = "Tendencia de ventas",
-            Description = "Gráfico de ventas vs compras por día.",
+            Description = "Gráfico de ventas, compras y egresos por día.",
             Category = "Reportes",
             RequiredPermission = FeatureCodes.ReportsSalesByDate,
             DefaultWidth = 8,

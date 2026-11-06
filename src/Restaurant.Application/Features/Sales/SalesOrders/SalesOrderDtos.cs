@@ -73,6 +73,12 @@ public sealed class AddSalesOrderLineDto
 public sealed class ConfirmSalesOrderDto
 {
     public List<AddSalesOrderLineDto> Lines { get; set; } = [];
+
+    /// <summary>
+    /// When the tenant mode is Ask: true prints the comanda, false skips files/jobs.
+    /// Ignored for Always/Never. Omitted on Ask prints (old clients).
+    /// </summary>
+    public bool? PrintKitchen { get; set; }
 }
 
 public sealed class KitchenTicketFileDto
@@ -167,6 +173,9 @@ public sealed class CancelSalesOrderLinesDto
     /// false leaves an empty active order (UI should ask).
     /// </summary>
     public bool VoidOrderIfEmpty { get; set; }
+
+    /// <summary>Same meaning as <see cref="ConfirmSalesOrderDto.PrintKitchen"/> for void tickets.</summary>
+    public bool? PrintKitchen { get; set; }
 }
 
 public sealed class VoidSalesOrderDto
@@ -177,6 +186,9 @@ public sealed class VoidSalesOrderDto
 
     [MaxLength(300)]
     public string? ReasonDetail { get; set; }
+
+    /// <summary>Same meaning as <see cref="ConfirmSalesOrderDto.PrintKitchen"/> for void tickets.</summary>
+    public bool? PrintKitchen { get; set; }
 }
 
 /// <summary>Same shape as confirm: updated order + anulación kitchen PDFs.</summary>

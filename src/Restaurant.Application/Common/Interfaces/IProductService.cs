@@ -7,6 +7,7 @@ namespace Restaurant.Application.Common.Interfaces;
 public interface IProductService
 {
     Task<PagedResult<ProductListItemDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default);
+    Task<ProductMenuDto> GetMenuAsync(CancellationToken cancellationToken = default);
     Task<ProductListItemDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ProductListItemDto> CreateAsync(CreateProductDto dto, CancellationToken cancellationToken = default);
     Task<ProductListItemDto?> UpdateAsync(Guid id, UpdateProductDto dto, CancellationToken cancellationToken = default);

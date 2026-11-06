@@ -31,8 +31,16 @@ public static class PermissionBootstrap
 
         foreach (var def in FeatureCatalog.All)
         {
-            if (existing.ContainsKey(def.Code))
+            if (existing.TryGetValue(def.Code, out var feature))
+            {
+                if (feature.Module != def.Module || feature.SortOrder != def.SortOrder || feature.Name != def.Name)
+                {
+                    feature.Module = def.Module;
+                    feature.SortOrder = def.SortOrder;
+                    feature.Name = def.Name;
+                }
                 continue;
+            }
 
             await db.Features.AddAsync(
                 new Feature

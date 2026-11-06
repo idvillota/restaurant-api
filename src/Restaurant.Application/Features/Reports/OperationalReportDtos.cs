@@ -65,9 +65,11 @@ public sealed class DailySummaryReportRowDto
     public DateOnly Date { get; set; }
     public decimal TotalSales { get; set; }
     public decimal TotalPurchases { get; set; }
+    public decimal TotalCashOutflows { get; set; }
     public decimal NetResult { get; set; }
     public int SalesOrderCount { get; set; }
     public int PurchaseCount { get; set; }
+    public int CashOutflowCount { get; set; }
     public decimal ItemsSold { get; set; }
 }
 
@@ -78,6 +80,7 @@ public sealed class DailySummaryReportDto
     public DateOnly EndDate { get; set; }
     public decimal GrandTotalSales { get; set; }
     public decimal GrandTotalPurchases { get; set; }
+    public decimal GrandTotalCashOutflows { get; set; }
     public decimal GrandNetResult { get; set; }
     public IReadOnlyList<DailySummaryReportRowDto> Rows { get; set; } = [];
 }

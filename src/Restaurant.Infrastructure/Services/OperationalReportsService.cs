@@ -228,22 +228,51 @@ public sealed class OperationalReportsService : IOperationalReportsService
             })
             .ToDictionaryAsync(x => x.Date, cancellationToken);
 
-        var dates = salesByDate.Keys.Union(purchasesByDate.Keys).OrderDescending().ToList();
+        var cashMovementsInRange = await _db.CashMovements
+            .AsNoTracking()
+            .Where(m =>
+                m.TenantId == tenantId
+                && m.BusinessDate >= startDate
+                && m.BusinessDate <= endDate)
+            .Select(m => new { m.BusinessDate, m.Amount, m.MovementType, m.IsCashDrawerPayment })
+            .ToListAsync(cancellationToken);
+
+        var outflowsByDate = cashMovementsInRange
+            .Where(m => CashMovementKinds.IsOutflow(m.MovementType) && m.IsCashDrawerPayment)
+            .GroupBy(m => m.BusinessDate)
+            .ToDictionary(
+                g => g.Key,
+                g => new DailySummaryOutflowsBucket
+                {
+                    Date = g.Key,
+                    TotalCashOutflows = g.Sum(x => x.Amount),
+                    CashOutflowCount = g.Count(),
+                });
+
+        var dates = salesByDate.Keys
+            .Union(purchasesByDate.Keys)
+            .Union(outflowsByDate.Keys)
+            .OrderDescending()
+            .ToList();
         var rows = dates.Select(date =>
         {
             salesByDate.TryGetValue(date, out var sales);
             purchasesByDate.TryGetValue(date, out var purchases);
+            outflowsByDate.TryGetValue(date, out var outflows);
             var totalSales = sales?.TotalSales ?? 0m;
             var totalPurchases = purchases?.TotalPurchases ?? 0m;
+            var totalOutflows = outflows?.TotalCashOutflows ?? 0m;
 
             return new DailySummaryReportRowDto
             {
                 Date = date,
                 TotalSales = totalSales,
                 TotalPurchases = totalPurchases,
-                NetResult = totalSales - totalPurchases,
+                TotalCashOutflows = totalOutflows,
+                NetResult = totalSales - totalPurchases - totalOutflows,
                 SalesOrderCount = sales?.SalesOrderCount ?? 0,
                 PurchaseCount = purchases?.PurchaseCount ?? 0,
+                CashOutflowCount = outflows?.CashOutflowCount ?? 0,
                 ItemsSold = sales?.ItemsSold ?? 0m,
             };
         }).ToList();
@@ -255,6 +284,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
             EndDate = endDate,
             GrandTotalSales = rows.Sum(r => r.TotalSales),
             GrandTotalPurchases = rows.Sum(r => r.TotalPurchases),
+            GrandTotalCashOutflows = rows.Sum(r => r.TotalCashOutflows),
             GrandNetResult = rows.Sum(r => r.NetResult),
             Rows = rows,
         };
@@ -273,6 +303,13 @@ public sealed class OperationalReportsService : IOperationalReportsService
         public DateOnly Date { get; init; }
         public decimal TotalPurchases { get; init; }
         public int PurchaseCount { get; init; }
+    }
+
+    private sealed class DailySummaryOutflowsBucket
+    {
+        public DateOnly Date { get; init; }
+        public decimal TotalCashOutflows { get; init; }
+        public int CashOutflowCount { get; init; }
     }
 
     private async Task<string> GetTenantNameAsync(Guid tenantId, CancellationToken cancellationToken)

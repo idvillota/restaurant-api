@@ -60,6 +60,10 @@ public sealed class CashMovementDto
     public PaymentMethod? Method { get; set; }
     public string Description { get; set; } = string.Empty;
     public Guid? PurchaseId { get; set; }
+    public Guid? ProviderId { get; set; }
+    public string? ProviderName { get; set; }
+    /// <summary>False = listed on reports only; omitted/true counts toward cash totals.</summary>
+    public bool IsCashDrawerPayment { get; set; } = true;
     public DateTime OccurredAtUtc { get; set; }
 }
 
@@ -67,6 +71,8 @@ public sealed class CashierShiftReportDto
 {
     public CashierShiftSummaryDto Shift { get; set; } = null!;
     public decimal TotalSales { get; set; }
+    public decimal VitrinaCafeSales { get; set; }
+    public bool SeparateVitrinaCafeSales { get; set; }
     public int BillCount { get; set; }
     public IReadOnlyList<ShiftTotalsByMethodDto> TotalsByMethod { get; set; } = [];
     public IReadOnlyList<ShiftPaymentLineDto> Payments { get; set; } = [];
@@ -88,7 +94,18 @@ public sealed class CreateCashMovementDto
 
     public Guid? PurchaseId { get; set; }
 
+    public Guid? ProviderId { get; set; }
+
     public Guid? CashierShiftId { get; set; }
+
+    /// <summary>Omitted defaults to true so older clients keep counting the outflow.</summary>
+    public bool IsCashDrawerPayment { get; set; } = true;
+}
+
+public sealed class CashierProviderOptionDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
 }
 
 public sealed class DailyClosureSummaryDto
@@ -107,6 +124,7 @@ public sealed class DailyShiftRollupDto
     public DateTime? ClosedAtUtc { get; set; }
     public CashierShiftStatus Status { get; set; }
     public decimal TotalSales { get; set; }
+    public decimal VitrinaCafeSales { get; set; }
     public decimal CashSales { get; set; }
     public decimal CardSales { get; set; }
     public decimal TransferSales { get; set; }
@@ -121,6 +139,8 @@ public sealed class DailyClosureReportDto
 
     public DailyClosureSummaryDto Closure { get; set; } = null!;
     public decimal TotalSales { get; set; }
+    public decimal VitrinaCafeSales { get; set; }
+    public bool SeparateVitrinaCafeSales { get; set; }
     public int BillCount { get; set; }
     public decimal TotalCashIn { get; set; }
     public decimal TotalCard { get; set; }

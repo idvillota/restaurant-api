@@ -153,17 +153,120 @@ public sealed class OperationalReportsServiceTests
             .CurrentValue = soldAt;
         await fx.Db.SaveChangesAsync();
 
+        var businessDate = DateOnly.FromDateTime(soldAt);
+        fx.Db.CashMovements.Add(
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = DevelopmentSeedIds.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.PettyCash,
+                Amount = 10000m,
+                Description = "Caja menor",
+                CreatedByUserId = DevelopmentSeedIds.AdminUserId,
+                OccurredAtUtc = soldAt,
+            });
+        await fx.Db.SaveChangesAsync();
+
         var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
         var start = DateOnly.FromDateTime(soldAt.Date.AddDays(-1));
         var end = DateOnly.FromDateTime(soldAt.Date.AddDays(1));
         var report = await sut.GetDailySummaryReportAsync(start, end);
 
         Assert.Equal("Bistró Demo", report.TenantName);
-        Assert.Contains(report.Rows, r =>
-            r.Date == DateOnly.FromDateTime(soldAt)
-            && r.TotalSales == 50000m
-            && r.SalesOrderCount == 1
-            && r.ItemsSold == 1m);
+        var row = Assert.Single(report.Rows, r => r.Date == businessDate && r.TotalSales == 50000m);
+        Assert.Equal(1, row.SalesOrderCount);
+        Assert.Equal(1m, row.ItemsSold);
+        Assert.Equal(10000m, row.TotalCashOutflows);
+        Assert.Equal(1, row.CashOutflowCount);
+        Assert.Equal(row.TotalSales - row.TotalPurchases - row.TotalCashOutflows, row.NetResult);
         Assert.True(report.GrandTotalSales >= 50000m);
+        Assert.True(report.GrandTotalCashOutflows >= 10000m);
+    }
+
+    [Fact]
+    public async Task GetDailySummaryReport_includes_outflow_only_days_and_skips_adjustment_in()
+    {
+        using var fx = new TenantDbFixture();
+        var hasher = new BcryptPasswordHasher();
+        await DevelopmentDataSeeder.SeedAsync(fx.Db, hasher, NullLogger.Instance, fx.TenantContext);
+        fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
+
+        var businessDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-12));
+        fx.Db.CashMovements.AddRange(
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = DevelopmentSeedIds.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.OtherOutflow,
+                Amount = 25000m,
+                Description = "Otro egreso",
+                CreatedByUserId = DevelopmentSeedIds.AdminUserId,
+                OccurredAtUtc = DateTime.UtcNow,
+            },
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = DevelopmentSeedIds.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.AdjustmentIn,
+                Amount = 8000m,
+                Description = "Ajuste entrada",
+                CreatedByUserId = DevelopmentSeedIds.AdminUserId,
+                OccurredAtUtc = DateTime.UtcNow,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
+        var report = await sut.GetDailySummaryReportAsync(businessDate, businessDate);
+        var row = Assert.Single(report.Rows, r => r.Date == businessDate && r.TotalCashOutflows == 25000m);
+
+        Assert.Equal(1, row.CashOutflowCount);
+        Assert.Equal(row.TotalSales - row.TotalPurchases - 25000m, row.NetResult);
+    }
+
+    [Fact]
+    public async Task GetDailySummaryReport_excludes_informational_outflows_from_totals()
+    {
+        using var fx = new TenantDbFixture();
+        var hasher = new BcryptPasswordHasher();
+        await DevelopmentDataSeeder.SeedAsync(fx.Db, hasher, NullLogger.Instance, fx.TenantContext);
+        fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
+
+        var businessDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-13));
+        fx.Db.CashMovements.AddRange(
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = DevelopmentSeedIds.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.PettyCash,
+                Amount = 15000m,
+                Description = "Caja",
+                IsCashDrawerPayment = true,
+                CreatedByUserId = DevelopmentSeedIds.AdminUserId,
+                OccurredAtUtc = DateTime.UtcNow,
+            },
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = DevelopmentSeedIds.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.OtherOutflow,
+                Amount = 40000m,
+                Description = "Informativo",
+                IsCashDrawerPayment = false,
+                CreatedByUserId = DevelopmentSeedIds.AdminUserId,
+                OccurredAtUtc = DateTime.UtcNow,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
+        var report = await sut.GetDailySummaryReportAsync(businessDate, businessDate);
+        var row = Assert.Single(report.Rows, r => r.Date == businessDate);
+
+        Assert.Equal(15000m, row.TotalCashOutflows);
+        Assert.Equal(1, row.CashOutflowCount);
     }
 }

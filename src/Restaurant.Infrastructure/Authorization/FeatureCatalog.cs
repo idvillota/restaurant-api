@@ -31,7 +31,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f100000f-0015-4015-8015-00000000000f"), FeatureCodes.OrganizationTeam, "Invitar equipo", "Administración", 150),
         new(Guid.Parse("f1000010-0016-4016-8016-000000000010"), FeatureCodes.OrganizationRoles, "Roles y permisos", "Administración", 160),
         new(Guid.Parse("f1000011-0017-4017-8017-000000000011"), FeatureCodes.CashierShifts, "Turnos de caja", "Servicio", 35),
-        new(Guid.Parse("f1000012-0018-4018-8018-000000000012"), FeatureCodes.ReportsDailyClosure, "Cierre diario", "Reportes", 165),
+        new(Guid.Parse("f1000012-0018-4018-8018-000000000012"), FeatureCodes.ReportsDailyClosure, "Cierre diario", "Servicio", 36),
         new(Guid.Parse("f1000013-0019-4019-8019-000000000013"), FeatureCodes.ReportsStrategicAi, "Informe IA", "Reportes", 170),
         new(Guid.Parse("f1000015-0021-4021-8021-000000000015"), FeatureCodes.ReportsSales, "Reporte de ventas", "Reportes", 175),
         new(Guid.Parse("f1000016-0022-4022-8022-000000000016"), FeatureCodes.ReportsIngredients, "Reporte de ingredientes", "Reportes", 176),

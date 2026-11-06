@@ -225,6 +225,11 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("CashierShiftId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsCashDrawerPayment")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -248,6 +253,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PurchaseId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProviderId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -261,6 +269,8 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("PurchaseId");
+
+                    b.HasIndex("ProviderId");
 
                     b.HasIndex("TenantId", "BusinessDate");
 
@@ -1735,6 +1745,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<bool>("AutoGeneratePurchaseBillNumbers")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("BreBKey")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -1807,7 +1820,13 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<bool>("InventoryEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("KitchenTicketPrintMode")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("ShowOperationalSalesPanel")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SeparateVitrinaCafeSales")
                         .HasColumnType("boolean");
 
                     b.Property<string>("TaxId")
@@ -2002,9 +2021,16 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("PurchaseId");
 
+                    b.HasOne("Restaurant.Domain.Entities.Provider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CashierShift");
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("Provider");
 
                     b.Navigation("Purchase");
                 });
