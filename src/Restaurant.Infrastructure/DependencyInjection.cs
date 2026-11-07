@@ -107,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<IOperationalBusinessDayService, OperationalBusinessDayService>();
         services.AddScoped<ICashierShiftService, CashierShiftService>();
         services.AddScoped<IDailyClosureService, DailyClosureService>();
+        services.AddScoped<IPlanillaPdfService, PlanillaPdfService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
         // Register Azure-based strategic AI report service implementation.

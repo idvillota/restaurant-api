@@ -13,13 +13,16 @@ public sealed class DailyClosureService : IDailyClosureService
 {
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IPlanillaPdfService _planillaPdf;
 
     public DailyClosureService(
         ApplicationDbContext db,
-        ICurrentTenantContext tenantContext)
+        ICurrentTenantContext tenantContext,
+        IPlanillaPdfService planillaPdf)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _planillaPdf = planillaPdf;
     }
 
     public async Task<DailyClosureReportDto> GetDailyReportAsync(
@@ -71,6 +74,15 @@ public sealed class DailyClosureService : IDailyClosureService
         var settings = await GetOrCreateTenantSettingsAsync(tenantId, cancellationToken);
         settings.ActiveOperationalBusinessDate = nextBusinessDate;
         await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _planillaPdf.GenerateDailyPlanillaAsync(businessDate, cancellationToken);
+        }
+        catch
+        {
+            // Day is already closed; PDF can be generated on download.
+        }
 
         var report = await BuildDailyReportAsync(tenantId, businessDate, cancellationToken);
         report.NextOperationalBusinessDate = nextBusinessDate;

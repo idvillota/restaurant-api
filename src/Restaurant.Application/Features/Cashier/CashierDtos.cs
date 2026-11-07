@@ -31,6 +31,7 @@ public sealed class CashierShiftSummaryDto
     public decimal? ExpectedCash { get; set; }
     public decimal? CountedCash { get; set; }
     public decimal? CashOverShort { get; set; }
+    public bool HasClosurePdf { get; set; }
 }
 
 public sealed class ShiftPaymentLineDto

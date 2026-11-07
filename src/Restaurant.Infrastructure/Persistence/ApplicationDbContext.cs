@@ -342,6 +342,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.ExpectedCash).HasPrecision(18, 2);
             e.Property(x => x.CountedCash).HasPrecision(18, 2);
             e.Property(x => x.ClosingNotes).HasMaxLength(500);
+            e.Property(x => x.ClosurePdfRelativePath).HasMaxLength(500);
             e.HasIndex(x => new { x.TenantId, x.CashierUserId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.BusinessDate });
         });
@@ -350,6 +351,10 @@ public sealed class ApplicationDbContext : DbContext
         {
             e.HasOne(x => x.ClosedByUser).WithMany().HasForeignKey(x => x.ClosedByUserId);
             e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.PlanillaPdfRelativePath).HasMaxLength(500);
+            e.Property(x => x.PlanillaTotalSales).HasPrecision(18, 2);
+            e.Property(x => x.PlanillaTotalEgresos).HasPrecision(18, 2);
+            e.Property(x => x.PlanillaOverShort).HasPrecision(18, 2);
             e.HasIndex(x => new { x.TenantId, x.BusinessDate }).IsUnique();
         });
 
