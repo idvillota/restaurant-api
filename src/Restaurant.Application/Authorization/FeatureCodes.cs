@@ -32,6 +32,7 @@ public static class FeatureCodes
     public const string ReportsSales = "reports.sales";
     public const string ReportsIngredients = "reports.ingredients";
     public const string ReportsPurchases = "reports.purchases";
+    public const string ReportsEgresos = "reports.egresos";
     public const string ReportsSalesByDate = "reports.sales_by_date";
 
     public static IReadOnlyList<string> All { get; } =
@@ -64,6 +65,7 @@ public static class FeatureCodes
         ReportsSales,
         ReportsIngredients,
         ReportsPurchases,
+        ReportsEgresos,
         ReportsSalesByDate,
     ];
 }

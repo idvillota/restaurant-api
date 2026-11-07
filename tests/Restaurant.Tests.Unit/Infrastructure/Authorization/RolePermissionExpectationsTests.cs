@@ -47,6 +47,7 @@ public sealed class RolePermissionExpectationsTests
         Assert.Contains(FeatureCodes.CashierShifts, permissions);
         Assert.Contains(FeatureCodes.ReportsSales, permissions);
         Assert.Contains(FeatureCodes.ReportsSalesByDate, permissions);
+        Assert.DoesNotContain(FeatureCodes.ReportsEgresos, permissions);
         Assert.DoesNotContain(FeatureCodes.CatalogProducts, permissions);
         Assert.DoesNotContain(FeatureCodes.ReservationsManage, permissions);
         Assert.DoesNotContain(FeatureCodes.OrganizationRoles, permissions);
@@ -66,6 +67,7 @@ public sealed class RolePermissionExpectationsTests
         Assert.Contains(FeatureCodes.CatalogProducts, permissions);
         Assert.Contains(FeatureCodes.SettingsTenant, permissions);
         Assert.Contains(FeatureCodes.OrganizationTeam, permissions);
+        Assert.Contains(FeatureCodes.ReportsEgresos, permissions);
         Assert.DoesNotContain(FeatureCodes.OrganizationRoles, permissions);
         Assert.DoesNotContain(FeatureCodes.ReportsStrategicAi, permissions);
     }

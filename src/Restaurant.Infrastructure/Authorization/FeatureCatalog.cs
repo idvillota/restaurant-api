@@ -36,6 +36,7 @@ public static class FeatureCatalog
         new(Guid.Parse("f1000015-0021-4021-8021-000000000015"), FeatureCodes.ReportsSales, "Reporte de ventas", "Reportes", 175),
         new(Guid.Parse("f1000016-0022-4022-8022-000000000016"), FeatureCodes.ReportsIngredients, "Reporte de ingredientes", "Reportes", 176),
         new(Guid.Parse("f1000017-0023-4023-8023-000000000017"), FeatureCodes.ReportsPurchases, "Reporte de compras", "Reportes", 177),
+        new(Guid.Parse("f1000024-0030-4030-8030-000000000024"), FeatureCodes.ReportsEgresos, "Reporte de egresos", "Reportes", 179),
         new(Guid.Parse("f1000018-0024-4024-8024-000000000018"), FeatureCodes.ReportsSalesByDate, "Ventas por fecha", "Reportes", 178),
     ];
 
@@ -75,6 +76,7 @@ public static class FeatureCatalog
                 FeatureCodes.ReportsSales,
                 FeatureCodes.ReportsIngredients,
                 FeatureCodes.ReportsPurchases,
+                FeatureCodes.ReportsEgresos,
                 FeatureCodes.ReportsSalesByDate,
             ],
             [SystemRoles.Waitress] =

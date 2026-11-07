@@ -111,6 +111,93 @@ public sealed class OperationalReportsServiceTests
     }
 
     [Fact]
+    public async Task GetCashOutflowsReport_lists_all_outflows_and_splits_caja_totals()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        var businessDate = new DateOnly(2026, 11, 7);
+        var providerId = Guid.NewGuid();
+
+        await fx.Db.Tenants.AddAsync(new Tenant
+        {
+            Id = fx.TenantId,
+            Name = "Local prueba",
+            Slug = "local-prueba",
+            TimeZoneId = "America/Bogota",
+            IsActive = true,
+        });
+        await fx.Db.Users.AddAsync(new User
+        {
+            Id = userId,
+            Email = "cajero@test.local",
+            NormalizedEmail = "CAJERO@TEST.LOCAL",
+            PasswordHash = "hash",
+        });
+        await fx.Db.Providers.AddAsync(new Provider
+        {
+            Id = providerId,
+            TenantId = fx.TenantId,
+            Name = "Café del valle",
+            IsActive = true,
+        });
+        fx.Db.CashMovements.AddRange(
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.ProviderPayment,
+                Amount = 40m,
+                Description = "Pago factura",
+                ProviderId = providerId,
+                IsCashDrawerPayment = true,
+                CreatedByUserId = userId,
+                OccurredAtUtc = DateTime.UtcNow,
+            },
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.OtherOutflow,
+                Amount = 10m,
+                Description = "Informativo",
+                IsCashDrawerPayment = false,
+                CreatedByUserId = userId,
+                OccurredAtUtc = DateTime.UtcNow,
+            },
+            new CashMovement
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                BusinessDate = businessDate,
+                MovementType = CashMovementType.AdjustmentIn,
+                Amount = 8m,
+                Description = "No es egreso",
+                IsCashDrawerPayment = true,
+                CreatedByUserId = userId,
+                OccurredAtUtc = DateTime.UtcNow,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
+        var all = await sut.GetCashOutflowsReportAsync(businessDate, businessDate, null, null, null);
+        var cajaOnly = await sut.GetCashOutflowsReportAsync(businessDate, businessDate, null, null, true);
+        var byProvider = await sut.GetCashOutflowsReportAsync(businessDate, businessDate, null, providerId, null);
+
+        Assert.Equal(2, all.TotalCount);
+        Assert.Equal(50m, all.TotalAmount);
+        Assert.Equal(40m, all.TotalCashDrawerAmount);
+        Assert.DoesNotContain(all.Rows, r => r.MovementType == CashMovementType.AdjustmentIn);
+        Assert.Contains(all.Rows, r => r.ProviderName == "Café del valle");
+        Assert.Equal(1, cajaOnly.TotalCount);
+        Assert.Equal(40m, cajaOnly.TotalAmount);
+        Assert.Equal(40m, cajaOnly.TotalCashDrawerAmount);
+        Assert.Equal(1, byProvider.TotalCount);
+        Assert.Equal("Café del valle", byProvider.ProviderName);
+    }
+
+    [Fact]
     public async Task GetDailySummaryReport_groups_sales_and_purchases_by_date()
     {
         using var fx = new TenantDbFixture();

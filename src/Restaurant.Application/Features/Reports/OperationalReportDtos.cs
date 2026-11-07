@@ -1,3 +1,5 @@
+using Restaurant.Domain.Enums;
+
 namespace Restaurant.Application.Features.Reports;
 
 public sealed class SalesReportRowDto
@@ -58,6 +60,34 @@ public sealed class PurchasesReportDto
     public int TotalCount { get; set; }
     public bool IsTruncated { get; set; }
     public IReadOnlyList<PurchasesReportRowDto> Rows { get; set; } = [];
+}
+
+public sealed class CashOutflowsReportRowDto
+{
+    public Guid Id { get; set; }
+    public DateOnly BusinessDate { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
+    public CashMovementType MovementType { get; set; }
+    public decimal Amount { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public string? ProviderName { get; set; }
+    public bool IsCashDrawerPayment { get; set; }
+    public string CashierEmail { get; set; } = string.Empty;
+}
+
+public sealed class CashOutflowsReportDto
+{
+    public string TenantName { get; set; } = string.Empty;
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
+    public string? MovementTypeName { get; set; }
+    public string? ProviderName { get; set; }
+    public bool? IsCashDrawerPayment { get; set; }
+    public int TotalCount { get; set; }
+    public bool IsTruncated { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal TotalCashDrawerAmount { get; set; }
+    public IReadOnlyList<CashOutflowsReportRowDto> Rows { get; set; } = [];
 }
 
 public sealed class DailySummaryReportRowDto

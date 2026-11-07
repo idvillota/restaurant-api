@@ -133,11 +133,12 @@ BEGIN
         ('f1000015-0021-4021-8021-000000000015', 'reports.sales', 'Reporte de ventas', 'Reportes', 175, v_now),
         ('f1000016-0022-4022-8022-000000000016', 'reports.ingredients', 'Reporte de ingredientes', 'Reportes', 176, v_now),
         ('f1000017-0023-4023-8023-000000000017', 'reports.purchases', 'Reporte de compras', 'Reportes', 177, v_now),
+        ('f1000024-0030-4030-8030-000000000024', 'reports.egresos', 'Reporte de egresos', 'Reportes', 179, v_now),
         ('f1000018-0024-4024-8024-000000000018', 'reports.sales_by_date', 'Ventas por fecha', 'Reportes', 178, v_now)
     ON CONFLICT ("Code") DO NOTHING;
 
     SELECT COUNT(*) INTO v_feature_count FROM "Features";
-    IF v_feature_count < 28 THEN
+    IF v_feature_count < 30 THEN
         RAISE EXCEPTION 'Features catalog incomplete (% rows). Run API once or fix seed above.', v_feature_count;
     END IF;
 
@@ -245,7 +246,7 @@ BEGIN
         'inventory.ingredient-movement-types', 'inventory.ingredient-movements', 'catalog.public_menu_qr',
         'settings.tenant', 'procurement.purchases', 'procurement.providers',
         'organization.employees', 'organization.team',
-        'reports.daily_closure', 'reports.sales', 'reports.ingredients', 'reports.purchases', 'reports.sales_by_date'
+        'reports.daily_closure', 'reports.sales', 'reports.ingredients', 'reports.purchases', 'reports.egresos', 'reports.sales_by_date'
     );
 
     INSERT INTO "RoleFeatures" ("Id", "TenantId", "RoleId", "FeatureId", "CreatedAtUtc")

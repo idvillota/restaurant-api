@@ -186,6 +186,91 @@ public sealed class OperationalReportsService : IOperationalReportsService
         };
     }
 
+    public async Task<CashOutflowsReportDto> GetCashOutflowsReportAsync(
+        DateOnly startDate,
+        DateOnly endDate,
+        CashMovementType? movementType,
+        Guid? providerId,
+        bool? isCashDrawerPayment,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateDateRange(startDate, endDate);
+        if (movementType is { } type && !CashMovementKinds.IsOutflow(type))
+            throw new InvalidOperationException("El tipo seleccionado no es un egreso.");
+
+        var tenantId = ResolveTenantId();
+        var tenantName = await GetTenantNameAsync(tenantId, cancellationToken);
+
+        string? movementTypeName = movementType is { } selectedType
+            ? CashOutflowTypeLabel(selectedType)
+            : null;
+
+        string? providerName = null;
+        if (providerId.HasValue)
+        {
+            providerName = await _db.Providers.AsNoTracking()
+                .Where(p => p.TenantId == tenantId && p.Id == providerId.Value)
+                .Select(p => p.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var query = _db.CashMovements
+            .AsNoTracking()
+            .Where(m =>
+                m.TenantId == tenantId
+                && m.BusinessDate >= startDate
+                && m.BusinessDate <= endDate
+                && CashMovementKinds.OutflowTypes.Contains(m.MovementType));
+
+        if (movementType.HasValue)
+            query = query.Where(m => m.MovementType == movementType.Value);
+        if (providerId.HasValue)
+            query = query.Where(m => m.ProviderId == providerId.Value);
+        if (isCashDrawerPayment.HasValue)
+            query = query.Where(m => m.IsCashDrawerPayment == isCashDrawerPayment.Value);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var totalAmount = totalCount == 0
+            ? 0m
+            : await query.SumAsync(m => m.Amount, cancellationToken);
+        var totalCashDrawerAmount = totalCount == 0
+            ? 0m
+            : await query.Where(m => m.IsCashDrawerPayment).SumAsync(m => m.Amount, cancellationToken);
+
+        var rows = await query
+            .OrderByDescending(m => m.BusinessDate)
+            .ThenByDescending(m => m.OccurredAtUtc)
+            .Select(m => new CashOutflowsReportRowDto
+            {
+                Id = m.Id,
+                BusinessDate = m.BusinessDate,
+                OccurredAtUtc = m.OccurredAtUtc,
+                MovementType = m.MovementType,
+                Amount = m.Amount,
+                Description = m.Description,
+                ProviderName = m.Provider != null ? m.Provider.Name : null,
+                IsCashDrawerPayment = m.IsCashDrawerPayment,
+                CashierEmail = m.CreatedByUser.Email,
+            })
+            .Take(MaxRows)
+            .ToListAsync(cancellationToken);
+
+        return new CashOutflowsReportDto
+        {
+            TenantName = tenantName,
+            StartDate = startDate,
+            EndDate = endDate,
+            MovementTypeName = movementTypeName,
+            ProviderName = providerName,
+            IsCashDrawerPayment = isCashDrawerPayment,
+            TotalCount = totalCount,
+            IsTruncated = totalCount > rows.Count,
+            TotalAmount = totalAmount,
+            TotalCashDrawerAmount = totalCashDrawerAmount,
+            Rows = rows,
+        };
+    }
+
     public async Task<DailySummaryReportDto> GetDailySummaryReportAsync(
         DateOnly startDate,
         DateOnly endDate,
@@ -328,6 +413,17 @@ public sealed class OperationalReportsService : IOperationalReportsService
         var endExclusive = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         return (startUtc, endExclusive);
     }
+
+    private static string CashOutflowTypeLabel(CashMovementType type) =>
+        type switch
+        {
+            CashMovementType.ProviderPayment => "Pago a proveedor",
+            CashMovementType.PettyCash => "Caja menor",
+            CashMovementType.Refund => "Devolución",
+            CashMovementType.OtherOutflow => "Otro egreso",
+            CashMovementType.AdjustmentOut => "Ajuste salida",
+            _ => type.ToString(),
+        };
 
     private static void ValidateDateRange(DateOnly startDate, DateOnly endDate)
     {
