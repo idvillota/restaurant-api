@@ -14,15 +14,18 @@ public sealed class CashierShiftService : ICashierShiftService
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IOperationalBusinessDayService _operationalDay;
+    private readonly IPlanillaPdfService _planillaPdf;
 
     public CashierShiftService(
         ApplicationDbContext db,
         ICurrentTenantContext tenantContext,
-        IOperationalBusinessDayService operationalDay)
+        IOperationalBusinessDayService operationalDay,
+        IPlanillaPdfService planillaPdf)
     {
         _db = db;
         _tenantContext = tenantContext;
         _operationalDay = operationalDay;
+        _planillaPdf = planillaPdf;
     }
 
     public async Task<BusinessDayContextDto> GetBusinessDayContextAsync(CancellationToken cancellationToken = default)
@@ -130,6 +133,16 @@ public sealed class CashierShiftService : ICashierShiftService
         shift.Status = CashierShiftStatus.Closed;
         _db.CashierShifts.Update(shift);
         await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _planillaPdf.GenerateShiftPdfAsync(shift.Id, cancellationToken);
+            await _db.Entry(shift).ReloadAsync(cancellationToken);
+        }
+        catch
+        {
+            // Shift is already closed; PDF can be generated on download.
+        }
 
         report.Shift = MapSummary(shift);
         report.Shift.CashOverShort = shift.CountedCash - shift.ExpectedCash;
@@ -395,6 +408,7 @@ public sealed class CashierShiftService : ICashierShiftService
             CashOverShort = shift.ExpectedCash is not null && shift.CountedCash is not null
                 ? shift.CountedCash - shift.ExpectedCash
                 : null,
+            HasClosurePdf = !string.IsNullOrWhiteSpace(shift.ClosurePdfRelativePath),
         };
 
     private static CashMovementDto MapMovement(CashMovement movement, string? providerName = null) =>

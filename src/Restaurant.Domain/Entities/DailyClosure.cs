@@ -11,6 +11,10 @@ public class DailyClosure : EntityBase, ITenantScoped
     public DateTime? ClosedAtUtc { get; set; }
     public Guid? ClosedByUserId { get; set; }
     public string? Notes { get; set; }
+    public string? PlanillaPdfRelativePath { get; set; }
+    public decimal PlanillaTotalSales { get; set; }
+    public decimal PlanillaTotalEgresos { get; set; }
+    public decimal? PlanillaOverShort { get; set; }
 
     public User? ClosedByUser { get; set; }
 }

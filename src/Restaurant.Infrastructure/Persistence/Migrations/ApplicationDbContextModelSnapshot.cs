@@ -296,6 +296,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ClosurePdfRelativePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<decimal?>("CountedCash")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -399,6 +403,22 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PlanillaPdfRelativePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("PlanillaTotalSales")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("PlanillaTotalEgresos")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("PlanillaOverShort")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");

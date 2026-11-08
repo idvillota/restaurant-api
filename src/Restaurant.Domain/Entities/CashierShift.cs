@@ -15,6 +15,7 @@ public class CashierShift : EntityBase, ITenantScoped
     public decimal? ExpectedCash { get; set; }
     public decimal? CountedCash { get; set; }
     public string? ClosingNotes { get; set; }
+    public string? ClosurePdfRelativePath { get; set; }
 
     public User CashierUser { get; set; } = null!;
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();

@@ -3,6 +3,7 @@ using Restaurant.Api.Authorization;
 using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Reports;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Api.Controllers;
 
@@ -76,6 +77,33 @@ public sealed class OperationalReportsController : ControllerBase
                 endDate,
                 ingredientId,
                 providerId,
+                cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("egresos")]
+    [RequireFeature(FeatureCodes.ReportsEgresos)]
+    [ProducesResponseType(typeof(CashOutflowsReportDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<CashOutflowsReportDto>> GetEgresos(
+        [FromQuery] DateOnly startDate,
+        [FromQuery] DateOnly endDate,
+        [FromQuery] CashMovementType? movementType,
+        [FromQuery] Guid? providerId,
+        [FromQuery] bool? isCashDrawerPayment,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _reports.GetCashOutflowsReportAsync(
+                startDate,
+                endDate,
+                movementType,
+                providerId,
+                isCashDrawerPayment,
                 cancellationToken));
         }
         catch (InvalidOperationException ex)

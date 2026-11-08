@@ -45,7 +45,7 @@ public sealed class CashierShiftServiceTests
         await SeedTenantUserAsync(fx, userId, "cashier@test.local");
 
         var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
-        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
         var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
 
         Assert.Equal("cashier@test.local", shift.CashierEmail);
@@ -62,7 +62,7 @@ public sealed class CashierShiftServiceTests
         await SeedTenantUserAsync(fx, userId, "cashier@test.local");
 
         var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
-        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
         await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 50m });
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -93,7 +93,7 @@ public sealed class CashierShiftServiceTests
         await fx.Db.SaveChangesAsync();
 
         var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
-        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
         await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 50m });
 
         var movement = await sut.RecordCashMovementAsync(new CreateCashMovementDto
@@ -127,7 +127,7 @@ public sealed class CashierShiftServiceTests
         await SeedTenantUserAsync(fx, userId, "cashier@test.local");
 
         var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
-        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
         var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
 
         await sut.RecordCashMovementAsync(new CreateCashMovementDto
@@ -192,7 +192,7 @@ public sealed class CashierShiftServiceTests
         await fx.Db.SaveChangesAsync();
 
         var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
-        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
         var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 0m });
 
         var customerId = Guid.NewGuid();

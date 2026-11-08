@@ -37,8 +37,8 @@ public sealed class DailyClosureAdvanceDayTests
         var expectedNext = businessDate.AddDays(1);
 
         var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
-        var cashierShifts = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay);
-        var dailyClosure = new DailyClosureService(fx.Db, fx.TenantContext);
+        var cashierShifts = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var dailyClosure = new DailyClosureService(fx.Db, fx.TenantContext, new NoopPlanillaPdfService());
 
         var report = await dailyClosure.CloseDailyAsync(
             businessDate,

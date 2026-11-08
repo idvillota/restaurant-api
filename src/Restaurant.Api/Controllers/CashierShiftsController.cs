@@ -12,11 +12,16 @@ public sealed class CashierShiftsController : ControllerBase
 {
     private readonly ICashierShiftService _service;
     private readonly IDailyClosureService _dailyClosure;
+    private readonly IPlanillaPdfService _planillas;
 
-    public CashierShiftsController(ICashierShiftService service, IDailyClosureService dailyClosure)
+    public CashierShiftsController(
+        ICashierShiftService service,
+        IDailyClosureService dailyClosure,
+        IPlanillaPdfService planillas)
     {
         _service = service;
         _dailyClosure = dailyClosure;
+        _planillas = planillas;
     }
 
     [HttpGet("context")]
@@ -60,6 +65,17 @@ public sealed class CashierShiftsController : ControllerBase
     [RequireFeature(FeatureCodes.CashierShifts)]
     public Task<ActionResult<CashierShiftReportDto>> GetReport(Guid id, CancellationToken cancellationToken) =>
         OkResult(_service.GetShiftReportAsync(id, cancellationToken));
+
+    [HttpGet("{id:guid}/pdf")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
+    public async Task<IActionResult> DownloadClosurePdf(Guid id, CancellationToken cancellationToken)
+    {
+        var file = await _planillas.OpenShiftPdfAsync(id, cancellationToken);
+        if (file is null)
+            return NotFound();
+
+        return File(file.Stream, "application/pdf", $"cierre-turno-{id:N}.pdf");
+    }
 
     [HttpPost("open")]
     [RequireFeature(FeatureCodes.CashierShifts)]
