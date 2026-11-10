@@ -19,4 +19,9 @@ public interface ITenantUserInviteService
         Guid tenantUserId,
         bool isActive,
         CancellationToken cancellationToken = default);
+
+    Task<TenantUserMemberDto> UpdateProfileAsync(
+        Guid tenantUserId,
+        UpdateTenantUserProfileDto dto,
+        CancellationToken cancellationToken = default);
 }

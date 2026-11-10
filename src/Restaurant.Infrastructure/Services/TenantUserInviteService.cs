@@ -237,6 +237,52 @@ public sealed class TenantUserInviteService : ITenantUserInviteService
         return ToMemberDto(membership);
     }
 
+    public async Task<TenantUserMemberDto> UpdateProfileAsync(
+        Guid tenantUserId,
+        UpdateTenantUserProfileDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureTenant();
+
+        var actorUserId = _tenantContext.UserId;
+        if (actorUserId is null || actorUserId == Guid.Empty)
+            throw new InvalidOperationException("Current user is not available.");
+
+        var membership = await _unitOfWork.Repository<TenantUser>().Query()
+            .Include(tu => tu.User)
+            .Include(tu => tu.TenantUserRoles).ThenInclude(tur => tur.Role)
+            .FirstOrDefaultAsync(tu => tu.Id == tenantUserId, cancellationToken)
+            ?? throw new InvalidOperationException("User was not found in this tenant.");
+
+        var email = dto.Email.Trim();
+        var normalizedEmail = email.ToUpperInvariant();
+        var passwordSet = !string.IsNullOrWhiteSpace(dto.Password);
+        var emailChanged = !string.Equals(membership.User.NormalizedEmail, normalizedEmail, StringComparison.Ordinal);
+
+        if (membership.UserId == actorUserId.Value && (emailChanged || passwordSet))
+            throw new InvalidOperationException("You cannot change your own email or password.");
+
+        if (emailChanged)
+        {
+            var taken = await _unitOfWork.Repository<User>().Query()
+                .AnyAsync(u => u.NormalizedEmail == normalizedEmail && u.Id != membership.UserId, cancellationToken);
+            if (taken)
+                throw new InvalidOperationException("Email is already registered.");
+
+            membership.User.NormalizedEmail = normalizedEmail;
+        }
+
+        membership.User.Email = email;
+
+        membership.User.DisplayName = string.IsNullOrWhiteSpace(dto.DisplayName) ? null : dto.DisplayName.Trim();
+
+        if (passwordSet)
+            membership.User.PasswordHash = _passwordHasher.Hash(dto.Password!.Trim());
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return ToMemberDto(membership);
+    }
+
     private async Task<InvitedTenantUserDto> ReactivateMembershipAsync(
         TenantUser membership,
         Guid roleId,

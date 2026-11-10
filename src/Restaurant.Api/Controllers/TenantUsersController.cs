@@ -85,4 +85,27 @@ public sealed class TenantUsersController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>Updates display name, login email, and optionally password for this member's global user.</summary>
+    [HttpPut("{tenantUserId:guid}/profile")]
+    public async Task<ActionResult<TenantUserMemberDto>> UpdateProfile(
+        Guid tenantUserId,
+        [FromBody] UpdateTenantUserProfileDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var result = await _inviteService.UpdateProfileAsync(tenantUserId, dto, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (ex.Message.Contains("already", StringComparison.OrdinalIgnoreCase))
+                return Conflict(new { message = ex.Message });
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

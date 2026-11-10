@@ -146,4 +146,42 @@ public sealed class TenantUsersControllerTests
         var body = Assert.IsType<TenantUserMemberDto>(ok.Value);
         Assert.False(body.IsActive);
     }
+
+    [Fact]
+    public async Task UpdateProfile_returns_ok()
+    {
+        var tenantUserId = Guid.NewGuid();
+        var dto = new TenantUserMemberDto
+        {
+            UserId = Guid.NewGuid(),
+            TenantUserId = tenantUserId,
+            Email = "new@example.com",
+            DisplayName = "Juan",
+            Role = "Waitress",
+            IsActive = true,
+        };
+        _service.Setup(s => s.UpdateProfileAsync(tenantUserId, It.IsAny<UpdateTenantUserProfileDto>(), default))
+            .ReturnsAsync(dto);
+
+        var result = await _controller.UpdateProfile(
+            tenantUserId,
+            new UpdateTenantUserProfileDto { Email = "new@example.com", DisplayName = "Juan" });
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var body = Assert.IsType<TenantUserMemberDto>(ok.Value);
+        Assert.Equal("new@example.com", body.Email);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_returns_conflict_when_email_taken()
+    {
+        _service.Setup(s => s.UpdateProfileAsync(It.IsAny<Guid>(), It.IsAny<UpdateTenantUserProfileDto>(), default))
+            .ThrowsAsync(new InvalidOperationException("Email is already registered."));
+
+        var result = await _controller.UpdateProfile(
+            Guid.NewGuid(),
+            new UpdateTenantUserProfileDto { Email = "taken@example.com" });
+
+        Assert.IsType<ConflictObjectResult>(result.Result);
+    }
 }

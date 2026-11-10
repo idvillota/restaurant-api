@@ -55,3 +55,19 @@ public sealed class SetTenantUserActiveDto
 {
     public bool IsActive { get; set; }
 }
+
+public sealed class UpdateTenantUserProfileDto
+{
+    [Required]
+    [EmailAddress]
+    [MaxLength(320)]
+    public string Email { get; set; } = string.Empty;
+
+    [MaxLength(200)]
+    public string? DisplayName { get; set; }
+
+    /// <summary>When omitted or blank, the current password is kept. Minimum 8 characters when set.</summary>
+    [MinLength(8)]
+    [MaxLength(200)]
+    public string? Password { get; set; }
+}

@@ -406,6 +406,101 @@ public sealed class TenantUserInviteServiceTests
         Assert.Single(roles);
     }
 
+    [Fact]
+    public async Task UpdateProfileAsync_updates_name_email_and_password()
+    {
+        using var fx = new TenantDbFixture();
+        await SeedTenantWithRolesAsync(fx);
+        var hasher = new BcryptPasswordHasher();
+        var actor = await SeedMemberAsync(fx, "admin@example.com", SystemRoles.Administrator);
+        var target = await SeedMemberAsync(fx, "john@example.com", SystemRoles.Waitress, "John");
+        fx.TenantContext.UserId = actor.User.Id;
+        var sut = CreateSut(fx);
+
+        var result = await sut.UpdateProfileAsync(
+            target.Membership.Id,
+            new UpdateTenantUserProfileDto
+            {
+                Email = "john.n@example.com",
+                DisplayName = "Juan",
+                Password = "NewPass12",
+            });
+
+        Assert.Equal("john.n@example.com", result.Email);
+        Assert.Equal("Juan", result.DisplayName);
+        Assert.Equal(SystemRoles.Waitress, result.Role);
+        var stored = await fx.Db.Users.AsNoTracking().SingleAsync(u => u.Id == target.User.Id);
+        Assert.Equal("JOHN.N@EXAMPLE.COM", stored.NormalizedEmail);
+        Assert.True(hasher.Verify("NewPass12", stored.PasswordHash));
+    }
+
+    [Fact]
+    public async Task UpdateProfileAsync_keeps_password_when_blank()
+    {
+        using var fx = new TenantDbFixture();
+        await SeedTenantWithRolesAsync(fx);
+        var actor = await SeedMemberAsync(fx, "admin@example.com", SystemRoles.Administrator);
+        var target = await SeedMemberAsync(fx, "john@example.com", SystemRoles.Waitress);
+        var previousHash = target.User.PasswordHash;
+        fx.TenantContext.UserId = actor.User.Id;
+        var sut = CreateSut(fx);
+
+        await sut.UpdateProfileAsync(
+            target.Membership.Id,
+            new UpdateTenantUserProfileDto { Email = "john@example.com", DisplayName = "John" });
+
+        var stored = await fx.Db.Users.AsNoTracking().SingleAsync(u => u.Id == target.User.Id);
+        Assert.Equal(previousHash, stored.PasswordHash);
+        Assert.Equal("John", stored.DisplayName);
+    }
+
+    [Fact]
+    public async Task UpdateProfileAsync_throws_when_email_taken()
+    {
+        using var fx = new TenantDbFixture();
+        await SeedTenantWithRolesAsync(fx);
+        var actor = await SeedMemberAsync(fx, "admin@example.com", SystemRoles.Administrator);
+        var target = await SeedMemberAsync(fx, "john@example.com", SystemRoles.Waitress);
+        await SeedMemberAsync(fx, "taken@example.com", SystemRoles.Cashier);
+        fx.TenantContext.UserId = actor.User.Id;
+        var sut = CreateSut(fx);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.UpdateProfileAsync(
+                target.Membership.Id,
+                new UpdateTenantUserProfileDto { Email = "taken@example.com" }));
+        Assert.Contains("already", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateProfileAsync_allows_own_name_but_not_own_email_or_password()
+    {
+        using var fx = new TenantDbFixture();
+        await SeedTenantWithRolesAsync(fx);
+        var actor = await SeedMemberAsync(fx, "admin@example.com", SystemRoles.Administrator, "Admin");
+        fx.TenantContext.UserId = actor.User.Id;
+        var sut = CreateSut(fx);
+
+        var renamed = await sut.UpdateProfileAsync(
+            actor.Membership.Id,
+            new UpdateTenantUserProfileDto { Email = "admin@example.com", DisplayName = "Dueño" });
+        Assert.Equal("Dueño", renamed.DisplayName);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.UpdateProfileAsync(
+                actor.Membership.Id,
+                new UpdateTenantUserProfileDto { Email = "other@example.com", DisplayName = "Dueño" }));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.UpdateProfileAsync(
+                actor.Membership.Id,
+                new UpdateTenantUserProfileDto
+                {
+                    Email = "admin@example.com",
+                    Password = "NewPass12",
+                }));
+    }
+
     private static async Task<(User User, TenantUser Membership)> SeedMemberAsync(
         TenantDbFixture fx,
         string email,
