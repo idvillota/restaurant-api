@@ -156,6 +156,7 @@ public sealed class ApplicationDbContext : DbContext
         {
             e.HasOne(x => x.ProductType).WithMany(x => x.Products).HasForeignKey(x => x.ProductTypeId);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            e.Property(x => x.ManualCostPrice).HasPrecision(18, 2);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.ImagePath).HasMaxLength(260);
         });

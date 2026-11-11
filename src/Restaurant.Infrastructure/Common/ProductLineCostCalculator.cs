@@ -16,6 +16,21 @@ internal static class ProductLineCostCalculator
             return new Dictionary<Guid, decimal>();
 
         var productIds = lines.Select(l => l.ProductId).Distinct().ToList();
+
+        if (!await ProductCostCalculator.IsInventoryEnabledAsync(db, cancellationToken))
+        {
+            var manuals = await ProductCostCalculator.GetManualCostPricesByProductIdsAsync(
+                db, productIds, cancellationToken);
+            var manualResult = new Dictionary<Guid, decimal>(lines.Count);
+            foreach (var line in lines)
+            {
+                var unitCost = manuals.GetValueOrDefault(line.ProductId);
+                manualResult[line.LineId] = decimal.Round(unitCost, 2, MidpointRounding.AwayFromZero);
+            }
+
+            return manualResult;
+        }
+
         var snapshots = await ProductInventoryExpansion.LoadCompositionSnapshotsAsync(db, productIds, cancellationToken);
 
         var ingredientIds = CollectIngredientIds(snapshots.Values);

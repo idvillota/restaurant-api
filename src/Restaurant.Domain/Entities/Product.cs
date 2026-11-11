@@ -12,6 +12,8 @@ public class Product : EntityBase, ITenantScoped
     public string? Description { get; set; }
     public string? ImagePath { get; set; }
     public decimal UnitPrice { get; set; }
+    /// <summary>Used as product cost when tenant inventory is off. Ignored for COGS while inventory is on.</summary>
+    public decimal ManualCostPrice { get; set; }
     public bool IsActive { get; set; } = true;
 
     public ProductType ProductType { get; set; } = null!;

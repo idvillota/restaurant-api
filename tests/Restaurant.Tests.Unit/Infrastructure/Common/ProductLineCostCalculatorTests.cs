@@ -134,4 +134,64 @@ public sealed class ProductLineCostCalculatorTests
 
         Assert.Equal(2m, costs[lineId]);
     }
+
+    [Fact]
+    public async Task ComputeUnitCostsAsync_uses_manual_cost_when_inventory_disabled()
+    {
+        using var fx = new TenantDbFixture();
+        var categoryId = Guid.NewGuid();
+        fx.Db.IngredientCategories.Add(
+            new IngredientCategory { Id = categoryId, TenantId = fx.TenantId, Name = "Base", IsActive = true });
+
+        var flourId = Guid.NewGuid();
+        fx.Db.Ingredients.Add(
+            new Ingredient
+            {
+                Id = flourId,
+                TenantId = fx.TenantId,
+                IngredientCategoryId = categoryId,
+                Name = "Harina",
+                Unit = IngredientUnit.Gram,
+                UnitCost = 2m,
+                IsActive = true,
+            });
+
+        var typeId = Guid.NewGuid();
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Pizza", IsActive = true });
+
+        var productId = Guid.NewGuid();
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Margarita",
+                CompositionType = EProductType.Prepared,
+                UnitPrice = 20m,
+                ManualCostPrice = 7.4m,
+                IsActive = true,
+            });
+        fx.Db.ProductIngredients.Add(
+            new ProductIngredient
+            {
+                Id = Guid.NewGuid(),
+                TenantId = fx.TenantId,
+                ProductId = productId,
+                IngredientId = flourId,
+                Quantity = 1m,
+            });
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, InventoryEnabled = false });
+        await fx.Db.SaveChangesAsync();
+
+        var lineId = Guid.NewGuid();
+        var costs = await ProductLineCostCalculator.ComputeUnitCostsAsync(
+            fx.Db,
+            [new ProductLineCostCalculator.LineCostSpec(lineId, productId, [])],
+            CancellationToken.None);
+
+        Assert.Equal(7.4m, costs[lineId]);
+    }
 }
