@@ -118,6 +118,24 @@ public sealed class CashierShiftsController : ControllerBase
         }
     }
 
+    [HttpPost("{id:guid}/force-close")]
+    [RequireFeature(FeatureCodes.ReportsDailyClosure)]
+    public async Task<ActionResult<CashierShiftReportDto>> ForceClose(
+        Guid id,
+        [FromBody] ForceCloseCashierShiftDto? dto,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var report = await _service.ForceCloseShiftAsync(id, dto?.Notes, cancellationToken);
+            return Ok(report);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("cash-movements")]
     [RequireFeature(FeatureCodes.CashierShifts)]
     public async Task<ActionResult<CashMovementDto>> RecordMovement(

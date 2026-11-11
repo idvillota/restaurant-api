@@ -1853,6 +1853,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<bool>("SeparateVitrinaCafeSales")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("RequirePriorDayCloseBeforeNewShift")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("TaxId")
                         .IsRequired()
                         .HasMaxLength(40)
