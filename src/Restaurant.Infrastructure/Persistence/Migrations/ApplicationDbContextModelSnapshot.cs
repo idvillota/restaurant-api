@@ -1910,6 +1910,42 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.ToTable("TenantUsers");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.TenantUserProductFavorite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "TenantUserId", "SortOrder");
+
+                    b.HasIndex("TenantUserId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("TenantUserProductFavorites");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.TenantUserRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2437,6 +2473,25 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Role");
+
+                    b.Navigation("TenantUser");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.TenantUserProductFavorite", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.TenantUser", "TenantUser")
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
 
                     b.Navigation("TenantUser");
                 });
