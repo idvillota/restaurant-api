@@ -39,6 +39,12 @@ public sealed class TenantSettingsDto
     /// <summary>When true, cierre splits Vitrina Café out of general ventas.</summary>
     public bool SeparateVitrinaCafeSales { get; set; }
 
+    /// <summary>
+    /// When true, a cashier cannot open a shift on a new operational day until prior days with activity are closed.
+    /// Default false.
+    /// </summary>
+    public bool RequirePriorDayCloseBeforeNewShift { get; set; }
+
     public string? BreBKey { get; set; }
 
     public int? BreBKeyType { get; set; }
@@ -110,6 +116,8 @@ public sealed class UpdateTenantSettingsDto
     public int KitchenTicketPrintMode { get; set; }
 
     public bool SeparateVitrinaCafeSales { get; set; }
+
+    public bool RequirePriorDayCloseBeforeNewShift { get; set; }
 
     [MaxLength(40)]
     public string? BreBKey { get; set; }

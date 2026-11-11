@@ -6,6 +6,19 @@ namespace Restaurant.Infrastructure.Common;
 
 internal static class ProductCostCalculator
 {
+    /// <summary>Missing settings row is treated as inventory on (safe default for existing tenants).</summary>
+    internal static async Task<bool> IsInventoryEnabledAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var enabled = await db.TenantSettings
+            .AsNoTracking()
+            .Select(s => (bool?)s.InventoryEnabled)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return enabled ?? true;
+    }
+
     internal static async Task<Dictionary<Guid, decimal>> GetCostPricesByProductIdsAsync(
         ApplicationDbContext db,
         IReadOnlyCollection<Guid> productIds,
@@ -13,6 +26,9 @@ internal static class ProductCostCalculator
     {
         if (productIds.Count == 0)
             return new Dictionary<Guid, decimal>();
+
+        if (!await IsInventoryEnabledAsync(db, cancellationToken))
+            return await GetManualCostPricesByProductIdsAsync(db, productIds, cancellationToken);
 
         var compositionByProduct = await db.Products
             .AsNoTracking()
@@ -62,6 +78,20 @@ internal static class ProductCostCalculator
         }
 
         return result;
+    }
+
+    internal static async Task<Dictionary<Guid, decimal>> GetManualCostPricesByProductIdsAsync(
+        ApplicationDbContext db,
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken)
+    {
+        if (productIds.Count == 0)
+            return new Dictionary<Guid, decimal>();
+
+        return await db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.ManualCostPrice, cancellationToken);
     }
 
     private static decimal ComputeLineCost(decimal quantity, decimal? unitCost) =>

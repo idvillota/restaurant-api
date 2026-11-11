@@ -22,6 +22,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Feature> Features => Set<Feature>();
     public DbSet<RoleFeature> RoleFeatures => Set<RoleFeature>();
     public DbSet<TenantUserRole> TenantUserRoles => Set<TenantUserRole>();
+    public DbSet<TenantUserProductFavorite> TenantUserProductFavorites => Set<TenantUserProductFavorite>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
     public DbSet<PrinterStation> PrinterStations => Set<PrinterStation>();
@@ -99,6 +100,14 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.TenantUserId, x.RoleId }).IsUnique();
         });
 
+        modelBuilder.Entity<TenantUserProductFavorite>(e =>
+        {
+            e.HasOne(x => x.TenantUser).WithMany().HasForeignKey(x => x.TenantUserId);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId);
+            e.HasIndex(x => new { x.TenantUserId, x.ProductId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.TenantUserId, x.SortOrder });
+        });
+
         modelBuilder.Entity<Feature>(e =>
         {
             e.HasIndex(x => x.Code).IsUnique();
@@ -147,6 +156,7 @@ public sealed class ApplicationDbContext : DbContext
         {
             e.HasOne(x => x.ProductType).WithMany(x => x.Products).HasForeignKey(x => x.ProductTypeId);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            e.Property(x => x.ManualCostPrice).HasPrecision(18, 2);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.ImagePath).HasMaxLength(260);
         });
@@ -482,6 +492,9 @@ public sealed class ApplicationDbContext : DbContext
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<TenantUserRole>().HasQueryFilter(e =>
+            e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<TenantUserProductFavorite>().HasQueryFilter(e =>
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Employee>().HasQueryFilter(e =>

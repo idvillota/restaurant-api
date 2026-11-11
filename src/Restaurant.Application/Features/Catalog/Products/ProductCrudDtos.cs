@@ -19,6 +19,13 @@ public sealed class CreateProductDto
     [Range(0, double.MaxValue)]
     public decimal UnitPrice { get; set; }
 
+    /// <summary>
+    /// Optional cost when inventory is disabled. Ignored (must be null or 0) while inventory is enabled.
+    /// For combos this is the combo's own cost, not a sum of components.
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal? CostPrice { get; set; }
+
     /// <summary>Required when <see cref="CompositionType"/> is <see cref="EProductType.Resale"/>.</summary>
     public Guid? ResaleIngredientId { get; set; }
 
@@ -44,6 +51,13 @@ public sealed class UpdateProductDto
 
     [Range(0, double.MaxValue)]
     public decimal UnitPrice { get; set; }
+
+    /// <summary>
+    /// Optional cost when inventory is disabled. Ignored (must be null or 0) while inventory is enabled.
+    /// For combos this is the combo's own cost, not a sum of components.
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal? CostPrice { get; set; }
 
     public bool IsActive { get; set; } = true;
 

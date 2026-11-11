@@ -1037,6 +1037,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<decimal>("ManualCostPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1849,6 +1853,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<bool>("SeparateVitrinaCafeSales")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("RequirePriorDayCloseBeforeNewShift")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("TaxId")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -1908,6 +1915,42 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("TenantUsers");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.TenantUserProductFavorite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "TenantUserId", "SortOrder");
+
+                    b.HasIndex("TenantUserId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("TenantUserProductFavorites");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.TenantUserRole", b =>
@@ -2437,6 +2480,25 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Role");
+
+                    b.Navigation("TenantUser");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.TenantUserProductFavorite", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.TenantUser", "TenantUser")
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
 
                     b.Navigation("TenantUser");
                 });

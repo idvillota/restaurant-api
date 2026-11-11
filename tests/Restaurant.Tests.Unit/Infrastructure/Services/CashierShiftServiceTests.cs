@@ -255,4 +255,206 @@ public sealed class CashierShiftServiceTests
         await fx.Db.SaveChangesAsync();
         return sut;
     }
+
+    [Fact]
+    public async Task OpenShiftAsync_allows_unclosed_prior_day_when_setting_is_off()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var today = (await operationalDay.ResolveAsync()).BusinessDate;
+        await AddShiftAsync(fx, userId, today.AddDays(-1), CashierShiftStatus.Closed);
+
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 10m });
+
+        Assert.Equal(today, shift.BusinessDate);
+        var context = await sut.GetBusinessDayContextAsync();
+        Assert.False(context.RequirePriorDayCloseBeforeNewShift);
+        Assert.Null(context.PendingPriorBusinessDate);
+    }
+
+    [Fact]
+    public async Task OpenShiftAsync_blocks_when_prior_activity_day_is_not_closed()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+        await EnablePriorDayCloseAsync(fx);
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var today = (await operationalDay.ResolveAsync()).BusinessDate;
+        var prior = today.AddDays(-1);
+        await AddShiftAsync(fx, userId, prior, CashierShiftStatus.Closed);
+
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 10m }));
+
+        Assert.Contains(prior.ToString("yyyy-MM-dd"), error.Message);
+
+        var context = await sut.GetBusinessDayContextAsync();
+        Assert.True(context.RequirePriorDayCloseBeforeNewShift);
+        Assert.Equal(prior, context.PendingPriorBusinessDate);
+        Assert.Empty(context.PendingPriorOpenShifts);
+    }
+
+    [Fact]
+    public async Task OpenShiftAsync_allows_when_prior_activity_day_is_closed()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+        await EnablePriorDayCloseAsync(fx);
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var today = (await operationalDay.ResolveAsync()).BusinessDate;
+        var prior = today.AddDays(-1);
+        await AddShiftAsync(fx, userId, prior, CashierShiftStatus.Closed);
+        await AddClosedDayAsync(fx, userId, prior);
+
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 10m });
+        Assert.Equal(today, shift.BusinessDate);
+    }
+
+    [Fact]
+    public async Task OpenShiftAsync_ignores_prior_calendar_days_without_activity()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+        await EnablePriorDayCloseAsync(fx);
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 10m });
+        Assert.NotEqual(default, shift.Id);
+    }
+
+    [Fact]
+    public async Task OpenShiftAsync_blocks_oldest_unclosed_activity_date()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+        await EnablePriorDayCloseAsync(fx);
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var today = (await operationalDay.ResolveAsync()).BusinessDate;
+        var oldest = today.AddDays(-2);
+        await AddShiftAsync(fx, userId, oldest, CashierShiftStatus.Closed);
+        await AddShiftAsync(fx, userId, today.AddDays(-1), CashierShiftStatus.Closed);
+
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var context = await sut.GetBusinessDayContextAsync();
+        Assert.Equal(oldest, context.PendingPriorBusinessDate);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.OpenShiftAsync(new OpenCashierShiftDto()));
+        Assert.Contains(oldest.ToString("yyyy-MM-dd"), error.Message);
+    }
+
+    [Fact]
+    public async Task ForceCloseShiftAsync_closes_another_users_open_shift()
+    {
+        using var fx = new TenantDbFixture();
+        var managerId = Guid.NewGuid();
+        var cashierId = Guid.NewGuid();
+        fx.TenantContext.UserId = managerId;
+        await SeedTenantUserAsync(fx, managerId, "manager@test.local");
+        await fx.Db.Users.AddAsync(new User
+        {
+            Id = cashierId,
+            Email = "other@test.local",
+            NormalizedEmail = "OTHER@TEST.LOCAL",
+            PasswordHash = "hash",
+        });
+        await fx.Db.SaveChangesAsync();
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var prior = (await operationalDay.ResolveAsync()).BusinessDate.AddDays(-1);
+        var leftoverId = await AddShiftAsync(fx, cashierId, prior, CashierShiftStatus.Open);
+
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var report = await sut.ForceCloseShiftAsync(leftoverId, "arqueo gerente");
+
+        Assert.Equal(CashierShiftStatus.Closed, report.Shift.Status);
+        Assert.Equal(report.Shift.ExpectedCash, report.Shift.CountedCash);
+        Assert.Equal(0m, report.Shift.CashOverShort);
+        var stored = await fx.Db.CashierShifts.SingleAsync(s => s.Id == leftoverId);
+        Assert.Contains("arqueo gerente", stored.ClosingNotes);
+    }
+
+    [Fact]
+    public async Task GetBusinessDayContext_lists_leftover_open_shifts_on_pending_day()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+        await EnablePriorDayCloseAsync(fx);
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var prior = (await operationalDay.ResolveAsync()).BusinessDate.AddDays(-1);
+        var leftoverId = await AddShiftAsync(fx, userId, prior, CashierShiftStatus.Open);
+
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var context = await sut.GetBusinessDayContextAsync();
+
+        Assert.Equal(prior, context.PendingPriorBusinessDate);
+        Assert.Equal(leftoverId, Assert.Single(context.PendingPriorOpenShifts).Id);
+    }
+
+    private static async Task EnablePriorDayCloseAsync(TenantDbFixture fx)
+    {
+        var settings = await fx.Db.TenantSettings.SingleAsync();
+        settings.RequirePriorDayCloseBeforeNewShift = true;
+        await fx.Db.SaveChangesAsync();
+    }
+
+    private static async Task<Guid> AddShiftAsync(
+        TenantDbFixture fx,
+        Guid cashierUserId,
+        DateOnly businessDate,
+        CashierShiftStatus status)
+    {
+        var id = Guid.NewGuid();
+        fx.Db.CashierShifts.Add(new CashierShift
+        {
+            Id = id,
+            TenantId = fx.TenantId,
+            CashierUserId = cashierUserId,
+            Status = status,
+            BusinessDate = businessDate,
+            OpenedAtUtc = DateTime.UtcNow.AddDays(-1),
+            ClosedAtUtc = status == CashierShiftStatus.Closed ? DateTime.UtcNow.AddHours(-12) : null,
+            OpeningFloat = 50m,
+            ExpectedCash = status == CashierShiftStatus.Closed ? 50m : null,
+            CountedCash = status == CashierShiftStatus.Closed ? 50m : null,
+        });
+        await fx.Db.SaveChangesAsync();
+        return id;
+    }
+
+    private static async Task AddClosedDayAsync(TenantDbFixture fx, Guid userId, DateOnly businessDate)
+    {
+        fx.Db.DailyClosures.Add(new DailyClosure
+        {
+            Id = Guid.NewGuid(),
+            TenantId = fx.TenantId,
+            BusinessDate = businessDate,
+            Status = DailyClosureStatus.Closed,
+            ClosedAtUtc = DateTime.UtcNow.AddHours(-8),
+            ClosedByUserId = userId,
+        });
+        await fx.Db.SaveChangesAsync();
+    }
 }

@@ -5,6 +5,7 @@ using Restaurant.Application.Features.Cashier;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 using Restaurant.Domain.Sales;
+using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -36,6 +37,16 @@ public sealed class CashierShiftService : ICashierShiftService
             cancellationToken);
 
         var myOpen = await GetMyOpenShiftAsync(cancellationToken);
+        var requirePriorClose = await PriorOperationalDayCloseGate.IsEnabledAsync(
+            _db, tenantId, cancellationToken);
+        var pendingPrior = requirePriorClose
+            ? await PriorOperationalDayCloseGate.FindBlockingDateAsync(
+                _db, tenantId, day.BusinessDate, cancellationToken)
+            : null;
+        var pendingOpenShifts = pendingPrior is { } priorDate
+            ? await PriorOperationalDayCloseGate.ListOpenShiftsAsync(
+                _db, tenantId, priorDate, cancellationToken)
+            : [];
 
         return new BusinessDayContextDto
         {
@@ -46,6 +57,9 @@ public sealed class CashierShiftService : ICashierShiftService
             DailyClosureStatus = day.ClosureStatus,
             OpenShiftsCount = openShiftsCount,
             MyOpenShift = myOpen,
+            RequirePriorDayCloseBeforeNewShift = requirePriorClose,
+            PendingPriorBusinessDate = pendingPrior,
+            PendingPriorOpenShifts = pendingOpenShifts,
         };
     }
 
@@ -74,6 +88,11 @@ public sealed class CashierShiftService : ICashierShiftService
         EnsureDayOpen(day);
 
         var businessDate = day.BusinessDate;
+        var blockingDate = await PriorOperationalDayCloseGate.FindBlockingDateAsync(
+            _db, tenantId, businessDate, cancellationToken);
+        if (blockingDate is { } prior)
+            throw new InvalidOperationException(PriorOperationalDayCloseGate.BlockingMessage(prior));
+
         var existing = await _db.CashierShifts.AnyAsync(
             s =>
                 s.TenantId == tenantId &&
@@ -121,32 +140,32 @@ public sealed class CashierShiftService : ICashierShiftService
         if (shift.CashierUserId != userId)
             throw new InvalidOperationException("Only the cashier who opened this shift can close it.");
 
+        return await CompleteCloseShiftAsync(shift, dto.CountedCash, dto.ClosingNotes, cancellationToken);
+    }
+
+    public async Task<CashierShiftReportDto> ForceCloseShiftAsync(
+        Guid shiftId,
+        string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        var (tenantId, _, _) = await ResolveContextAsync(cancellationToken);
+        var shift = await _db.CashierShifts
+            .Include(s => s.CashierUser)
+            .FirstOrDefaultAsync(s => s.Id == shiftId && s.TenantId == tenantId, cancellationToken)
+            ?? throw new InvalidOperationException("Cashier shift was not found.");
+
+        if (shift.Status != CashierShiftStatus.Open)
+            throw new InvalidOperationException("This shift is already closed.");
+
         var report = await BuildShiftReportAsync(shift, cancellationToken);
-        var expectedCash = report.Shift.OpeningFloat + report.TotalsByMethod
-            .Where(t => t.Method == PaymentMethod.Cash)
-            .Sum(t => t.Total) - report.CashOutflowTotal;
+        var expectedCash = ExpectedDrawerCash(report);
+        var forceNote = string.IsNullOrWhiteSpace(notes)
+            ? "Cierre forzado para permitir el cierre del día operativo."
+            : notes.Trim();
+        if (forceNote.Length > 500)
+            forceNote = forceNote[..500];
 
-        shift.ExpectedCash = decimal.Round(expectedCash, 2, MidpointRounding.AwayFromZero);
-        shift.CountedCash = decimal.Round(Math.Max(0, dto.CountedCash), 2, MidpointRounding.AwayFromZero);
-        shift.ClosingNotes = dto.ClosingNotes?.Trim();
-        shift.ClosedAtUtc = DateTime.UtcNow;
-        shift.Status = CashierShiftStatus.Closed;
-        _db.CashierShifts.Update(shift);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        try
-        {
-            await _planillaPdf.GenerateShiftPdfAsync(shift.Id, cancellationToken);
-            await _db.Entry(shift).ReloadAsync(cancellationToken);
-        }
-        catch
-        {
-            // Shift is already closed; PDF can be generated on download.
-        }
-
-        report.Shift = MapSummary(shift);
-        report.Shift.CashOverShort = shift.CountedCash - shift.ExpectedCash;
-        return report;
+        return await CompleteCloseShiftAsync(shift, expectedCash, forceNote, cancellationToken);
     }
 
     public async Task<CashierShiftReportDto> GetShiftReportAsync(
@@ -292,6 +311,43 @@ public sealed class CashierShiftService : ICashierShiftService
 
         return (shift.Id, userId);
     }
+
+    private async Task<CashierShiftReportDto> CompleteCloseShiftAsync(
+        CashierShift shift,
+        decimal countedCash,
+        string? closingNotes,
+        CancellationToken cancellationToken)
+    {
+        var report = await BuildShiftReportAsync(shift, cancellationToken);
+        var expectedCash = ExpectedDrawerCash(report);
+
+        shift.ExpectedCash = decimal.Round(expectedCash, 2, MidpointRounding.AwayFromZero);
+        shift.CountedCash = decimal.Round(Math.Max(0, countedCash), 2, MidpointRounding.AwayFromZero);
+        shift.ClosingNotes = closingNotes?.Trim();
+        shift.ClosedAtUtc = DateTime.UtcNow;
+        shift.Status = CashierShiftStatus.Closed;
+        _db.CashierShifts.Update(shift);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _planillaPdf.GenerateShiftPdfAsync(shift.Id, cancellationToken);
+            await _db.Entry(shift).ReloadAsync(cancellationToken);
+        }
+        catch
+        {
+            // Shift is already closed; PDF can be generated on download.
+        }
+
+        report.Shift = MapSummary(shift);
+        report.Shift.CashOverShort = shift.CountedCash - shift.ExpectedCash;
+        return report;
+    }
+
+    private static decimal ExpectedDrawerCash(CashierShiftReportDto report) =>
+        report.Shift.OpeningFloat
+        + report.TotalsByMethod.Where(t => t.Method == PaymentMethod.Cash).Sum(t => t.Total)
+        - report.CashOutflowTotal;
 
     private async Task<CashierShiftReportDto> BuildShiftReportAsync(
         CashierShift shift,

@@ -18,6 +18,12 @@ public sealed class CloseCashierShiftDto
     public string? ClosingNotes { get; set; }
 }
 
+public sealed class ForceCloseCashierShiftDto
+{
+    [MaxLength(500)]
+    public string? Notes { get; set; }
+}
+
 public sealed class CashierShiftSummaryDto
 {
     public Guid Id { get; set; }
@@ -160,6 +166,15 @@ public sealed class CloseDailyClosureDto
     public string? Notes { get; set; }
 }
 
+public sealed class PendingPriorOpenShiftDto
+{
+    public Guid Id { get; set; }
+    public Guid CashierUserId { get; set; }
+    public string CashierEmail { get; set; } = string.Empty;
+    public DateTime OpenedAtUtc { get; set; }
+    public decimal OpeningFloat { get; set; }
+}
+
 public sealed class BusinessDayContextDto
 {
     public DateOnly BusinessDate { get; set; }
@@ -170,4 +185,12 @@ public sealed class BusinessDayContextDto
     public DailyClosureStatus DailyClosureStatus { get; set; }
     public int OpenShiftsCount { get; set; }
     public CashierShiftSummaryDto? MyOpenShift { get; set; }
+
+    /// <summary>When true, opening a shift on a new day is blocked until prior activity dates are closed.</summary>
+    public bool RequirePriorDayCloseBeforeNewShift { get; set; }
+
+    /// <summary>Oldest prior operational date with activity that is still Open. Null if none or the setting is off.</summary>
+    public DateOnly? PendingPriorBusinessDate { get; set; }
+
+    public IReadOnlyList<PendingPriorOpenShiftDto> PendingPriorOpenShifts { get; set; } = [];
 }

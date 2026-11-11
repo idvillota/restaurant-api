@@ -457,6 +457,58 @@ public sealed class ProductServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_persists_manual_cost_when_inventory_disabled()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
+        fx.Db.TenantSettings.Add(
+            new TenantSettings { TenantId = fx.TenantId, InventoryEnabled = false });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        var created = await sut.CreateAsync(
+            new CreateProductDto
+            {
+                ProductTypeId = typeId,
+                Name = "Burger",
+                CompositionType = EProductType.Prepared,
+                UnitPrice = 18m,
+                CostPrice = 6.5m,
+            });
+
+        Assert.Equal(6.5m, created.CostPrice);
+        var stored = await fx.Db.Products.AsNoTracking().SingleAsync(p => p.Id == created.Id);
+        Assert.Equal(6.5m, stored.ManualCostPrice);
+
+        var list = await sut.ListAsync(new ListQuery());
+        Assert.Equal(6.5m, list.Items.Single(p => p.Id == created.Id).CostPrice);
+    }
+
+    [Fact]
+    public async Task CreateAsync_rejects_posted_cost_when_inventory_enabled()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = CreateSut(fx);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.CreateAsync(
+                new CreateProductDto
+                {
+                    ProductTypeId = typeId,
+                    Name = "Burger",
+                    CompositionType = EProductType.Prepared,
+                    UnitPrice = 18m,
+                    CostPrice = 6.5m,
+                }));
+    }
+
+    [Fact]
     public async Task SetRecipeAsync_allows_empty_when_inventory_disabled()
     {
         using var fx = new TenantDbFixture();

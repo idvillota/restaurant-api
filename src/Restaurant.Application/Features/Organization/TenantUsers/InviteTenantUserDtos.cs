@@ -32,3 +32,42 @@ public sealed class InvitedTenantUserDto
     public string Email { get; set; } = string.Empty;
     public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
 }
+
+public sealed class TenantUserMemberDto
+{
+    public Guid UserId { get; set; }
+    public Guid TenantUserId { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string Role { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+}
+
+public sealed class ChangeTenantUserRoleDto
+{
+    /// <summary>Manager, Waitress, or Cashier. Replaces any existing roles with this single role.</summary>
+    [Required]
+    [RegularExpression("^(Manager|Waitress|Cashier|Staff)$", ErrorMessage = "Role must be Manager, Waitress, or Cashier.")]
+    public string Role { get; set; } = string.Empty;
+}
+
+public sealed class SetTenantUserActiveDto
+{
+    public bool IsActive { get; set; }
+}
+
+public sealed class UpdateTenantUserProfileDto
+{
+    [Required]
+    [EmailAddress]
+    [MaxLength(320)]
+    public string Email { get; set; } = string.Empty;
+
+    [MaxLength(200)]
+    public string? DisplayName { get; set; }
+
+    /// <summary>When omitted or blank, the current password is kept. Minimum 8 characters when set.</summary>
+    [MinLength(8)]
+    [MaxLength(200)]
+    public string? Password { get; set; }
+}

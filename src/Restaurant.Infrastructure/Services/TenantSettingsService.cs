@@ -58,6 +58,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.AutoGeneratePurchaseBillNumbers = dto.AutoGeneratePurchaseBillNumbers;
         settings.KitchenTicketPrintMode = NormalizePrintMode(dto.KitchenTicketPrintMode);
         settings.SeparateVitrinaCafeSales = dto.SeparateVitrinaCafeSales;
+        settings.RequirePriorDayCloseBeforeNewShift = dto.RequirePriorDayCloseBeforeNewShift;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
@@ -146,6 +147,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             AutoGeneratePurchaseBillNumbers = settings.AutoGeneratePurchaseBillNumbers,
             KitchenTicketPrintMode = (int)settings.KitchenTicketPrintMode,
             SeparateVitrinaCafeSales = settings.SeparateVitrinaCafeSales,
+            RequirePriorDayCloseBeforeNewShift = settings.RequirePriorDayCloseBeforeNewShift,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

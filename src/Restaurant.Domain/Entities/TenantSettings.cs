@@ -71,5 +71,11 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool SeparateVitrinaCafeSales { get; set; }
 
+    /// <summary>
+    /// When true, opening a cashier shift on a new operational day requires every prior
+    /// date that had cashier activity to be Closed. Default false (manual close only).
+    /// </summary>
+    public bool RequirePriorDayCloseBeforeNewShift { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }

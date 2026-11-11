@@ -8,6 +8,7 @@ public interface ICashierShiftService
     Task<CashierShiftSummaryDto?> GetMyOpenShiftAsync(CancellationToken cancellationToken = default);
     Task<CashierShiftSummaryDto> OpenShiftAsync(OpenCashierShiftDto dto, CancellationToken cancellationToken = default);
     Task<CashierShiftReportDto> CloseShiftAsync(Guid shiftId, CloseCashierShiftDto dto, CancellationToken cancellationToken = default);
+    Task<CashierShiftReportDto> ForceCloseShiftAsync(Guid shiftId, string? notes, CancellationToken cancellationToken = default);
     Task<CashierShiftReportDto> GetShiftReportAsync(Guid shiftId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CashierShiftSummaryDto>> ListShiftsAsync(DateOnly? businessDate, CancellationToken cancellationToken = default);
     Task<CashMovementDto> RecordCashMovementAsync(CreateCashMovementDto dto, CancellationToken cancellationToken = default);
