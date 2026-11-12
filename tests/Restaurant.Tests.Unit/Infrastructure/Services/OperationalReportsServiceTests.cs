@@ -272,7 +272,7 @@ public sealed class OperationalReportsServiceTests
     }
 
     [Fact]
-    public async Task GetDailySummaryReport_includes_outflow_only_days_and_skips_adjustment_in()
+    public async Task GetDailySummaryReport_includes_outflow_only_days_and_adds_adjustment_in_to_net()
     {
         using var fx = new TenantDbFixture();
         var hasher = new BcryptPasswordHasher();
@@ -310,7 +310,9 @@ public sealed class OperationalReportsServiceTests
         var row = Assert.Single(report.Rows, r => r.Date == businessDate && r.TotalCashOutflows == 25000m);
 
         Assert.Equal(1, row.CashOutflowCount);
-        Assert.Equal(row.TotalSales - row.TotalPurchases - 25000m, row.NetResult);
+        Assert.Equal(8000m, row.TotalCashInflows);
+        Assert.Equal(1, row.CashInflowCount);
+        Assert.Equal(row.TotalSales - row.TotalPurchases - 25000m + 8000m, row.NetResult);
     }
 
     [Fact]

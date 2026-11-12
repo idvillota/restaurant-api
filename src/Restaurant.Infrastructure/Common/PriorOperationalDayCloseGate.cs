@@ -43,7 +43,10 @@ internal static class PriorOperationalDayCloseGate
 
         var movementDates = await db.CashMovements
             .AsNoTracking()
-            .Where(m => m.TenantId == tenantId && m.BusinessDate < currentBusinessDate)
+            .Where(m =>
+                m.TenantId == tenantId
+                && m.BusinessDate < currentBusinessDate
+                && m.VoidedAtUtc == null)
             .Select(m => m.BusinessDate)
             .Distinct()
             .ToListAsync(cancellationToken);

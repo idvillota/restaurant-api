@@ -24,8 +24,15 @@ public class CashMovement : EntityBase, ITenantScoped
     public Guid CreatedByUserId { get; set; }
     public DateTime OccurredAtUtc { get; set; }
 
+    public DateTime? VoidedAtUtc { get; set; }
+    public Guid? VoidedByUserId { get; set; }
+    public string? VoidReason { get; set; }
+
+    public bool IsVoided => VoidedAtUtc is not null;
+
     public CashierShift? CashierShift { get; set; }
     public Purchase? Purchase { get; set; }
     public Provider? Provider { get; set; }
     public User CreatedByUser { get; set; } = null!;
+    public User? VoidedByUser { get; set; }
 }

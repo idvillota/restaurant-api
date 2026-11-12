@@ -17,4 +17,7 @@ public static class CashMovementKinds
             or CashMovementType.Refund
             or CashMovementType.OtherOutflow
             or CashMovementType.AdjustmentOut;
+
+    public static bool IsInflow(CashMovementType type) =>
+        type is CashMovementType.AdjustmentIn;
 }

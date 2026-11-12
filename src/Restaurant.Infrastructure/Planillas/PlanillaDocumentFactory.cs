@@ -16,6 +16,7 @@ internal static class PlanillaDocumentFactory
     {
         var dayPayments = shifts.SelectMany(s => s.Payments).ToList();
         var dayOutflows = shifts.SelectMany(s => s.Outflows).ToList();
+        var dayInflows = shifts.SelectMany(s => s.Inflows).ToList();
         var dayLines = shifts.SelectMany(s => s.BillLines).ToList();
 
         var collected = dayPayments.Sum(p => p.Amount);
@@ -46,6 +47,7 @@ internal static class PlanillaDocumentFactory
             PaymentsByMethod = GroupPayments(dayPayments),
             EgresosByType = GroupEgresos(dayOutflows),
             TotalEgresos = dayOutflows.Sum(o => o.Amount),
+            TotalAjustesEntrada = dayInflows.Sum(i => i.Amount),
             TotalPurchasesPaid = dayOutflows.Where(o => o.PurchaseId is not null).Sum(o => o.Amount),
             OverShort = overShort,
             DayNotes = dayNotes,
@@ -78,6 +80,7 @@ internal static class PlanillaDocumentFactory
             TotalSales = sales,
             VitrinaCafeSales = vitrinaSales,
             TotalEgresos = shift.Outflows.Sum(o => o.Amount),
+            TotalAjustesEntrada = shift.Inflows.Sum(i => i.Amount),
             TotalPurchasesPaid = shift.Outflows.Where(o => o.PurchaseId is not null).Sum(o => o.Amount),
         };
     }
@@ -154,6 +157,7 @@ internal sealed class PlanillaShiftInput
     public string? Notes { get; init; }
     public IReadOnlyList<PlanillaPaymentInput> Payments { get; init; } = [];
     public IReadOnlyList<PlanillaOutflowInput> Outflows { get; init; } = [];
+    public IReadOnlyList<PlanillaInflowInput> Inflows { get; init; } = [];
     public IReadOnlyList<PlanillaBillLineInput> BillLines { get; init; } = [];
 }
 
@@ -169,6 +173,11 @@ internal sealed class PlanillaOutflowInput
     public CashMovementType MovementType { get; init; }
     public decimal Amount { get; init; }
     public Guid? PurchaseId { get; init; }
+}
+
+internal sealed class PlanillaInflowInput
+{
+    public decimal Amount { get; init; }
 }
 
 internal sealed class PlanillaBillLineInput

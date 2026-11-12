@@ -262,6 +262,16 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("VoidedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CashierShiftId");
@@ -271,6 +281,8 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("PurchaseId");
 
                     b.HasIndex("ProviderId");
+
+                    b.HasIndex("VoidedByUserId");
 
                     b.HasIndex("TenantId", "BusinessDate");
 
@@ -2089,6 +2101,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProviderId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Restaurant.Domain.Entities.User", "VoidedByUser")
+                        .WithMany()
+                        .HasForeignKey("VoidedByUserId");
+
                     b.Navigation("CashierShift");
 
                     b.Navigation("CreatedByUser");
@@ -2096,6 +2112,8 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("Provider");
 
                     b.Navigation("Purchase");
+
+                    b.Navigation("VoidedByUser");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.CashierShift", b =>

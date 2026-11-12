@@ -413,6 +413,194 @@ public sealed class CashierShiftServiceTests
         Assert.Equal(leftoverId, Assert.Single(context.PendingPriorOpenShifts).Id);
     }
 
+    [Fact]
+    public async Task VoidCashMovement_excludes_amount_from_open_shift_cash_total()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
+        var movement = await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.PettyCash,
+            Amount = 30m,
+            Description = "Duplicado",
+        });
+
+        var voided = await sut.VoidCashMovementAsync(
+            movement.Id,
+            new VoidCashMovementDto { Reason = "Doble registro" },
+            canVoidClosedShift: false);
+
+        Assert.True(voided.IsVoided);
+        var report = await sut.GetShiftReportAsync(shift.Id);
+        Assert.Equal(0m, report.CashOutflowTotal);
+        Assert.Contains(report.CashOutflows, m => m.Id == movement.Id && m.IsVoided);
+    }
+
+    [Fact]
+    public async Task VoidCashMovement_rejects_other_cashier_on_open_shift()
+    {
+        using var fx = new TenantDbFixture();
+        var creatorId = Guid.NewGuid();
+        fx.TenantContext.UserId = creatorId;
+        await SeedTenantUserAsync(fx, creatorId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 50m });
+        var movement = await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.PettyCash,
+            Amount = 10m,
+            Description = "Taxi",
+        });
+
+        fx.TenantContext.UserId = Guid.NewGuid();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.VoidCashMovementAsync(movement.Id, new VoidCashMovementDto(), canVoidClosedShift: false));
+    }
+
+    [Fact]
+    public async Task VoidCashMovement_rejects_when_operational_day_is_closed()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 50m });
+        var movement = await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.PettyCash,
+            Amount = 10m,
+            Description = "Taxi",
+        });
+
+        var today = (await operationalDay.ResolveAsync()).BusinessDate;
+        await AddClosedDayAsync(fx, userId, today);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.VoidCashMovementAsync(movement.Id, new VoidCashMovementDto(), canVoidClosedShift: true));
+    }
+
+    [Fact]
+    public async Task VoidCashMovement_recalculates_expected_cash_on_closed_shift()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
+        var movement = await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.PettyCash,
+            Amount = 30m,
+            Description = "Duplicado",
+        });
+        await sut.CloseShiftAsync(shift.Id, new CloseCashierShiftDto { CountedCash = 70m });
+
+        await sut.VoidCashMovementAsync(
+            movement.Id,
+            new VoidCashMovementDto { Reason = "Error" },
+            canVoidClosedShift: true);
+
+        var stored = await fx.Db.CashierShifts.SingleAsync(s => s.Id == shift.Id);
+        Assert.Equal(100m, stored.ExpectedCash);
+        Assert.Equal(70m, stored.CountedCash);
+    }
+
+    [Fact]
+    public async Task VoidCashMovement_rejects_second_void()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 50m });
+        var movement = await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.PettyCash,
+            Amount = 10m,
+            Description = "Taxi",
+        });
+        await sut.VoidCashMovementAsync(movement.Id, new VoidCashMovementDto(), canVoidClosedShift: false);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.VoidCashMovementAsync(movement.Id, new VoidCashMovementDto(), canVoidClosedShift: false));
+    }
+
+    [Fact]
+    public async Task RecordCashMovementAsync_rejects_adjustment_in_without_daily_closure()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.RecordCashMovementAsync(new CreateCashMovementDto
+            {
+                MovementType = CashMovementType.AdjustmentIn,
+                Amount = 30m,
+                Description = "Corrección egreso duplicado",
+            }));
+    }
+
+    [Fact]
+    public async Task AdjustmentIn_increases_expected_cash_on_open_shift()
+    {
+        using var fx = new TenantDbFixture();
+        var userId = Guid.NewGuid();
+        fx.TenantContext.UserId = userId;
+        await SeedTenantUserAsync(fx, userId, "cashier@test.local");
+
+        var operationalDay = new OperationalBusinessDayService(fx.Db, fx.TenantContext);
+        var sut = new CashierShiftService(fx.Db, fx.TenantContext, operationalDay, new NoopPlanillaPdfService());
+        var shift = await sut.OpenShiftAsync(new OpenCashierShiftDto { OpeningFloat = 100m });
+
+        await sut.RecordCashMovementAsync(new CreateCashMovementDto
+        {
+            MovementType = CashMovementType.PettyCash,
+            Amount = 30m,
+            Description = "Duplicado ayer en libros",
+        });
+        await sut.RecordCashMovementAsync(
+            new CreateCashMovementDto
+            {
+                MovementType = CashMovementType.AdjustmentIn,
+                Amount = 30m,
+                Description = "Corrección egreso duplicado del día anterior",
+            },
+            canRecordCashAdjustment: true);
+
+        var report = await sut.GetShiftReportAsync(shift.Id);
+        Assert.Equal(30m, report.CashOutflowTotal);
+        Assert.Equal(30m, report.CashInflowTotal);
+        Assert.Single(report.CashInflows);
+        Assert.Equal(CashMovementType.AdjustmentIn, report.CashInflows[0].MovementType);
+
+        var closed = await sut.CloseShiftAsync(shift.Id, new CloseCashierShiftDto { CountedCash = 100m });
+        Assert.Equal(100m, closed.Shift.ExpectedCash);
+        Assert.Equal(0m, closed.Shift.CashOverShort);
+    }
+
     private static async Task EnablePriorDayCloseAsync(TenantDbFixture fx)
     {
         var settings = await fx.Db.TenantSettings.SingleAsync();

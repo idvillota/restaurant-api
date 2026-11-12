@@ -230,12 +230,11 @@ public sealed class OperationalReportsService : IOperationalReportsService
             query = query.Where(m => m.IsCashDrawerPayment == isCashDrawerPayment.Value);
 
         var totalCount = await query.CountAsync(cancellationToken);
-        var totalAmount = totalCount == 0
-            ? 0m
-            : await query.SumAsync(m => m.Amount, cancellationToken);
-        var totalCashDrawerAmount = totalCount == 0
-            ? 0m
-            : await query.Where(m => m.IsCashDrawerPayment).SumAsync(m => m.Amount, cancellationToken);
+        var activeQuery = query.Where(m => m.VoidedAtUtc == null);
+        var totalAmount = await activeQuery.SumAsync(m => (decimal?)m.Amount, cancellationToken) ?? 0m;
+        var totalCashDrawerAmount = await activeQuery
+            .Where(m => m.IsCashDrawerPayment)
+            .SumAsync(m => (decimal?)m.Amount, cancellationToken) ?? 0m;
 
         var rows = await query
             .OrderByDescending(m => m.BusinessDate)
@@ -250,6 +249,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
                 Description = m.Description,
                 ProviderName = m.Provider != null ? m.Provider.Name : null,
                 IsCashDrawerPayment = m.IsCashDrawerPayment,
+                IsVoided = m.VoidedAtUtc != null,
                 CashierEmail = m.CreatedByUser.Email,
             })
             .Take(MaxRows)
@@ -319,11 +319,14 @@ public sealed class OperationalReportsService : IOperationalReportsService
                 m.TenantId == tenantId
                 && m.BusinessDate >= startDate
                 && m.BusinessDate <= endDate)
-            .Select(m => new { m.BusinessDate, m.Amount, m.MovementType, m.IsCashDrawerPayment })
+            .Select(m => new { m.BusinessDate, m.Amount, m.MovementType, m.IsCashDrawerPayment, m.VoidedAtUtc })
             .ToListAsync(cancellationToken);
 
         var outflowsByDate = cashMovementsInRange
-            .Where(m => CashMovementKinds.IsOutflow(m.MovementType) && m.IsCashDrawerPayment)
+            .Where(m =>
+                CashMovementKinds.IsOutflow(m.MovementType)
+                && m.IsCashDrawerPayment
+                && m.VoidedAtUtc is null)
             .GroupBy(m => m.BusinessDate)
             .ToDictionary(
                 g => g.Key,
@@ -334,9 +337,25 @@ public sealed class OperationalReportsService : IOperationalReportsService
                     CashOutflowCount = g.Count(),
                 });
 
+        var inflowsByDate = cashMovementsInRange
+            .Where(m =>
+                CashMovementKinds.IsInflow(m.MovementType)
+                && m.IsCashDrawerPayment
+                && m.VoidedAtUtc is null)
+            .GroupBy(m => m.BusinessDate)
+            .ToDictionary(
+                g => g.Key,
+                g => new DailySummaryInflowsBucket
+                {
+                    Date = g.Key,
+                    TotalCashInflows = g.Sum(x => x.Amount),
+                    CashInflowCount = g.Count(),
+                });
+
         var dates = salesByDate.Keys
             .Union(purchasesByDate.Keys)
             .Union(outflowsByDate.Keys)
+            .Union(inflowsByDate.Keys)
             .OrderDescending()
             .ToList();
         var rows = dates.Select(date =>
@@ -344,9 +363,11 @@ public sealed class OperationalReportsService : IOperationalReportsService
             salesByDate.TryGetValue(date, out var sales);
             purchasesByDate.TryGetValue(date, out var purchases);
             outflowsByDate.TryGetValue(date, out var outflows);
+            inflowsByDate.TryGetValue(date, out var inflows);
             var totalSales = sales?.TotalSales ?? 0m;
             var totalPurchases = purchases?.TotalPurchases ?? 0m;
             var totalOutflows = outflows?.TotalCashOutflows ?? 0m;
+            var totalInflows = inflows?.TotalCashInflows ?? 0m;
 
             return new DailySummaryReportRowDto
             {
@@ -354,10 +375,12 @@ public sealed class OperationalReportsService : IOperationalReportsService
                 TotalSales = totalSales,
                 TotalPurchases = totalPurchases,
                 TotalCashOutflows = totalOutflows,
-                NetResult = totalSales - totalPurchases - totalOutflows,
+                TotalCashInflows = totalInflows,
+                NetResult = totalSales - totalPurchases - totalOutflows + totalInflows,
                 SalesOrderCount = sales?.SalesOrderCount ?? 0,
                 PurchaseCount = purchases?.PurchaseCount ?? 0,
                 CashOutflowCount = outflows?.CashOutflowCount ?? 0,
+                CashInflowCount = inflows?.CashInflowCount ?? 0,
                 ItemsSold = sales?.ItemsSold ?? 0m,
             };
         }).ToList();
@@ -370,6 +393,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
             GrandTotalSales = rows.Sum(r => r.TotalSales),
             GrandTotalPurchases = rows.Sum(r => r.TotalPurchases),
             GrandTotalCashOutflows = rows.Sum(r => r.TotalCashOutflows),
+            GrandTotalCashInflows = rows.Sum(r => r.TotalCashInflows),
             GrandNetResult = rows.Sum(r => r.NetResult),
             Rows = rows,
         };
@@ -395,6 +419,13 @@ public sealed class OperationalReportsService : IOperationalReportsService
         public DateOnly Date { get; init; }
         public decimal TotalCashOutflows { get; init; }
         public int CashOutflowCount { get; init; }
+    }
+
+    private sealed class DailySummaryInflowsBucket
+    {
+        public DateOnly Date { get; init; }
+        public decimal TotalCashInflows { get; init; }
+        public int CashInflowCount { get; init; }
     }
 
     private async Task<string> GetTenantNameAsync(Guid tenantId, CancellationToken cancellationToken)

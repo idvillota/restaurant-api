@@ -72,6 +72,15 @@ public sealed class CashMovementDto
     /// <summary>False = listed on reports only; omitted/true counts toward cash totals.</summary>
     public bool IsCashDrawerPayment { get; set; } = true;
     public DateTime OccurredAtUtc { get; set; }
+    public bool IsVoided { get; set; }
+    public DateTime? VoidedAtUtc { get; set; }
+    public string? VoidReason { get; set; }
+}
+
+public sealed class VoidCashMovementDto
+{
+    [MaxLength(500)]
+    public string? Reason { get; set; }
 }
 
 public sealed class CashierShiftReportDto
@@ -85,6 +94,8 @@ public sealed class CashierShiftReportDto
     public IReadOnlyList<ShiftPaymentLineDto> Payments { get; set; } = [];
     public IReadOnlyList<CashMovementDto> CashOutflows { get; set; } = [];
     public decimal CashOutflowTotal { get; set; }
+    public IReadOnlyList<CashMovementDto> CashInflows { get; set; } = [];
+    public decimal CashInflowTotal { get; set; }
 }
 
 public sealed class CreateCashMovementDto
@@ -154,9 +165,11 @@ public sealed class DailyClosureReportDto
     public decimal TotalTransfer { get; set; }
     public decimal TotalOther { get; set; }
     public decimal TotalCashOutflows { get; set; }
+    public decimal TotalCashInflows { get; set; }
     public decimal NetCash { get; set; }
     public IReadOnlyList<DailyShiftRollupDto> Shifts { get; set; } = [];
     public IReadOnlyList<CashMovementDto> CashOutflows { get; set; } = [];
+    public IReadOnlyList<CashMovementDto> CashInflows { get; set; } = [];
     public IReadOnlyList<ShiftPaymentLineDto> Payments { get; set; } = [];
 }
 

@@ -38,6 +38,8 @@ internal static class QuestPdfPlanillaDocument
                         column.Item().Text($"Vitrina Café: {Money(model.VitrinaCafeSales)}");
                     column.Item().Text($"Pagos cobrados: {Money(model.CollectedPayments)}");
                     column.Item().Text($"Egresos: {Money(model.TotalEgresos)}");
+                    if (model.TotalAjustesEntrada != 0)
+                        column.Item().Text($"Ajustes de entrada: {Money(model.TotalAjustesEntrada)}");
                     column.Item().Text($"Compras pagadas en caja: {Money(model.TotalPurchasesPaid)}");
                     column.Item().Text($"Sobrante / faltante: {OverShortText(model.OverShort)}");
                     if (!string.IsNullOrWhiteSpace(model.DayNotes))
@@ -124,6 +126,8 @@ internal static class QuestPdfPlanillaDocument
                         if (model.SeparateVitrinaCafeSales)
                             column.Item().Text($"Vitrina Café: {Money(shift.VitrinaCafeSales)}");
                         column.Item().Text($"Egresos: {Money(shift.TotalEgresos)}");
+                        if (shift.TotalAjustesEntrada != 0)
+                            column.Item().Text($"Ajustes de entrada: {Money(shift.TotalAjustesEntrada)}");
                         column.Item().Text($"Compras pagadas en caja: {Money(shift.TotalPurchasesPaid)}");
                         column.Item().Text($"Fondo inicial: {Money(shift.OpeningFloat)}");
                         column.Item().Text($"Efectivo esperado: {NullableMoney(shift.ExpectedCash)}");

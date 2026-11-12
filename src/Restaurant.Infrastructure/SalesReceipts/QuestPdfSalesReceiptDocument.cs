@@ -57,8 +57,8 @@ internal static class QuestPdfSalesReceiptDocument
 
                         column.Item().PaddingTop(3).LineHorizontal(0.5f);
 
-                        // —— Factura electrónica ——
-                        column.Item().AlignCenter().Text("FACTURA ELECTRÓNICA").Bold().FontSize(9);
+                        // —— Factura POS ——
+                        column.Item().AlignCenter().Text("FACTURA POS").Bold().FontSize(9);
 
                         column.Item().PaddingTop(2).Row(row =>
                         {

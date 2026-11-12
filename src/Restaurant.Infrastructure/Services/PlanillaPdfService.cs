@@ -220,19 +220,26 @@ public sealed class PlanillaPdfService : IPlanillaPdfService
                 .Select(l => new { l.BillId, l.ProductTypeName, l.Quantity, l.LineTotal })
                 .ToListAsync(cancellationToken);
 
-        var outflows = shiftIds.Count == 0
+        var movements = shiftIds.Count == 0
             ? []
             : await _db.CashMovements.AsNoTracking()
                 .Where(m =>
                     m.CashierShiftId != null
                     && shiftIds.Contains(m.CashierShiftId.Value)
-                    && CashMovementKinds.OutflowTypes.Contains(m.MovementType))
+                    && m.VoidedAtUtc == null
+                    && (CashMovementKinds.OutflowTypes.Contains(m.MovementType)
+                        || m.MovementType == CashMovementType.AdjustmentIn))
                 .Select(m => new { ShiftId = m.CashierShiftId!.Value, m.MovementType, m.Amount, m.PurchaseId })
                 .ToListAsync(cancellationToken);
 
         var paymentsByShift = payments.ToLookup(p => p.ShiftId);
         var linesByBill = lines.ToLookup(l => l.BillId);
-        var outflowsByShift = outflows.ToLookup(o => o.ShiftId);
+        var outflowsByShift = movements
+            .Where(m => CashMovementKinds.IsOutflow(m.MovementType))
+            .ToLookup(o => o.ShiftId);
+        var inflowsByShift = movements
+            .Where(m => CashMovementKinds.IsInflow(m.MovementType))
+            .ToLookup(i => i.ShiftId);
 
         var inputs = shifts.Select(shift =>
         {
@@ -262,6 +269,9 @@ public sealed class PlanillaPdfService : IPlanillaPdfService
                         Amount = o.Amount,
                         PurchaseId = o.PurchaseId,
                     })
+                    .ToList(),
+                Inflows = inflowsByShift[shift.Id]
+                    .Select(i => new PlanillaInflowInput { Amount = i.Amount })
                     .ToList(),
                 BillLines = shiftBillIds
                     .SelectMany(billId => linesByBill[billId])

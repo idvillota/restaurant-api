@@ -210,12 +210,18 @@ public sealed class DailyClosureService : IDailyClosureService
 
         await ShiftPaymentTableCodes.FillMissingAsync(_db, payments, cancellationToken);
 
-        var outflows = await _db.CashMovements
+        var movements = await _db.CashMovements
             .AsNoTracking()
             .Include(m => m.Provider)
-            .Where(m => m.TenantId == tenantId && m.BusinessDate == businessDate && CashMovementKinds.OutflowTypes.Contains(m.MovementType))
+            .Where(m =>
+                m.TenantId == tenantId
+                && m.BusinessDate == businessDate
+                && (CashMovementKinds.OutflowTypes.Contains(m.MovementType)
+                    || m.MovementType == CashMovementType.AdjustmentIn))
             .OrderBy(m => m.OccurredAtUtc)
             .ToListAsync(cancellationToken);
+        var outflows = movements.Where(m => CashMovementKinds.IsOutflow(m.MovementType)).ToList();
+        var inflows = movements.Where(m => CashMovementKinds.IsInflow(m.MovementType)).ToList();
 
         var paymentsByShift = paymentRows.ToLookup(p => p.ShiftId);
         var separateVitrina = await VitrinaCafeBillTotals.IsSeparateEnabledAsync(_db, cancellationToken);
@@ -266,7 +272,12 @@ public sealed class DailyClosureService : IDailyClosureService
         var totalCard = payments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount);
         var totalTransfer = payments.Where(p => p.Method == PaymentMethod.Transfer).Sum(p => p.Amount);
         var totalOther = payments.Where(p => p.Method == PaymentMethod.Other).Sum(p => p.Amount);
-        var totalOutflows = outflows.Where(m => m.IsCashDrawerPayment).Sum(m => m.Amount);
+        var totalOutflows = outflows
+            .Where(m => m.IsCashDrawerPayment && m.VoidedAtUtc is null)
+            .Sum(m => m.Amount);
+        var totalInflows = inflows
+            .Where(m => m.IsCashDrawerPayment && m.VoidedAtUtc is null)
+            .Sum(m => m.Amount);
         var collected = payments.Sum(p => p.Amount);
         decimal totalSales;
         decimal vitrinaCafeSales;
@@ -292,24 +303,32 @@ public sealed class DailyClosureService : IDailyClosureService
             TotalTransfer = totalTransfer,
             TotalOther = totalOther,
             TotalCashOutflows = totalOutflows,
-            NetCash = totalCash - totalOutflows,
+            TotalCashInflows = totalInflows,
+            NetCash = totalCash + totalInflows - totalOutflows,
             Shifts = shiftRollups,
-            CashOutflows = outflows.Select(m => new CashMovementDto
-            {
-                Id = m.Id,
-                MovementType = m.MovementType,
-                Amount = m.Amount,
-                Method = m.Method,
-                Description = m.Description,
-                PurchaseId = m.PurchaseId,
-                ProviderId = m.ProviderId,
-                ProviderName = m.Provider?.Name,
-                IsCashDrawerPayment = m.IsCashDrawerPayment,
-                OccurredAtUtc = m.OccurredAtUtc,
-            }).ToList(),
+            CashOutflows = outflows.Select(MapMovement).ToList(),
+            CashInflows = inflows.Select(MapMovement).ToList(),
             Payments = payments,
         };
     }
+
+    private static CashMovementDto MapMovement(CashMovement m) =>
+        new()
+        {
+            Id = m.Id,
+            MovementType = m.MovementType,
+            Amount = m.Amount,
+            Method = m.Method,
+            Description = m.Description,
+            PurchaseId = m.PurchaseId,
+            ProviderId = m.ProviderId,
+            ProviderName = m.Provider?.Name,
+            IsCashDrawerPayment = m.IsCashDrawerPayment,
+            OccurredAtUtc = m.OccurredAtUtc,
+            IsVoided = m.VoidedAtUtc is not null,
+            VoidedAtUtc = m.VoidedAtUtc,
+            VoidReason = m.VoidReason,
+        };
 
     private Guid ResolveTenantId()
     {

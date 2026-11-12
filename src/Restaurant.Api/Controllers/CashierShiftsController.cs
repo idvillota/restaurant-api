@@ -145,10 +145,39 @@ public sealed class CashierShiftsController : ControllerBase
         if (!ModelState.IsValid)
             return ValidationProblem(ModelState);
 
+        var canRecordCashAdjustment = User.HasClaim(PermissionClaims.Type, FeatureCodes.ReportsDailyClosure);
+
         try
         {
-            var movement = await _service.RecordCashMovementAsync(dto, cancellationToken);
+            var movement = await _service.RecordCashMovementAsync(
+                dto,
+                canRecordCashAdjustment,
+                cancellationToken);
             return StatusCode(StatusCodes.Status201Created, movement);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("cash-movements/{id:guid}/void")]
+    [RequireFeature(FeatureCodes.CashierShifts)]
+    public async Task<ActionResult<CashMovementDto>> VoidMovement(
+        Guid id,
+        [FromBody] VoidCashMovementDto? dto,
+        CancellationToken cancellationToken)
+    {
+        var canVoidClosedShift = User.HasClaim(PermissionClaims.Type, FeatureCodes.ReportsDailyClosure);
+
+        try
+        {
+            var movement = await _service.VoidCashMovementAsync(
+                id,
+                dto ?? new VoidCashMovementDto(),
+                canVoidClosedShift,
+                cancellationToken);
+            return Ok(movement);
         }
         catch (InvalidOperationException ex)
         {
