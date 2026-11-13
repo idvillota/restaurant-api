@@ -16,5 +16,8 @@ public class DiningTable : EntityBase, ITenantScoped
     public ETableStatus Status { get; set; } = ETableStatus.Available;
     public bool IsActive { get; set; } = true;
 
+    /// <summary>System slot for delivery orders; hidden from the salon floor and reservations.</summary>
+    public bool IsDeliverySlot { get; set; }
+
     public ICollection<ReservationTable> ReservationTables { get; set; } = new List<ReservationTable>();
 }

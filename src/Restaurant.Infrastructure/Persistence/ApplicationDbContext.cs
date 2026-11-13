@@ -269,6 +269,7 @@ public sealed class ApplicationDbContext : DbContext
         {
             e.Property(x => x.Code).HasMaxLength(40);
             e.Property(x => x.Zone).HasMaxLength(80);
+            e.Property(x => x.IsDeliverySlot).HasDefaultValue(false);
         });
 
         modelBuilder.Entity<Reservation>(e =>
@@ -293,6 +294,10 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.TaxAmount).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
             e.Property(x => x.VoidReason).HasMaxLength(300);
+            e.Property(x => x.DeliveryCustomerName).HasMaxLength(200);
+            e.Property(x => x.DeliveryPhone).HasMaxLength(40);
+            e.Property(x => x.DeliveryAddress).HasMaxLength(300);
+            e.Property(x => x.IsDelivery).HasDefaultValue(false);
             e.HasIndex(x => new { x.TenantId, x.DiningTableId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.ClosedAtUtc });
@@ -466,6 +471,11 @@ public sealed class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Customer>(e =>
         {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Email).HasMaxLength(320);
+            e.Property(x => x.Phone).HasMaxLength(40);
+            e.Property(x => x.TaxId).HasMaxLength(80);
+            e.Property(x => x.Address).HasMaxLength(300);
             e.HasIndex(x => new { x.TenantId, x.TaxId });
         });
 

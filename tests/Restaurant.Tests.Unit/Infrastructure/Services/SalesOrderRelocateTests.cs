@@ -129,7 +129,8 @@ public sealed class SalesOrderRelocateTests
             Mock.Of<IKitchenPrinterService>(),
             day.Object,
             fx.TenantContext,
-            fx.Db);
+            fx.Db,
+            Mock.Of<ICustomerService>());
     }
 
     private static async Task<(Guid SourceId, Guid TargetId, Guid OrderId, SalesOrderService Sut)>

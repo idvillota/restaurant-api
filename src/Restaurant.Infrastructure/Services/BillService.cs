@@ -55,14 +55,20 @@ public sealed class BillService : IBillService
             .Where(o =>
                 search == null ||
                 search.Length == 0 ||
-                (o.DiningTable != null && EF.Functions.ILike(o.DiningTable.Code, $"%{search}%")))
+                (o.DiningTable != null && EF.Functions.ILike(o.DiningTable.Code, $"%{search}%")) ||
+                (o.DeliveryCustomerName != null && EF.Functions.ILike(o.DeliveryCustomerName, $"%{search}%")) ||
+                (o.DeliveryAddress != null && EF.Functions.ILike(o.DeliveryAddress, $"%{search}%")))
             .Select(o => new
             {
                 o.Id,
                 o.Number,
                 o.DiningTableId,
-                TableCode = o.DiningTable != null ? o.DiningTable.Code : "—",
+                TableCode = o.IsDelivery ? "Domicilio" : (o.DiningTable != null ? o.DiningTable.Code : "—"),
                 Zone = o.DiningTable != null ? o.DiningTable.Zone : null,
+                o.IsDelivery,
+                o.CustomerId,
+                CustomerName = o.DeliveryCustomerName,
+                o.DeliveryAddress,
                 Lines = o.Lines.Where(l => l.Quantity > 0).Select(l => new
                 {
                     l.Id,
@@ -90,6 +96,10 @@ public sealed class BillService : IBillService
                     TableId = first.DiningTableId ?? Guid.Empty,
                     TableCode = first.TableCode,
                     Zone = first.Zone,
+                    IsDelivery = first.IsDelivery,
+                    CustomerId = first.CustomerId,
+                    CustomerName = first.CustomerName,
+                    DeliveryAddress = first.DeliveryAddress,
                     Orders = g.Select(o => new PayableOrderDto
                     {
                         OrderId = o.Id,
@@ -145,7 +155,15 @@ public sealed class BillService : IBillService
         var (shiftId, processedByUserId) = await _cashierShifts.RequireOpenShiftAsync(cancellationToken);
         var cashierName = await ResolveCashierDisplayNameAsync(processedByUserId, cancellationToken);
 
-        var customer = await ResolveCustomerAsync(dto.CustomerId, cancellationToken);
+        var checkoutCustomerId = dto.CustomerId;
+        var deliveryCustomerIds = orders
+            .Where(o => o.IsDelivery && o.CustomerId is not null)
+            .Select(o => o.CustomerId!.Value)
+            .Distinct()
+            .ToList();
+        if (checkoutCustomerId is null && deliveryCustomerIds.Count == 1)
+            checkoutCustomerId = deliveryCustomerIds[0];
+        var customer = await ResolveCustomerAsync(checkoutCustomerId, cancellationToken);
         var now = DateTime.UtcNow;
         var billId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
@@ -628,7 +646,7 @@ public sealed class BillService : IBillService
         CancellationToken cancellationToken)
     {
         var fromNav = orders
-            .Select(o => o.DiningTable?.Code)
+            .Select(o => o.IsDelivery ? "Domicilio" : o.DiningTable?.Code)
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();

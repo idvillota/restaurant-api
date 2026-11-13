@@ -1,3 +1,4 @@
+using Restaurant.Application.Features.Crm.Customers;
 using Restaurant.Application.Features.Sales.SalesOrders;
 
 namespace Restaurant.Application.Common.Interfaces;
@@ -11,6 +12,8 @@ public interface ISalesOrderService
     Task<SalesOrderDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<SalesOrderDto> StartOrderForTableAsync(Guid tableId, CancellationToken cancellationToken = default);
+
+    Task<SalesOrderDto> StartDeliveryOrderAsync(StartDeliveryCustomerDto dto, CancellationToken cancellationToken = default);
 
     Task<SalesOrderDto?> AddLineAsync(Guid orderId, AddSalesOrderLineDto dto, CancellationToken cancellationToken = default);
 

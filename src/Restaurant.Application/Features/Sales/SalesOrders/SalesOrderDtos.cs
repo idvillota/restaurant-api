@@ -8,6 +8,11 @@ public sealed class SalesOrderDto
     public Guid Id { get; set; }
     public Guid? DiningTableId { get; set; }
     public string? DiningTableCode { get; set; }
+    public Guid? CustomerId { get; set; }
+    public bool IsDelivery { get; set; }
+    public string? DeliveryCustomerName { get; set; }
+    public string? DeliveryPhone { get; set; }
+    public string? DeliveryAddress { get; set; }
     public string Number { get; set; } = string.Empty;
     public SalesOrderStatus Status { get; set; }
     public DateTime OpenedAtUtc { get; set; }
@@ -110,6 +115,10 @@ public sealed class TableServiceSummaryDto
     public decimal? OpenOrderTotal { get; set; }
 
     public int OpenOrderPendingKitchenLineCount { get; set; }
+    public bool IsDeliverySlot { get; set; }
+    public bool IsDeliveryOrder { get; set; }
+    public string? DeliveryCustomerName { get; set; }
+    public string? DeliveryAddress { get; set; }
 }
 
 public sealed class RelocateOrderDto

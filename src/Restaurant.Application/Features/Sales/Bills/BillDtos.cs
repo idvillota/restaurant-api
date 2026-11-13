@@ -130,6 +130,10 @@ public sealed class PayableTableGroupDto
     public Guid TableId { get; set; }
     public string TableCode { get; set; } = string.Empty;
     public string? Zone { get; set; }
+    public bool IsDelivery { get; set; }
+    public Guid? CustomerId { get; set; }
+    public string? CustomerName { get; set; }
+    public string? DeliveryAddress { get; set; }
     public IReadOnlyList<PayableOrderDto> Orders { get; set; } = [];
 }
 

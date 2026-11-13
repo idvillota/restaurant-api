@@ -9,6 +9,7 @@ public sealed class CustomerDto
     public string? Email { get; set; }
     public string? Phone { get; set; }
     public string? TaxId { get; set; }
+    public string? Address { get; set; }
     public int? BirthMonth { get; set; }
     public int? BirthDay { get; set; }
     public bool IsActive { get; set; }
@@ -29,6 +30,9 @@ public sealed class CreateCustomerDto
 
     [MaxLength(80)]
     public string? TaxId { get; set; }
+
+    [MaxLength(300)]
+    public string? Address { get; set; }
 
     [Range(1, 12)]
     public int? BirthMonth { get; set; }
@@ -53,6 +57,9 @@ public sealed class UpdateCustomerDto
     [MaxLength(80)]
     public string? TaxId { get; set; }
 
+    [MaxLength(300)]
+    public string? Address { get; set; }
+
     [Range(1, 12)]
     public int? BirthMonth { get; set; }
 
@@ -60,6 +67,24 @@ public sealed class UpdateCustomerDto
     public int? BirthDay { get; set; }
 
     public bool IsActive { get; set; } = true;
+}
+
+public sealed class StartDeliveryCustomerDto
+{
+    [Required, MaxLength(80)]
+    public string TaxId { get; set; } = string.Empty;
+
+    [Required, MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    [Required, MaxLength(40)]
+    public string Phone { get; set; } = string.Empty;
+
+    [Required, MaxLength(300)]
+    public string Address { get; set; } = string.Empty;
+
+    [MaxLength(320), EmailAddress]
+    public string? Email { get; set; }
 }
 
 public static class CustomerBirthday

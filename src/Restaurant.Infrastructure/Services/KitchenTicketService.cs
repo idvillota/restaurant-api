@@ -126,7 +126,9 @@ public sealed class KitchenTicketService : IKitchenTicketService
 
         return new KitchenTicketModel
         {
-            TableCode = order.DiningTable?.Code ?? "—",
+            TableCode = order.IsDelivery ? "DOMICILIO" : order.DiningTable?.Code ?? "—",
+            IsDelivery = order.IsDelivery,
+            DeliveryAddress = order.DeliveryAddress,
             OrderNumber = order.Number,
             SentBy = sentBy,
             SentAtUtc = DateTime.UtcNow,

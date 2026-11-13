@@ -26,7 +26,10 @@ internal static class QuestPdfKitchenTicketDocument
                     {
                         column.Spacing(4);
 
-                        column.Item().AlignCenter().Text($"MESA {ticket.TableCode}").Bold().FontSize(14);
+                        column.Item().AlignCenter().Text(
+                            ticket.IsDelivery ? "DOMICILIO" : $"MESA {ticket.TableCode}").Bold().FontSize(14);
+                        if (ticket.IsDelivery && !string.IsNullOrWhiteSpace(ticket.DeliveryAddress))
+                            column.Item().AlignCenter().Text(ticket.DeliveryAddress).FontSize(8);
 
                         if (ticket.IsCancellation)
                         {

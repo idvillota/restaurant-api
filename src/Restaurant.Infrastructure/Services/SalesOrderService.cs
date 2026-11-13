@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Features.Crm.Customers;
 using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
@@ -28,6 +29,7 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IOperationalBusinessDayService _operationalDay;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly ApplicationDbContext _db;
+    private readonly ICustomerService _customers;
     private readonly IMobileSalePublisher? _salePublisher;
     private readonly IPrintJobQueue? _printJobs;
 
@@ -46,6 +48,7 @@ public sealed class SalesOrderService : ISalesOrderService
         IOperationalBusinessDayService operationalDay,
         ICurrentTenantContext tenantContext,
         ApplicationDbContext db,
+        ICustomerService customers,
         IMobileSalePublisher? salePublisher = null,
         IPrintJobQueue? printJobs = null)
     {
@@ -63,6 +66,7 @@ public sealed class SalesOrderService : ISalesOrderService
         _operationalDay = operationalDay;
         _tenantContext = tenantContext;
         _db = db;
+        _customers = customers;
         _salePublisher = salePublisher;
         _printJobs = printJobs;
     }
@@ -81,7 +85,16 @@ public sealed class SalesOrderService : ISalesOrderService
             .AsNoTracking()
             .Where(o => o.DiningTableId != null &&
                         (o.Status == SalesOrderStatus.Draft || o.Status == SalesOrderStatus.Open))
-            .Select(o => new { o.Id, o.DiningTableId, o.Number, o.Total })
+            .Select(o => new
+            {
+                o.Id,
+                o.DiningTableId,
+                o.Number,
+                o.Total,
+                o.IsDelivery,
+                o.DeliveryCustomerName,
+                o.DeliveryAddress,
+            })
             .ToListAsync(cancellationToken);
 
         var orderIds = openOrders.Select(o => o.Id).ToList();
@@ -120,6 +133,10 @@ public sealed class SalesOrderService : ISalesOrderService
                     OpenOrderNumber = order?.Number,
                     OpenOrderTotal = order?.Total,
                     OpenOrderPendingKitchenLineCount = pendingKitchen,
+                    IsDeliverySlot = t.IsDeliverySlot,
+                    IsDeliveryOrder = order?.IsDelivery ?? false,
+                    DeliveryCustomerName = order?.DeliveryCustomerName,
+                    DeliveryAddress = order?.DeliveryAddress,
                 };
             })
             .ToList();
@@ -141,6 +158,8 @@ public sealed class SalesOrderService : ISalesOrderService
         var table = await _tables.GetByIdAsync(tableId, cancellationToken);
         if (table is null || !table.IsActive)
             throw new InvalidOperationException("Table was not found or is inactive.");
+        if (table.IsDeliverySlot)
+            throw new InvalidOperationException("Use el flujo de domicilio para este pedido.");
 
         var existingActive = await _orders.Query()
             .AnyAsync(
@@ -176,6 +195,46 @@ public sealed class SalesOrderService : ISalesOrderService
         await _orders.AddAsync(order, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        return (await GetByIdAsync(orderId, cancellationToken))!;
+    }
+
+    public async Task<SalesOrderDto> StartDeliveryOrderAsync(
+        StartDeliveryCustomerDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+
+        var customer = await _customers.UpsertDeliveryProfileAsync(dto, cancellationToken);
+        var slot = await AllocateDeliverySlotAsync(cancellationToken);
+
+        var existingActive = await _orders.Query()
+            .AnyAsync(
+                o => o.DiningTableId == slot.Id &&
+                     (o.Status == SalesOrderStatus.Draft || o.Status == SalesOrderStatus.Open),
+                cancellationToken);
+        if (existingActive)
+            throw new InvalidOperationException("No hay cupos de domicilio disponibles. Intente de nuevo.");
+
+        var orderId = Guid.NewGuid();
+        var order = new SalesOrder
+        {
+            Id = orderId,
+            DiningTableId = slot.Id,
+            CustomerId = customer.Id,
+            IsDelivery = true,
+            DeliveryCustomerName = customer.Name,
+            DeliveryPhone = customer.Phone,
+            DeliveryAddress = customer.Address,
+            Number = await GenerateOrderNumberAsync(cancellationToken),
+            Status = SalesOrderStatus.Draft,
+            OpenedAtUtc = DateTime.UtcNow,
+            Subtotal = 0,
+            TaxAmount = 0,
+            Total = 0,
+        };
+
+        await _orders.AddAsync(order, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return (await GetByIdAsync(orderId, cancellationToken))!;
     }
 
@@ -377,6 +436,9 @@ public sealed class SalesOrderService : ISalesOrderService
         var targetTable = await _tables.GetByIdAsync(dto.TargetTableId, cancellationToken);
         if (targetTable is null || !targetTable.IsActive)
             throw new InvalidOperationException("La mesa de destino no existe o está inactiva.");
+        if (sourceTable.IsDeliverySlot != targetTable.IsDeliverySlot)
+            throw new InvalidOperationException(
+                "No se puede mover un domicilio a una mesa de salón, ni al revés.");
 
         await EnsureNoOpenBillForOrderAsync(sourceOrder.Id, cancellationToken);
 
@@ -827,6 +889,53 @@ public sealed class SalesOrderService : ISalesOrderService
         order.Subtotal = order.Lines.Where(l => l.Quantity > 0).Sum(l => l.LineTotal);
         order.TaxAmount = 0;
         order.Total = order.Subtotal;
+    }
+
+    private async Task<DiningTable> AllocateDeliverySlotAsync(CancellationToken cancellationToken)
+    {
+        var slots = await _tables.Query()
+            .Where(t => t.IsDeliverySlot && t.IsActive)
+            .OrderBy(t => t.Code)
+            .ToListAsync(cancellationToken);
+
+        var busySlotIds = await _orders.Query()
+            .Where(o =>
+                o.DiningTableId != null
+                && (o.Status == SalesOrderStatus.Draft || o.Status == SalesOrderStatus.Open))
+            .Select(o => o.DiningTableId!.Value)
+            .ToListAsync(cancellationToken);
+
+        var free = slots.FirstOrDefault(s =>
+            s.Status == ETableStatus.Available && !busySlotIds.Contains(s.Id));
+        if (free is not null)
+        {
+            TableStatusTransitions.EnsureCanTransition(free.Status, ETableStatus.Busy);
+            free.Status = ETableStatus.Busy;
+            _tables.Update(free);
+            return free;
+        }
+
+        var next = 1;
+        string code;
+        do
+        {
+            code = $"D-{next:00}";
+            next++;
+        }
+        while (await _tables.Query().AnyAsync(t => t.IsActive && t.Code == code, cancellationToken));
+
+        var slot = new DiningTable
+        {
+            Id = Guid.NewGuid(),
+            Code = code,
+            Capacity = 1,
+            Zone = "Domicilios",
+            Status = ETableStatus.Busy,
+            IsActive = true,
+            IsDeliverySlot = true,
+        };
+        await _tables.AddAsync(slot, cancellationToken);
+        return slot;
     }
 
     private async Task<string> GenerateOrderNumberAsync(CancellationToken cancellationToken)
