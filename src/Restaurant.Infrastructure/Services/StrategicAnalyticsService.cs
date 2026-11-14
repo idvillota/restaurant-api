@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Reports;
 using Restaurant.Domain.Entities;
@@ -57,7 +58,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
         var tenantId = _tenant.TenantId
             ?? throw new InvalidOperationException("No se pudo determinar el local activo.");
 
-        var cacheDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var cacheDate = ColombiaTime.Today();
 
         if (!refresh)
         {
@@ -577,7 +578,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
                 var stock = ing?.StockQuantity ?? 0m;
                 var daysCover = dailyAvg > 0 ? stock / dailyAvg : (decimal?)null;
                 var runOutDate = daysCover.HasValue
-                    ? DateOnly.FromDateTime(DateTime.UtcNow).AddDays((int)Math.Floor(daysCover.Value))
+                    ? ColombiaTime.Today().AddDays((int)Math.Floor(daysCover.Value))
                     : (DateOnly?)null;
                 var belowReorder = ing?.ReorderLevel is not null && stock <= ing.ReorderLevel;
                 return new IngredientForecastRow(

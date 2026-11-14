@@ -223,7 +223,7 @@ public sealed class PurchaseService : IPurchaseService
         DateTime purchasedAtUtc,
         CancellationToken cancellationToken)
     {
-        var dayPrefix = $"COMPRA-{purchasedAtUtc:yyyyMMdd}-";
+        var dayPrefix = $"COMPRA-{ColombiaTime.Stamp(purchasedAtUtc, "yyyyMMdd")}-";
         var latestNumber = await _purchases.Query()
             .AsNoTracking()
             .Where(p => p.BillNumber.StartsWith(dayPrefix))

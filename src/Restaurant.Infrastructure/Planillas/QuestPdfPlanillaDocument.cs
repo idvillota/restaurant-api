@@ -2,6 +2,7 @@ using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Restaurant.Application.Common;
 using Restaurant.Application.Features.Cashier;
 
 namespace Restaurant.Infrastructure.Planillas;
@@ -202,5 +203,5 @@ internal static class QuestPdfPlanillaDocument
             : value.ToString("N2", EsCo);
 
     private static string Local(DateTime utc) =>
-        utc.ToLocalTime().ToString("dd/MM/yyyy HH:mm", EsCo);
+        ColombiaTime.ToBogota(utc).ToString("dd/MM/yyyy HH:mm", EsCo);
 }

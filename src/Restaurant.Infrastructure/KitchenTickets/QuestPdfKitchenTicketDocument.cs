@@ -1,6 +1,7 @@
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Restaurant.Application.Common;
 using Restaurant.Application.Features.Sales.KitchenTickets;
 
 namespace Restaurant.Infrastructure.KitchenTickets;
@@ -11,7 +12,7 @@ internal static class QuestPdfKitchenTicketDocument
 
     public static byte[] BuildPdf(KitchenTicketModel ticket)
     {
-        var sentLocal = ticket.SentAtUtc.ToLocalTime();
+        var sentLocal = ColombiaTime.ToBogota(ticket.SentAtUtc);
 
         return Document.Create(document =>
             {

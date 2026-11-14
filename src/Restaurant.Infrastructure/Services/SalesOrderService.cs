@@ -943,7 +943,7 @@ public sealed class SalesOrderService : ISalesOrderService
         for (var attempt = 0; attempt < 5; attempt++)
         {
             var suffix = Random.Shared.Next(1000, 9999);
-            var number = $"T-{DateTime.UtcNow:yyyyMMdd}-{suffix}";
+            var number = $"T-{ColombiaTime.NowStamp("yyyyMMdd")}-{suffix}";
             if (!await _orders.Query().AnyAsync(o => o.Number == number, cancellationToken))
                 return number;
         }

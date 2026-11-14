@@ -745,7 +745,7 @@ public sealed class BillService : IBillService
     private async Task<string> GenerateBillNumberAsync(CancellationToken cancellationToken)
     {
         var tenantId = ResolveTenantId();
-        var dayPrefix = $"BILL-{DateTime.UtcNow:yyyyMMdd}-";
+        var dayPrefix = $"BILL-{ColombiaTime.NowStamp("yyyyMMdd")}-";
         var latestNumber = await _db.Bills
             .AsNoTracking()
             .Where(b => b.TenantId == tenantId && b.Number.StartsWith(dayPrefix))
