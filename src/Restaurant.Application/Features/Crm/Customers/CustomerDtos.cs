@@ -85,6 +85,12 @@ public sealed class StartDeliveryCustomerDto
 
     [MaxLength(320), EmailAddress]
     public string? Email { get; set; }
+
+    /// <summary>
+    /// When false, Address is only for this order. The client ficha is left unchanged.
+    /// New clients always save Address.
+    /// </summary>
+    public bool UpdateProfileAddress { get; set; } = true;
 }
 
 public static class CustomerBirthday

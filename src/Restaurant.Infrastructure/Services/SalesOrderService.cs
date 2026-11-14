@@ -224,7 +224,7 @@ public sealed class SalesOrderService : ISalesOrderService
             IsDelivery = true,
             DeliveryCustomerName = customer.Name,
             DeliveryPhone = customer.Phone,
-            DeliveryAddress = customer.Address,
+            DeliveryAddress = dto.Address.Trim(),
             Number = await GenerateOrderNumberAsync(cancellationToken),
             Status = SalesOrderStatus.Draft,
             OpenedAtUtc = DateTime.UtcNow,

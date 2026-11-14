@@ -160,7 +160,8 @@ public sealed class CustomerService : ICustomerService
             entity.Email = NullIfEmpty(dto.Email);
             entity.Phone = phone;
             entity.TaxId = taxId;
-            entity.Address = address;
+            if (dto.UpdateProfileAddress)
+                entity.Address = address;
             entity.IsActive = true;
             _customers.Update(entity);
         }

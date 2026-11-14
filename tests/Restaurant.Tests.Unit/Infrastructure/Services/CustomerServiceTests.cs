@@ -106,6 +106,33 @@ public sealed class CustomerServiceTests
     }
 
     [Fact]
+    public async Task UpsertDeliveryProfileAsync_skips_address_when_not_updating_profile()
+    {
+        using var fx = new TenantDbFixture();
+        var sut = CreateSut(fx);
+        await sut.UpsertDeliveryProfileAsync(new StartDeliveryCustomerDto
+        {
+            TaxId = "555",
+            Name = "Luis",
+            Phone = "301",
+            Address = "Calle 1",
+        });
+
+        var second = await sut.UpsertDeliveryProfileAsync(new StartDeliveryCustomerDto
+        {
+            TaxId = "555",
+            Name = "Luis",
+            Phone = "302",
+            Address = "Casa de mamá",
+            UpdateProfileAddress = false,
+        });
+
+        Assert.Equal("Calle 1", second.Address);
+        Assert.Equal("302", second.Phone);
+        Assert.Equal("Calle 1", (await fx.Db.Customers.SingleAsync()).Address);
+    }
+
+    [Fact]
     public async Task UpsertDeliveryProfileAsync_rejects_consumidor_final()
     {
         using var fx = new TenantDbFixture();

@@ -62,7 +62,35 @@ public sealed class SalesOrderDeliveryTests
 
         Assert.Equal(1, await fx.Db.Customers.CountAsync());
         Assert.Equal("Calle 2", second.DeliveryAddress);
+        Assert.Equal("Calle 2", (await fx.Db.Customers.SingleAsync()).Address);
         Assert.Equal(2, await fx.Db.SalesOrders.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartDeliveryOrder_temporary_address_does_not_overwrite_profile()
+    {
+        using var fx = new TenantDbFixture();
+        var sut = CreateSut(fx);
+
+        await sut.StartDeliveryOrderAsync(new StartDeliveryCustomerDto
+        {
+            TaxId = "555",
+            Name = "Luis",
+            Phone = "301",
+            Address = "Calle 1",
+        });
+
+        var second = await sut.StartDeliveryOrderAsync(new StartDeliveryCustomerDto
+        {
+            TaxId = "555",
+            Name = "Luis",
+            Phone = "301",
+            Address = "Casa de mamá",
+            UpdateProfileAddress = false,
+        });
+
+        Assert.Equal("Casa de mamá", second.DeliveryAddress);
+        Assert.Equal("Calle 1", (await fx.Db.Customers.SingleAsync()).Address);
     }
 
     private static SalesOrderService CreateSut(TenantDbFixture fx)
