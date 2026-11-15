@@ -8,6 +8,10 @@ public class SalesOrder : EntityBase, ITenantScoped
     public Guid TenantId { get; set; }
     public Guid? DiningTableId { get; set; }
     public Guid? CustomerId { get; set; }
+    public bool IsDelivery { get; set; }
+    public string? DeliveryCustomerName { get; set; }
+    public string? DeliveryPhone { get; set; }
+    public string? DeliveryAddress { get; set; }
     public string Number { get; set; } = string.Empty;
     public DateTime OpenedAtUtc { get; set; }
     public SalesOrderStatus Status { get; set; } = SalesOrderStatus.Draft;

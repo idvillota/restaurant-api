@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Restaurant.Api.Authorization;
 using Restaurant.Application.Authorization;
 using Restaurant.Application.Common.Interfaces;
+using Restaurant.Application.Features.Crm.Customers;
 using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Infrastructure.Authorization;
 
@@ -13,8 +14,13 @@ namespace Restaurant.Api.Controllers;
 public sealed class SalesOrdersController : ControllerBase
 {
     private readonly ISalesOrderService _service;
+    private readonly ICustomerService _customers;
 
-    public SalesOrdersController(ISalesOrderService service) => _service = service;
+    public SalesOrdersController(ISalesOrderService service, ICustomerService customers)
+    {
+        _service = service;
+        _customers = customers;
+    }
 
     [HttpGet("tables")]
     public async Task<ActionResult<IReadOnlyList<TableServiceSummaryDto>>> ListTables(
@@ -28,6 +34,40 @@ public sealed class SalesOrdersController : ControllerBase
     {
         var order = await _service.GetOpenByTableIdAsync(tableId, cancellationToken);
         return order is null ? NotFound() : Ok(order);
+    }
+
+    [HttpGet("delivery-customers")]
+    public async Task<ActionResult<CustomerDto>> FindDeliveryCustomer(
+        [FromQuery] string? taxId,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = CustomerTaxId.Normalize(taxId);
+        if (normalized is null)
+            return BadRequest(new { message = "Indique el número de documento." });
+        if (CustomerTaxId.IsConsumidorFinal(normalized))
+            return Conflict(new { message = "No use consumidor final para un domicilio." });
+
+        var item = await _customers.FindByTaxIdAsync(normalized, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
+    [HttpPost("delivery")]
+    public async Task<ActionResult<SalesOrderDto>> StartDelivery(
+        [FromBody] StartDeliveryCustomerDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var created = await _service.StartDeliveryOrderAsync(dto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     [HttpPost("table/{tableId:guid}")]

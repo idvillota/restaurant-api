@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Reports;
@@ -57,7 +58,7 @@ public sealed class StrategicAiReportService : IStrategicAiReportService
         var tenantId = _tenant.TenantId
             ?? throw new InvalidOperationException("No se pudo determinar el local activo.");
 
-        var cacheDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        var cacheDate = ColombiaTime.Today();
 
         if (!refresh)
         {

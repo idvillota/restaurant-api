@@ -31,6 +31,7 @@ public sealed class PlanillaDocumentModel
     public IReadOnlyList<PlanillaPaymentRow> PaymentsByMethod { get; set; } = [];
     public IReadOnlyList<PlanillaEgresoRow> EgresosByType { get; set; } = [];
     public decimal TotalEgresos { get; set; }
+    public decimal TotalAjustesEntrada { get; set; }
     public decimal TotalPurchasesPaid { get; set; }
     public decimal? OverShort { get; set; }
     public string? DayNotes { get; set; }
@@ -71,5 +72,6 @@ public sealed class PlanillaShiftSection
     public decimal TotalSales { get; set; }
     public decimal VitrinaCafeSales { get; set; }
     public decimal TotalEgresos { get; set; }
+    public decimal TotalAjustesEntrada { get; set; }
     public decimal TotalPurchasesPaid { get; set; }
 }

@@ -2,6 +2,7 @@ using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Restaurant.Application.Common;
 using Restaurant.Application.Features.Sales.SalesReceipts;
 
 namespace Restaurant.Infrastructure.SalesReceipts;
@@ -13,7 +14,7 @@ internal static class QuestPdfSalesReceiptDocument
 
     public static byte[] BuildPdf(SalesReceiptModel receipt)
     {
-        var issuedLocal = receipt.IssuedAtUtc.ToLocalTime();
+        var issuedLocal = ColombiaTime.ToBogota(receipt.IssuedAtUtc);
         var tenant = receipt.Tenant;
         var dateText = issuedLocal.ToString("MMM. dd yyyy hh:mm tt", EsCo).ToLowerInvariant();
         var rangeLabel = string.IsNullOrWhiteSpace(tenant.InvoiceNumberPrefix)
@@ -57,8 +58,8 @@ internal static class QuestPdfSalesReceiptDocument
 
                         column.Item().PaddingTop(3).LineHorizontal(0.5f);
 
-                        // —— Factura electrónica ——
-                        column.Item().AlignCenter().Text("FACTURA ELECTRÓNICA").Bold().FontSize(9);
+                        // —— Factura POS ——
+                        column.Item().AlignCenter().Text("FACTURA POS").Bold().FontSize(9);
 
                         column.Item().PaddingTop(2).Row(row =>
                         {

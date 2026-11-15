@@ -29,6 +29,15 @@ public sealed class CustomersController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    [HttpGet("by-tax-id")]
+    public async Task<ActionResult<CustomerDto>> GetByTaxId(
+        [FromQuery] string? taxId,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await _service.FindByTaxIdAsync(taxId ?? string.Empty, cancellationToken);
+        return item is null ? NotFound() : Ok(item);
+    }
+
     [HttpPost]
     public async Task<ActionResult<CustomerDto>> Create(
         [FromBody] CreateCustomerDto dto,

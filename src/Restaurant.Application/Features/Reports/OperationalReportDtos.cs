@@ -72,6 +72,7 @@ public sealed class CashOutflowsReportRowDto
     public string Description { get; set; } = string.Empty;
     public string? ProviderName { get; set; }
     public bool IsCashDrawerPayment { get; set; }
+    public bool IsVoided { get; set; }
     public string CashierEmail { get; set; } = string.Empty;
 }
 
@@ -96,10 +97,12 @@ public sealed class DailySummaryReportRowDto
     public decimal TotalSales { get; set; }
     public decimal TotalPurchases { get; set; }
     public decimal TotalCashOutflows { get; set; }
+    public decimal TotalCashInflows { get; set; }
     public decimal NetResult { get; set; }
     public int SalesOrderCount { get; set; }
     public int PurchaseCount { get; set; }
     public int CashOutflowCount { get; set; }
+    public int CashInflowCount { get; set; }
     public decimal ItemsSold { get; set; }
 }
 
@@ -111,6 +114,7 @@ public sealed class DailySummaryReportDto
     public decimal GrandTotalSales { get; set; }
     public decimal GrandTotalPurchases { get; set; }
     public decimal GrandTotalCashOutflows { get; set; }
+    public decimal GrandTotalCashInflows { get; set; }
     public decimal GrandNetResult { get; set; }
     public IReadOnlyList<DailySummaryReportRowDto> Rows { get; set; } = [];
 }

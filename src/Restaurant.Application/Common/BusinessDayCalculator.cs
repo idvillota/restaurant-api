@@ -27,7 +27,7 @@ public static class BusinessDayCalculator
     private static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
     {
         if (string.IsNullOrWhiteSpace(timeZoneId))
-            return TimeZoneInfo.Utc;
+            return ColombiaTime.TimeZone;
 
         try
         {
@@ -35,11 +35,11 @@ public static class BusinessDayCalculator
         }
         catch (TimeZoneNotFoundException)
         {
-            return TimeZoneInfo.Utc;
+            return ColombiaTime.TimeZone;
         }
         catch (InvalidTimeZoneException)
         {
-            return TimeZoneInfo.Utc;
+            return ColombiaTime.TimeZone;
         }
     }
 }

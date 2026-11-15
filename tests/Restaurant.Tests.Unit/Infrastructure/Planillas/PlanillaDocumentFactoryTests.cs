@@ -69,6 +69,10 @@ public sealed class PlanillaDocumentFactoryTests
                             Amount = 5m,
                         },
                     ],
+                    Inflows =
+                    [
+                        new PlanillaInflowInput { Amount = 12m },
+                    ],
                 },
             ]);
 
@@ -77,6 +81,7 @@ public sealed class PlanillaDocumentFactoryTests
         Assert.Equal(30m, model.VitrinaCafeSales);
         Assert.Equal(100m, model.CollectedPayments);
         Assert.Equal(55m, model.TotalEgresos);
+        Assert.Equal(12m, model.TotalAjustesEntrada);
         Assert.Equal(40m, model.TotalPurchasesPaid);
         Assert.Equal(-10m, model.OverShort);
         Assert.Equal(2, model.Categories.Count);

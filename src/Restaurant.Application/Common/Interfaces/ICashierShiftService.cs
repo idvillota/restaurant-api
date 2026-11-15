@@ -11,7 +11,15 @@ public interface ICashierShiftService
     Task<CashierShiftReportDto> ForceCloseShiftAsync(Guid shiftId, string? notes, CancellationToken cancellationToken = default);
     Task<CashierShiftReportDto> GetShiftReportAsync(Guid shiftId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CashierShiftSummaryDto>> ListShiftsAsync(DateOnly? businessDate, CancellationToken cancellationToken = default);
-    Task<CashMovementDto> RecordCashMovementAsync(CreateCashMovementDto dto, CancellationToken cancellationToken = default);
+    Task<CashMovementDto> RecordCashMovementAsync(
+        CreateCashMovementDto dto,
+        bool canRecordCashAdjustment = false,
+        CancellationToken cancellationToken = default);
+    Task<CashMovementDto> VoidCashMovementAsync(
+        Guid movementId,
+        VoidCashMovementDto dto,
+        bool canVoidClosedShift,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CashierProviderOptionDto>> ListActiveProvidersAsync(CancellationToken cancellationToken = default);
     Task<(Guid ShiftId, Guid UserId)> RequireOpenShiftAsync(CancellationToken cancellationToken = default);
 }

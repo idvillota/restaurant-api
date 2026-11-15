@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Xml.Linq;
+using Restaurant.Application.Common;
 using Restaurant.Application.Features.Sales.SalesReceipts;
 
 namespace Restaurant.Infrastructure.SalesReceipts;
@@ -11,7 +12,7 @@ internal static class SalesReceiptXmlBuilder
 
     public static byte[] BuildXml(SalesReceiptModel receipt)
     {
-        var issuedLocal = receipt.IssuedAtUtc.ToLocalTime();
+        var issuedLocal = ColombiaTime.ToBogota(receipt.IssuedAtUtc);
         var tenant = receipt.Tenant;
         var inv = CultureInfo.InvariantCulture;
 
@@ -42,7 +43,7 @@ internal static class SalesReceiptXmlBuilder
                 new XElement(Ns + "ConsecutivoDIAN", receipt.DianConsecutiveNumber.ToString(inv)),
                 new XElement(Ns + "NumeroFactura", receipt.InvoiceDisplayNumber),
                 new XElement(Ns + "NumeroCuenta", receipt.BillNumber),
-                new XElement(Ns + "FechaHora", issuedLocal.ToString("o")),
+                new XElement(Ns + "FechaHora", issuedLocal.ToString("yyyy-MM-dd'T'HH:mm:ss", inv) + "-05:00"),
                 El(Ns + "Mesas", receipt.TableCodes),
                 El(Ns + "Pedidos", receipt.OrderNumbers)));
 

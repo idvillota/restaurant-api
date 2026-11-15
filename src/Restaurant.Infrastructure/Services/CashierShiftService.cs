@@ -205,6 +205,7 @@ public sealed class CashierShiftService : ICashierShiftService
 
     public async Task<CashMovementDto> RecordCashMovementAsync(
         CreateCashMovementDto dto,
+        bool canRecordCashAdjustment = false,
         CancellationToken cancellationToken = default)
     {
         var (tenantId, userId, day) = await ResolveContextAsync(cancellationToken);
@@ -213,6 +214,19 @@ public sealed class CashierShiftService : ICashierShiftService
 
         if (dto.Amount <= 0)
             throw new InvalidOperationException("Amount must be greater than zero.");
+
+        var isAdjustment = dto.MovementType is CashMovementType.AdjustmentIn or CashMovementType.AdjustmentOut;
+        if (isAdjustment && !canRecordCashAdjustment)
+            throw new InvalidOperationException(
+                "Solo un usuario con cierre diario puede registrar un ajuste de caja.");
+
+        if (dto.MovementType == CashMovementType.AdjustmentIn)
+        {
+            if (dto.PurchaseId is not null)
+                throw new InvalidOperationException("Un ajuste de entrada no puede vincularse a una compra.");
+            dto.ProviderId = null;
+            dto.IsCashDrawerPayment = true;
+        }
 
         CashierShift? shift = null;
         if (dto.CashierShiftId is { } shiftId)
@@ -235,6 +249,10 @@ public sealed class CashierShiftService : ICashierShiftService
                     s.Status == CashierShiftStatus.Open,
                 cancellationToken);
         }
+
+        if (dto.MovementType == CashMovementType.AdjustmentIn && shift is null)
+            throw new InvalidOperationException(
+                "Debe tener un turno abierto para registrar un ajuste de entrada.");
 
         if (dto.PurchaseId is { } purchaseId)
         {
@@ -280,6 +298,89 @@ public sealed class CashierShiftService : ICashierShiftService
         await _db.SaveChangesAsync(cancellationToken);
 
         return MapMovement(movement, providerName);
+    }
+
+    public async Task<CashMovementDto> VoidCashMovementAsync(
+        Guid movementId,
+        VoidCashMovementDto dto,
+        bool canVoidClosedShift,
+        CancellationToken cancellationToken = default)
+    {
+        var (tenantId, userId, _) = await ResolveContextAsync(cancellationToken);
+        var movement = await _db.CashMovements
+            .Include(m => m.Provider)
+            .FirstOrDefaultAsync(m => m.Id == movementId && m.TenantId == tenantId, cancellationToken)
+            ?? throw new InvalidOperationException("Cash movement was not found.");
+
+        if (movement.VoidedAtUtc is not null)
+            throw new InvalidOperationException("Este egreso ya está anulado.");
+
+        var dayClosed = await _db.DailyClosures.AnyAsync(
+            c =>
+                c.TenantId == tenantId
+                && c.BusinessDate == movement.BusinessDate
+                && c.Status == DailyClosureStatus.Closed,
+            cancellationToken);
+        if (dayClosed)
+            throw new InvalidOperationException(
+                "No se puede anular un egreso de un día operativo cerrado.");
+
+        CashierShift? shift = null;
+        if (movement.CashierShiftId is { } shiftId)
+        {
+            shift = await _db.CashierShifts.FirstOrDefaultAsync(
+                s => s.Id == shiftId && s.TenantId == tenantId,
+                cancellationToken);
+        }
+
+        var shiftOpen = shift is { Status: CashierShiftStatus.Open };
+        if (shiftOpen)
+        {
+            if (movement.CreatedByUserId != userId && !canVoidClosedShift)
+                throw new InvalidOperationException(
+                    "Solo quien registró el egreso puede anularlo mientras el turno está abierto.");
+        }
+        else if (!canVoidClosedShift)
+        {
+            throw new InvalidOperationException(
+                "Solo un usuario con cierre diario puede anular un egreso de un turno cerrado.");
+        }
+
+        var reason = dto.Reason?.Trim();
+        if (string.IsNullOrEmpty(reason))
+            reason = "Egreso duplicado o registrado por error.";
+        if (reason.Length > 500)
+            reason = reason[..500];
+
+        movement.VoidedAtUtc = DateTime.UtcNow;
+        movement.VoidedByUserId = userId;
+        movement.VoidReason = reason;
+        _db.CashMovements.Update(movement);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        if (shift is { Status: CashierShiftStatus.Closed })
+            await RecalculateClosedShiftExpectedCashAsync(shift, cancellationToken);
+
+        return MapMovement(movement);
+    }
+
+    private async Task RecalculateClosedShiftExpectedCashAsync(
+        CashierShift shift,
+        CancellationToken cancellationToken)
+    {
+        var report = await BuildShiftReportAsync(shift, cancellationToken);
+        shift.ExpectedCash = decimal.Round(ExpectedDrawerCash(report), 2, MidpointRounding.AwayFromZero);
+        _db.CashierShifts.Update(shift);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _planillaPdf.GenerateShiftPdfAsync(shift.Id, cancellationToken);
+        }
+        catch
+        {
+            // Expected cash is already updated; PDF can be generated on download.
+        }
     }
 
     public async Task<IReadOnlyList<CashierProviderOptionDto>> ListActiveProvidersAsync(
@@ -347,7 +448,8 @@ public sealed class CashierShiftService : ICashierShiftService
     private static decimal ExpectedDrawerCash(CashierShiftReportDto report) =>
         report.Shift.OpeningFloat
         + report.TotalsByMethod.Where(t => t.Method == PaymentMethod.Cash).Sum(t => t.Total)
-        - report.CashOutflowTotal;
+        - report.CashOutflowTotal
+        + report.CashInflowTotal;
 
     private async Task<CashierShiftReportDto> BuildShiftReportAsync(
         CashierShift shift,
@@ -376,12 +478,17 @@ public sealed class CashierShiftService : ICashierShiftService
 
         await ShiftPaymentTableCodes.FillMissingAsync(_db, payments, cancellationToken);
 
-        var outflows = await _db.CashMovements
+        var movements = await _db.CashMovements
             .AsNoTracking()
             .Include(m => m.Provider)
-            .Where(m => m.CashierShiftId == shift.Id && CashMovementKinds.OutflowTypes.Contains(m.MovementType))
+            .Where(m =>
+                m.CashierShiftId == shift.Id
+                && (CashMovementKinds.OutflowTypes.Contains(m.MovementType)
+                    || m.MovementType == CashMovementType.AdjustmentIn))
             .OrderBy(m => m.OccurredAtUtc)
             .ToListAsync(cancellationToken);
+        var outflows = movements.Where(m => CashMovementKinds.IsOutflow(m.MovementType)).ToList();
+        var inflows = movements.Where(m => CashMovementKinds.IsInflow(m.MovementType)).ToList();
 
         var totalsByMethod = payments
             .GroupBy(p => p.Method)
@@ -412,7 +519,12 @@ public sealed class CashierShiftService : ICashierShiftService
             totalSales = collected;
             vitrinaCafeSales = 0m;
         }
-        var cashOutflowTotal = outflows.Where(m => m.IsCashDrawerPayment).Sum(m => m.Amount);
+        var cashOutflowTotal = outflows
+            .Where(m => m.IsCashDrawerPayment && m.VoidedAtUtc is null)
+            .Sum(m => m.Amount);
+        var cashInflowTotal = inflows
+            .Where(m => m.IsCashDrawerPayment && m.VoidedAtUtc is null)
+            .Sum(m => m.Amount);
 
         var summary = MapSummary(shift);
         if (summary.ExpectedCash is not null && summary.CountedCash is not null)
@@ -429,6 +541,8 @@ public sealed class CashierShiftService : ICashierShiftService
             Payments = payments,
             CashOutflows = outflows.Select(m => MapMovement(m)).ToList(),
             CashOutflowTotal = cashOutflowTotal,
+            CashInflows = inflows.Select(m => MapMovement(m)).ToList(),
+            CashInflowTotal = cashInflowTotal,
         };
     }
 
@@ -480,6 +594,9 @@ public sealed class CashierShiftService : ICashierShiftService
             ProviderName = providerName ?? movement.Provider?.Name,
             IsCashDrawerPayment = movement.IsCashDrawerPayment,
             OccurredAtUtc = movement.OccurredAtUtc,
+            IsVoided = movement.VoidedAtUtc is not null,
+            VoidedAtUtc = movement.VoidedAtUtc,
+            VoidReason = movement.VoidReason,
         };
 
     private Guid ResolveTenantId()

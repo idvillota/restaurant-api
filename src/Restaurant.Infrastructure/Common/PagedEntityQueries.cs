@@ -306,6 +306,8 @@ internal static class PagedEntityQueries
 
     public static IQueryable<DiningTable> ShapeDiningTables(IQueryable<DiningTable> query, ListQuery q)
     {
+        query = query.Where(t => !t.IsDeliverySlot);
+
         if (!q.IncludeInactive)
             query = query.Where(t => t.IsActive);
 

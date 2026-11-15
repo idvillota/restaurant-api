@@ -7,7 +7,9 @@ public interface ICustomerService
 {
     Task<PagedResult<CustomerDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default);
     Task<CustomerDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<CustomerDto?> FindByTaxIdAsync(string taxId, CancellationToken cancellationToken = default);
     Task<CustomerDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default);
+    Task<CustomerDto> UpsertDeliveryProfileAsync(StartDeliveryCustomerDto dto, CancellationToken cancellationToken = default);
     Task<CustomerDto?> UpdateAsync(Guid id, UpdateCustomerDto dto, CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }
