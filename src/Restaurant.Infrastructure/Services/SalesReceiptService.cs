@@ -167,6 +167,7 @@ public sealed class SalesReceiptService : ISalesReceiptService
             PaymentMethod.Cash => "EFECTIVO",
             PaymentMethod.Card => "TARJETA",
             PaymentMethod.Transfer => "TRANSFERENCIA",
+            PaymentMethod.Tiquetera => "TIQUETERA",
             _ => "OTRO",
         };
 

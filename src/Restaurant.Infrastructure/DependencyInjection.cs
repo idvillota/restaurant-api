@@ -101,6 +101,9 @@ public static class DependencyInjection
         services.AddScoped<ISalesOrderService, SalesOrderService>();
         services.AddScoped<IMobileSyncService, MobileSyncService>();
         services.AddScoped<IBillService, BillService>();
+        services.AddScoped<ILunchTicketBookletService, LunchTicketBookletService>();
+        services.AddScoped<ITiqueteraConfigService, TiqueteraConfigService>();
+        services.AddScoped<ITiqueteraSalesService, TiqueteraSalesService>();
         services.AddScoped<IBreBQrService, BreBQrService>();
         services.AddScoped<IPrintJobQueue, PrintJobQueue>();
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();

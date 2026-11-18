@@ -77,5 +77,11 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool RequirePriorDayCloseBeforeNewShift { get; set; }
 
+    /// <summary>
+    /// When true, the tenant may sell lunch-ticket packs and redeem lunches with payment method Tiquetera.
+    /// Default false.
+    /// </summary>
+    public bool TiqueterasEnabled { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }

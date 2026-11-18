@@ -59,6 +59,17 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.KitchenTicketPrintMode = NormalizePrintMode(dto.KitchenTicketPrintMode);
         settings.SeparateVitrinaCafeSales = dto.SeparateVitrinaCafeSales;
         settings.RequirePriorDayCloseBeforeNewShift = dto.RequirePriorDayCloseBeforeNewShift;
+        if (settings.TiqueterasEnabled && !dto.TiqueterasEnabled)
+        {
+            var remaining = await _db.LunchTicketBooklets
+                .AsNoTracking()
+                .SumAsync(b => (int?)b.RemainingTickets, cancellationToken) ?? 0;
+            if (remaining > 0)
+                throw new InvalidOperationException(
+                    $"No se pueden desactivar las tiqueteras mientras haya cupos pendientes ({remaining}).");
+        }
+
+        settings.TiqueterasEnabled = dto.TiqueterasEnabled;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
@@ -148,6 +159,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             KitchenTicketPrintMode = (int)settings.KitchenTicketPrintMode,
             SeparateVitrinaCafeSales = settings.SeparateVitrinaCafeSales,
             RequirePriorDayCloseBeforeNewShift = settings.RequirePriorDayCloseBeforeNewShift,
+            TiqueterasEnabled = settings.TiqueterasEnabled,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

@@ -40,6 +40,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<PurchaseLine> PurchaseLines => Set<PurchaseLine>();
     public DbSet<DiningTable> DiningTables => Set<DiningTable>();
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<LunchTicketBooklet> LunchTicketBooklets => Set<LunchTicketBooklet>();
     public DbSet<Reservation> Reservations => Set<Reservation>();
     public DbSet<ReservationTable> ReservationTables => Set<ReservationTable>();
     public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
@@ -350,6 +351,15 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.DashboardLayoutJson);
         });
 
+        modelBuilder.Entity<LunchTicketBooklet>(e =>
+        {
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PurchaseBill).WithMany().HasForeignKey(x => x.PurchaseBillId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.PackProduct).WithMany().HasForeignKey(x => x.PackProductId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.PackUnitPrice).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.TenantId, x.CustomerId, x.RemainingTickets });
+        });
+
         modelBuilder.Entity<CashierShift>(e =>
         {
             e.HasOne(x => x.CashierUser).WithMany().HasForeignKey(x => x.CashierUserId);
@@ -559,6 +569,9 @@ public sealed class ApplicationDbContext : DbContext
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Customer>().HasQueryFilter(e =>
+            e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<LunchTicketBooklet>().HasQueryFilter(e =>
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<Reservation>().HasQueryFilter(e =>

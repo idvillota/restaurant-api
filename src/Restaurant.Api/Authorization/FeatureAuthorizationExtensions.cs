@@ -44,6 +44,14 @@ public static class FeatureAuthorizationExtensions
                         || HasPermission(context, FeatureCodes.ReportsDailyClosure)));
 
             options.AddPolicy(
+                FeatureAuthorizationPolicies.TiqueterasAccess,
+                policy => policy
+                    .RequireAuthenticatedUser()
+                    .RequireAssertion(context =>
+                        HasPermission(context, FeatureCodes.CatalogProducts)
+                        || HasPermission(context, FeatureCodes.PaymentsCheckout)));
+
+            options.AddPolicy(
                 PlatformAuthorizationPolicies.PlatformAdmin,
                 policy => policy
                     .RequireAuthenticatedUser()

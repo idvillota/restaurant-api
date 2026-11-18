@@ -15,6 +15,8 @@ public sealed class ProductListItemDto
     public string? ImagePath { get; set; }
     public string? ImageUrl { get; set; }
     public bool IsActive { get; set; }
+    public int? LunchTicketPackSize { get; set; }
+    public bool IsLunchTicketRedeemable { get; set; }
 }
 
 public sealed class ProductMenuDto

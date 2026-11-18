@@ -45,6 +45,9 @@ public sealed class TenantSettingsDto
     /// </summary>
     public bool RequirePriorDayCloseBeforeNewShift { get; set; }
 
+    /// <summary>When true, tenant can sell/redeem lunch ticket packs (tiqueteras).</summary>
+    public bool TiqueterasEnabled { get; set; }
+
     public string? BreBKey { get; set; }
 
     public int? BreBKeyType { get; set; }
@@ -119,6 +122,8 @@ public sealed class UpdateTenantSettingsDto
 
     public bool RequirePriorDayCloseBeforeNewShift { get; set; }
 
+    public bool TiqueterasEnabled { get; set; }
+
     [MaxLength(40)]
     public string? BreBKey { get; set; }
 
@@ -161,6 +166,9 @@ public sealed class PayableOrderLineDto
 
     /// <summary>Ingredient exclusions for display grouping (same product + notes + exclusions).</summary>
     public List<Guid> ExcludedIngredientIds { get; set; } = [];
+
+    public bool IsLunchTicketRedeemable { get; set; }
+    public int? LunchTicketPackSize { get; set; }
 }
 
 public sealed class CheckoutCategoryTotalDto
@@ -171,7 +179,8 @@ public sealed class CheckoutCategoryTotalDto
 
 public sealed class CheckoutPaymentLineDto
 {
-    [Range(0.01, double.MaxValue)]
+    /// <summary>Must be &gt; 0 for cash/card/transfer/other. Must be 0 for Tiquetera redemptions.</summary>
+    [Range(0, double.MaxValue)]
     public decimal Amount { get; set; }
 
     public PaymentMethod Method { get; set; }

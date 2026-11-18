@@ -131,6 +131,7 @@ internal static class PlanillaDocumentFactory
             PaymentMethod.Cash => "Efectivo",
             PaymentMethod.Card => "Tarjeta",
             PaymentMethod.Transfer => "Transferencia",
+            PaymentMethod.Tiquetera => "Tiquetera",
             _ => "Otro",
         };
 

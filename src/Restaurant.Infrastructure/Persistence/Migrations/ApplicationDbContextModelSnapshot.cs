@@ -854,6 +854,56 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.ToTable("Invoices");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.LunchTicketBooklet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PackProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PackUnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("PurchasedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PurchaseBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RemainingTickets")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TotalTickets")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("PackProductId");
+
+                    b.HasIndex("PurchaseBillId");
+
+                    b.HasIndex("TenantId", "CustomerId", "RemainingTickets");
+
+                    b.ToTable("LunchTicketBooklets");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.MobileSyncReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1061,6 +1111,12 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsLunchTicketRedeemable")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LunchTicketPackSize")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("ManualCostPrice")
                         .HasPrecision(18, 2)
@@ -1898,6 +1954,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<bool>("RequirePriorDayCloseBeforeNewShift")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("TiqueterasEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("TaxId")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -2245,6 +2304,32 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("SalesOrder");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.LunchTicketBooklet", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.Product", "PackProduct")
+                        .WithMany()
+                        .HasForeignKey("PackProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.Bill", "PurchaseBill")
+                        .WithMany()
+                        .HasForeignKey("PurchaseBillId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("PackProduct");
+
+                    b.Navigation("PurchaseBill");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.Payment", b =>

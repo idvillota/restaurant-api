@@ -79,6 +79,8 @@ public sealed class ProductService : IProductService
         {
             Products = products
                 .Where(p => p.ProductType is { IsActive: true })
+                // Packs are sold from Tiqueteras (customer-first), not from salon orders.
+                .Where(p => p.LunchTicketPackSize is null or <= 0)
                 .Select(p => MapProduct(p, costPrice: 0m))
                 .ToList(),
         };
@@ -149,6 +151,7 @@ public sealed class ProductService : IProductService
         entity.Description = NormalizeDescription(dto.Description);
         entity.UnitPrice = dto.UnitPrice;
         entity.IsActive = dto.IsActive;
+        // Lunch-ticket pack/redeemable flags are managed only via Tiqueteras config.
         await ApplyPostedCostAsync(entity, dto.CostPrice, cancellationToken);
 
         if (compositionTypeChanged)
