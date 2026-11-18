@@ -8,6 +8,7 @@ public sealed class SalesReportRowDto
     public decimal UnitPrice { get; set; }
     public decimal Quantity { get; set; }
     public DateTime SoldAtUtc { get; set; }
+    public DateOnly OperationalDate { get; set; }
 }
 
 public sealed class SalesReportDto

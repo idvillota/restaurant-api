@@ -129,7 +129,7 @@ public sealed class CustomerServiceTests
 
         Assert.Equal("Calle 1", second.Address);
         Assert.Equal("302", second.Phone);
-        Assert.Equal("Calle 1", (await fx.Db.Customers.SingleAsync()).Address);
+        Assert.Equal("Calle 1", fx.Db.Customers.Single().Address);
     }
 
     [Fact]

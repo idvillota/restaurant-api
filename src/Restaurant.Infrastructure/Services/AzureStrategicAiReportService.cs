@@ -7,6 +7,7 @@ using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
 using Restaurant.Application.Features.Reports;
+using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Persistence;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -162,22 +163,21 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         DateOnly salesEndDate,
         CancellationToken cancellationToken)
     {
-        var startUtc = salesStartDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var endExclusive = salesEndDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var (startUtc, endExclusive) = ColombiaTime.ToUtcRange(salesStartDate, salesEndDate);
 
-        var paidLineRows = await _db.SalesOrderLines
-            .AsNoTracking()
-            .Where(l =>
-                l.TenantId == tenantId
-                && l.CreatedAtUtc >= startUtc
-                && l.CreatedAtUtc < endExclusive
-                && l.SalesOrder.Status == Domain.Enums.SalesOrderStatus.Paid)
+        var paidLineRows = await OperationalDayQueries.PaidBillLinesOnOperationalDays(
+                _db.BillLines.AsNoTracking().Where(l => l.TenantId == tenantId),
+                salesStartDate,
+                salesEndDate,
+                startUtc,
+                endExclusive)
             .Select(l => new PaidSalesLineRow(
-                l.Product.Name,
+                l.ProductName,
                 l.Quantity,
                 l.LineTotal,
-                l.SalesOrderId,
-                l.CreatedAtUtc))
+                l.BillId,
+                l.Bill.PaidAtUtc ?? l.Bill.IssuedAtUtc,
+                l.Bill.CashierShift != null ? (DateOnly?)l.Bill.CashierShift.BusinessDate : null))
             .ToListAsync(cancellationToken);
 
         var productTotals = paidLineRows
@@ -193,7 +193,7 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
             .ToList();
 
         var dailyTotals = paidLineRows
-            .GroupBy(l => DateOnly.FromDateTime(l.CreatedAtUtc))
+            .GroupBy(l => l.OperationalDate)
             .Select(g => new
             {
                 Date = g.Key,
@@ -205,7 +205,7 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
             .ToList();
 
         var hourlyTotals = paidLineRows
-            .GroupBy(l => l.CreatedAtUtc.Hour)
+            .GroupBy(l => ColombiaTime.Hour(l.PaidAtUtc))
             .Select(g => new
             {
                 Hour = g.Key,
@@ -229,7 +229,7 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         }
 
         sb.AppendLine();
-        sb.AppendLine("=== RESUMEN POR DÍA ===");
+        sb.AppendLine("=== RESUMEN POR DÍA OPERATIVO ===");
         sb.AppendLine("Fecha\tCantidad\tIngresoBruto\tPedidos");
         foreach (var row in dailyTotals)
         {
@@ -242,7 +242,7 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         }
 
         sb.AppendLine();
-        sb.AppendLine("=== DISTRIBUCIÓN POR HORA (UTC) ===");
+        sb.AppendLine("=== DISTRIBUCIÓN POR HORA (America/Bogota) ===");
         sb.AppendLine("Hora\tCantidad\tIngresoBruto");
         foreach (var row in hourlyTotals)
         {
@@ -436,5 +436,10 @@ public sealed class AzureStrategicAiReportService : IStrategicAiReportService
         decimal Quantity,
         decimal LineTotal,
         Guid SalesOrderId,
-        DateTime CreatedAtUtc);
+        DateTime PaidAtUtc,
+        DateOnly? ShiftDate)
+    {
+        public DateOnly OperationalDate =>
+            ShiftDate ?? ColombiaTime.CalendarDate(PaidAtUtc);
+    }
 }

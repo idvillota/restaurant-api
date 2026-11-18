@@ -28,4 +28,16 @@ public static class ColombiaTime
     public static string Stamp(DateTime utc, string format) => ToBogota(utc).ToString(format);
 
     public static string NowStamp(string format) => Stamp(DateTime.UtcNow, format);
+
+    public static int Hour(DateTime utc) => ToBogota(utc).Hour;
+
+    /// <summary>UTC instant of 00:00 America/Bogota on <paramref name="date"/>.</summary>
+    public static DateTime StartOfDayUtc(DateOnly date)
+    {
+        var localMidnight = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(localMidnight, TimeZone);
+    }
+
+    public static (DateTime StartUtc, DateTime EndExclusive) ToUtcRange(DateOnly startDate, DateOnly endDate) =>
+        (StartOfDayUtc(startDate), StartOfDayUtc(endDate.AddDays(1)));
 }
