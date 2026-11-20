@@ -3,6 +3,7 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -54,7 +55,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.InvoiceNumberPrefix = dto.InvoiceNumberPrefix?.Trim();
         settings.ImpoconsumoPercent = dto.ImpoconsumoPercent;
         settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
-        settings.InventoryEnabled = dto.InventoryEnabled;
+        StockControlHelper.ApplyToSettings(settings, dto.StockControlMode, dto.InventoryEnabled);
         settings.AutoGeneratePurchaseBillNumbers = dto.AutoGeneratePurchaseBillNumbers;
         settings.KitchenTicketPrintMode = NormalizePrintMode(dto.KitchenTicketPrintMode);
         settings.SeparateVitrinaCafeSales = dto.SeparateVitrinaCafeSales;
@@ -96,6 +97,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             Country = "Colombia",
             ShowOperationalSalesPanel = true,
             InventoryEnabled = true,
+            StockControlMode = StockControlMode.Ingredients,
             AutoGeneratePurchaseBillNumbers = false,
             KitchenTicketPrintMode = KitchenTicketPrintMode.Always,
             SeparateVitrinaCafeSales = false,
@@ -155,6 +157,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
             ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
             InventoryEnabled = settings.InventoryEnabled,
+            StockControlMode = (int)settings.StockControlMode,
             AutoGeneratePurchaseBillNumbers = settings.AutoGeneratePurchaseBillNumbers,
             KitchenTicketPrintMode = (int)settings.KitchenTicketPrintMode,
             SeparateVitrinaCafeSales = settings.SeparateVitrinaCafeSales,

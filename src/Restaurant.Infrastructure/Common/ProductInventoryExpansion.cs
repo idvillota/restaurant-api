@@ -37,6 +37,63 @@ internal static class ProductInventoryExpansion
         }
     }
 
+    /// <summary>
+    /// Builds finished-goods demand for ProductUnits mode.
+    /// Prepared/Resale consume their own units; bundles expand to component products.
+    /// </summary>
+    internal static async Task AddProductUnitDemandAsync(
+        ApplicationDbContext db,
+        Dictionary<Guid, decimal> requirements,
+        IReadOnlyList<(Guid ProductId, decimal LineQuantity)> specs,
+        CancellationToken cancellationToken)
+    {
+        if (specs.Count == 0)
+            return;
+
+        var rootProductIds = specs.Select(s => s.ProductId).Distinct().ToList();
+        var snapshots = await LoadCompositionSnapshotsAsync(db, rootProductIds, cancellationToken);
+
+        foreach (var (productId, lineQuantity) in specs)
+        {
+            ExpandProductUnitDemand(requirements, productId, lineQuantity, snapshots, []);
+        }
+    }
+
+    private static void ExpandProductUnitDemand(
+        Dictionary<Guid, decimal> requirements,
+        Guid productId,
+        decimal multiplier,
+        IReadOnlyDictionary<Guid, ProductCompositionSnapshot> snapshots,
+        HashSet<Guid> visitedProducts)
+    {
+        if (!visitedProducts.Add(productId))
+            return;
+
+        if (!snapshots.TryGetValue(productId, out var snapshot))
+            return;
+
+        switch (snapshot.CompositionType)
+        {
+            case EProductType.Prepared:
+            case EProductType.Resale:
+                requirements[productId] = requirements.GetValueOrDefault(productId) + multiplier;
+                break;
+
+            case EProductType.Bundle:
+                foreach (var (componentProductId, componentQuantity) in snapshot.BundleLines)
+                {
+                    ExpandProductUnitDemand(
+                        requirements,
+                        componentProductId,
+                        multiplier * componentQuantity,
+                        snapshots,
+                        visitedProducts);
+                }
+
+                break;
+        }
+    }
+
     private static void ExpandProductDemand(
         Dictionary<Guid, decimal> requirements,
         Guid productId,

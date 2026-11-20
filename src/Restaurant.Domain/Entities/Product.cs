@@ -14,6 +14,13 @@ public class Product : EntityBase, ITenantScoped
     public decimal UnitPrice { get; set; }
     /// <summary>Used as product cost when tenant inventory is off. Ignored for COGS while inventory is on.</summary>
     public decimal ManualCostPrice { get; set; }
+
+    /// <summary>
+    /// Finished-goods units available when <see cref="Enums.StockControlMode.ProductUnits"/> is on.
+    /// Increased by production documents; decreased on sale.
+    /// </summary>
+    public decimal StockQuantity { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     /// <summary>

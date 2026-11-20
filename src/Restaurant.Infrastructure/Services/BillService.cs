@@ -526,10 +526,8 @@ public sealed class BillService : IBillService
 
     private async Task DeductInventoryForOrderAsync(SalesOrder order, CancellationToken cancellationToken)
     {
-        var inventoryEnabled = await _db.TenantSettings.AsNoTracking()
-            .Select(s => (bool?)s.InventoryEnabled)
-            .FirstOrDefaultAsync(cancellationToken) ?? true;
-        if (!inventoryEnabled)
+        var mode = await StockControlHelper.GetModeAsync(_db, cancellationToken);
+        if (mode == StockControlMode.None)
             return;
 
         var distinctLines = order.Lines
@@ -537,6 +535,12 @@ public sealed class BillService : IBillService
             .Select(g => g.First())
             .Where(l => l.Quantity > 0)
             .ToList();
+
+        if (mode == StockControlMode.ProductUnits)
+        {
+            await DeductProductUnitsForOrderAsync(distinctLines, cancellationToken);
+            return;
+        }
 
         var requirements = new Dictionary<Guid, decimal>();
         var specs = distinctLines
@@ -560,6 +564,32 @@ public sealed class BillService : IBillService
 
             ingredient.StockQuantity = InventoryCosting.SubtractStock(ingredient.StockQuantity, deduct);
             _db.Ingredients.Update(ingredient);
+        }
+    }
+
+    private async Task DeductProductUnitsForOrderAsync(
+        IReadOnlyList<SalesOrderLine> distinctLines,
+        CancellationToken cancellationToken)
+    {
+        var requirements = new Dictionary<Guid, decimal>();
+        var specs = distinctLines.Select(l => (l.ProductId, l.Quantity)).ToList();
+        await ProductInventoryExpansion.AddProductUnitDemandAsync(_db, requirements, specs, cancellationToken);
+
+        if (requirements.Count == 0)
+            return;
+
+        var productIds = requirements.Keys.ToList();
+        var products = await _db.Products
+            .Where(p => productIds.Contains(p.Id) && p.IsActive)
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        foreach (var (productId, deduct) in requirements)
+        {
+            if (!products.TryGetValue(productId, out var product))
+                continue;
+
+            product.StockQuantity = InventoryCosting.SubtractStock(product.StockQuantity, deduct);
+            _db.Products.Update(product);
         }
     }
 

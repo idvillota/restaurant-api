@@ -50,8 +50,14 @@ public class TenantSettings : ITenantScoped
     /// <summary>
     /// When true, Resale/Prepared products use ingredients for stock and cost.
     /// When false, catalog is sell-only (recipes optional). Default true for existing tenants.
+    /// Synced from <see cref="StockControlMode"/>: true only when mode is Ingredients.
     /// </summary>
     public bool InventoryEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Transversal stock strategy: Ingredients, None, or ProductUnits.
+    /// </summary>
+    public StockControlMode StockControlMode { get; set; } = StockControlMode.Ingredients;
 
     /// <summary>
     /// When true, a blank purchase bill number is replaced with COMPRA-yyyyMMdd-0001.

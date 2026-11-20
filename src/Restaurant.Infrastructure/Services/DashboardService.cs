@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Dashboard;
 using Restaurant.Domain.Entities;
+using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -157,6 +158,7 @@ public sealed class DashboardService : IDashboardService
             Country = "Colombia",
             ShowOperationalSalesPanel = true,
             InventoryEnabled = true,
+            StockControlMode = StockControlMode.Ingredients,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);

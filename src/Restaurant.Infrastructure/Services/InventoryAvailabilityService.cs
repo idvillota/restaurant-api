@@ -19,13 +19,16 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         StockAvailabilityCheckDto dto,
         CancellationToken cancellationToken = default)
     {
-        if (!await IsInventoryEnabledAsync(cancellationToken))
+        var mode = await StockControlHelper.GetModeAsync(_db, cancellationToken);
+        if (mode == StockControlMode.None)
             return new StockAvailabilityResultDto { IsAvailable = true };
 
         var requirements = new Dictionary<Guid, decimal>();
-        await AddDemandFromOpenOrdersAsync(requirements, dto.SalesOrderId, cancellationToken);
-        await AddDemandFromLineDtosAsync(requirements, dto.Lines, cancellationToken);
-        return await BuildResultAsync(requirements, cancellationToken);
+        await AddDemandFromOpenOrdersAsync(requirements, dto.SalesOrderId, mode, cancellationToken);
+        await AddDemandFromLineDtosAsync(requirements, dto.Lines, mode, cancellationToken);
+        return mode == StockControlMode.ProductUnits
+            ? await BuildProductUnitResultAsync(requirements, cancellationToken)
+            : await BuildIngredientResultAsync(requirements, cancellationToken);
     }
 
     public Task<StockAvailabilityResultDto> CheckKitchenBatchAsync(
@@ -57,21 +60,15 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         IReadOnlyList<SalesOrder> orders,
         CancellationToken cancellationToken = default)
     {
-        if (!await IsInventoryEnabledAsync(cancellationToken))
+        var mode = await StockControlHelper.GetModeAsync(_db, cancellationToken);
+        if (mode == StockControlMode.None)
             return new StockAvailabilityResultDto { IsAvailable = true };
 
         var requirements = new Dictionary<Guid, decimal>();
-        await AddDemandFromOrderEntitiesAsync(requirements, orders, cancellationToken);
-        return await BuildResultAsync(requirements, cancellationToken);
-    }
-
-    private async Task<bool> IsInventoryEnabledAsync(CancellationToken cancellationToken)
-    {
-        var enabled = await _db.TenantSettings.AsNoTracking()
-            .Select(s => (bool?)s.InventoryEnabled)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return enabled ?? true;
+        await AddDemandFromOrderEntitiesAsync(requirements, orders, mode, cancellationToken);
+        return mode == StockControlMode.ProductUnits
+            ? await BuildProductUnitResultAsync(requirements, cancellationToken)
+            : await BuildIngredientResultAsync(requirements, cancellationToken);
     }
 
     public void EnsureAvailable(StockAvailabilityResultDto result)
@@ -91,6 +88,7 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
     private async Task AddDemandFromOpenOrdersAsync(
         Dictionary<Guid, decimal> requirements,
         Guid? excludeSalesOrderId,
+        StockControlMode mode,
         CancellationToken cancellationToken)
     {
         var openOrderIds = await _db.SalesOrders
@@ -120,7 +118,7 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
             .Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredientIds.ToHashSet()))
             .ToList();
 
-        await AddDemandFromSpecsAsync(requirements, specs, cancellationToken);
+        await AddDemandFromSpecsAsync(requirements, specs, mode, cancellationToken);
     }
 
     private async Task<List<SalesOrder>> LoadOrdersWithLinesAsync(
@@ -137,6 +135,7 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
     private async Task AddDemandFromOrderEntitiesAsync(
         Dictionary<Guid, decimal> requirements,
         IReadOnlyList<SalesOrder> orders,
+        StockControlMode mode,
         CancellationToken cancellationToken)
     {
         var lineSpecs = orders
@@ -145,25 +144,34 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
             .Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet()))
             .ToList();
 
-        await AddDemandFromSpecsAsync(requirements, lineSpecs, cancellationToken);
+        await AddDemandFromSpecsAsync(requirements, lineSpecs, mode, cancellationToken);
     }
 
     private async Task AddDemandFromLineDtosAsync(
         Dictionary<Guid, decimal> requirements,
         IReadOnlyList<StockCheckLineDto> lines,
+        StockControlMode mode,
         CancellationToken cancellationToken)
     {
         var specs = lines.Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredientIds.ToHashSet())).ToList();
-        await AddDemandFromSpecsAsync(requirements, specs, cancellationToken);
+        await AddDemandFromSpecsAsync(requirements, specs, mode, cancellationToken);
     }
 
     private async Task AddDemandFromSpecsAsync(
         Dictionary<Guid, decimal> requirements,
         IReadOnlyList<(Guid ProductId, decimal Quantity, HashSet<Guid> Excluded)> specs,
+        StockControlMode mode,
         CancellationToken cancellationToken)
     {
         if (specs.Count == 0)
             return;
+
+        if (mode == StockControlMode.ProductUnits)
+        {
+            var unitSpecs = specs.Select(s => (s.ProductId, s.Quantity)).ToList();
+            await ProductInventoryExpansion.AddProductUnitDemandAsync(_db, requirements, unitSpecs, cancellationToken);
+            return;
+        }
 
         var expansionSpecs = specs
             .Select(s => (s.ProductId, s.Quantity, s.Excluded))
@@ -172,7 +180,7 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         await ProductInventoryExpansion.AddIngredientDemandAsync(_db, requirements, expansionSpecs, cancellationToken);
     }
 
-    private async Task<StockAvailabilityResultDto> BuildResultAsync(
+    private async Task<StockAvailabilityResultDto> BuildIngredientResultAsync(
         Dictionary<Guid, decimal> requirements,
         CancellationToken cancellationToken)
     {
@@ -200,6 +208,47 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
                 {
                     IngredientId = ingredientId,
                     IngredientName = ingredient.Name,
+                    Required = decimal.Round(required, 4),
+                    Available = decimal.Round(available, 4),
+                    Missing = decimal.Round(required - available, 4),
+                });
+        }
+
+        return new StockAvailabilityResultDto
+        {
+            IsAvailable = shortages.Count == 0,
+            Shortages = shortages,
+        };
+    }
+
+    private async Task<StockAvailabilityResultDto> BuildProductUnitResultAsync(
+        Dictionary<Guid, decimal> requirements,
+        CancellationToken cancellationToken)
+    {
+        if (requirements.Count == 0)
+            return new StockAvailabilityResultDto { IsAvailable = true };
+
+        var productIds = requirements.Keys.ToList();
+        var products = await _db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        var shortages = new List<IngredientShortageDto>();
+        foreach (var (productId, required) in requirements)
+        {
+            if (!products.TryGetValue(productId, out var product))
+                continue;
+
+            var available = product.StockQuantity;
+            if (required <= available)
+                continue;
+
+            shortages.Add(
+                new IngredientShortageDto
+                {
+                    IngredientId = productId,
+                    IngredientName = product.Name,
                     Required = decimal.Round(required, 4),
                     Available = decimal.Round(available, 4),
                     Missing = decimal.Round(required - available, 4),

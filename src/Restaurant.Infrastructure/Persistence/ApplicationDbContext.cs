@@ -33,6 +33,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<IngredientMovementType> IngredientMovementTypes => Set<IngredientMovementType>();
     public DbSet<IngredientMovementDocument> IngredientMovementDocuments => Set<IngredientMovementDocument>();
     public DbSet<IngredientMovement> IngredientMovements => Set<IngredientMovement>();
+    public DbSet<ProductProductionDocument> ProductProductionDocuments => Set<ProductProductionDocument>();
+    public DbSet<ProductProductionLine> ProductProductionLines => Set<ProductProductionLine>();
     public DbSet<ProductIngredient> ProductIngredients => Set<ProductIngredient>();
     public DbSet<ProductBundleLine> ProductBundleLines => Set<ProductBundleLine>();
     public DbSet<Provider> Providers => Set<Provider>();
@@ -158,6 +160,7 @@ public sealed class ApplicationDbContext : DbContext
             e.HasOne(x => x.ProductType).WithMany(x => x.Products).HasForeignKey(x => x.ProductTypeId);
             e.Property(x => x.UnitPrice).HasPrecision(18, 2);
             e.Property(x => x.ManualCostPrice).HasPrecision(18, 2);
+            e.Property(x => x.StockQuantity).HasPrecision(18, 4);
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.ImagePath).HasMaxLength(260);
         });
@@ -212,6 +215,34 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.UnitCostSnapshot).HasPrecision(18, 4);
             e.HasIndex(x => new { x.TenantId, x.IngredientId });
             e.HasIndex(x => new { x.IngredientMovementDocumentId, x.IngredientId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductProductionDocument>(e =>
+        {
+            e.HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.DocumentNumber).HasMaxLength(100);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.HasIndex(x => new { x.TenantId, x.OccurredAtUtc });
+            e.HasIndex(x => new { x.TenantId, x.DocumentNumber });
+        });
+
+        modelBuilder.Entity<ProductProductionLine>(e =>
+        {
+            e.HasOne(x => x.Document)
+                .WithMany(x => x.Lines)
+                .HasForeignKey(x => x.ProductProductionDocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.Quantity).HasPrecision(18, 4);
+            e.Property(x => x.StockQuantitySnapshot).HasPrecision(18, 4);
+            e.HasIndex(x => new { x.TenantId, x.ProductId });
+            e.HasIndex(x => new { x.ProductProductionDocumentId, x.ProductId }).IsUnique();
         });
 
         modelBuilder.Entity<ProductIngredient>(e =>
@@ -548,6 +579,12 @@ public sealed class ApplicationDbContext : DbContext
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<IngredientMovement>().HasQueryFilter(e =>
+            e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<ProductProductionDocument>().HasQueryFilter(e =>
+            e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<ProductProductionLine>().HasQueryFilter(e =>
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<ProductIngredient>().HasQueryFilter(e =>

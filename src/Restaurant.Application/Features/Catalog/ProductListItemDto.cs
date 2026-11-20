@@ -17,6 +17,8 @@ public sealed class ProductListItemDto
     public bool IsActive { get; set; }
     public int? LunchTicketPackSize { get; set; }
     public bool IsLunchTicketRedeemable { get; set; }
+    /// <summary>Finished-goods units when tenant uses ProductUnits stock mode.</summary>
+    public decimal StockQuantity { get; set; }
 }
 
 public sealed class ProductMenuDto

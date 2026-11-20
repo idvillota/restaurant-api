@@ -27,8 +27,11 @@ public sealed class TenantSettingsDto
     /// <summary>Show dashboard panel with bill-level sales for today / current shift.</summary>
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
-    /// <summary>When true, products use ingredients for inventory/cost. Default true.</summary>
+    /// <summary>When true, products use ingredients for inventory/cost. Default true. Synced from StockControlMode.</summary>
     public bool InventoryEnabled { get; set; } = true;
+
+    /// <summary>0 Ingredients, 1 None, 2 ProductUnits.</summary>
+    public int StockControlMode { get; set; }
 
     /// <summary>When true, blank purchase bill numbers are auto-assigned. Default false.</summary>
     public bool AutoGeneratePurchaseBillNumbers { get; set; }
@@ -112,6 +115,10 @@ public sealed class UpdateTenantSettingsDto
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
     public bool InventoryEnabled { get; set; } = true;
+
+    /// <summary>0 Ingredients, 1 None, 2 ProductUnits. When null, InventoryEnabled drives mode (legacy clients).</summary>
+    [Range(0, 2)]
+    public int? StockControlMode { get; set; }
 
     public bool AutoGeneratePurchaseBillNumbers { get; set; }
 

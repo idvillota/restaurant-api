@@ -320,8 +320,9 @@ public sealed class OperationalReportsServiceTests
         fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
 
         // Sunday 21:00 Bogota = Monday 02:00 UTC — calendar Bogotá still Sunday.
-        var paidAtUtc = new DateTime(2026, 11, 16, 2, 0, 0, DateTimeKind.Utc);
-        var sunday = new DateOnly(2026, 11, 15);
+        // Keep outside historical seed window so the assertion is exact.
+        var paidAtUtc = new DateTime(2024, 3, 4, 2, 0, 0, DateTimeKind.Utc);
+        var sunday = new DateOnly(2024, 3, 3);
         await SeedPaidBillAsync(
             fx,
             sunday,
@@ -348,10 +349,11 @@ public sealed class OperationalReportsServiceTests
         await DevelopmentDataSeeder.SeedAsync(fx.Db, hasher, NullLogger.Instance, fx.TenantContext);
         fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
 
-        var monday = new DateOnly(2026, 11, 16);
+        // Use dates outside DevelopmentHistoricalDataSeeder's rolling window so totals are exact.
+        var monday = new DateOnly(2024, 3, 4);
         var tuesday = monday.AddDays(1);
         // Monday 20:00 Bogota = Tuesday 01:00 UTC, after a 19:00 close → Tuesday shift.
-        var paidAtUtc = new DateTime(2026, 11, 17, 1, 0, 0, DateTimeKind.Utc);
+        var paidAtUtc = new DateTime(2024, 3, 5, 1, 0, 0, DateTimeKind.Utc);
         await SeedPaidBillAsync(
             fx,
             tuesday,
