@@ -12,11 +12,16 @@ public sealed class TenantSettingsService : ITenantSettingsService
 {
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IProductImageStorage _mediaStorage;
 
-    public TenantSettingsService(ApplicationDbContext db, ICurrentTenantContext tenantContext)
+    public TenantSettingsService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IProductImageStorage mediaStorage)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _mediaStorage = mediaStorage;
     }
 
     public async Task<TenantSettingsDto> GetAsync(CancellationToken cancellationToken = default)
@@ -80,6 +85,45 @@ public sealed class TenantSettingsService : ITenantSettingsService
         return Map(settings);
     }
 
+    public async Task<TenantSettingsDto> SetLogoAsync(
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        var tenantId = ResolveTenantId();
+        var previousPath = settings.LogoPath;
+
+        var relativePath = await _mediaStorage.SaveTenantLogoAsync(
+            tenantId,
+            content,
+            fileName,
+            cancellationToken);
+
+        settings.LogoPath = relativePath;
+        _db.TenantSettings.Update(settings);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        if (!string.Equals(previousPath, relativePath, StringComparison.OrdinalIgnoreCase))
+            await _mediaStorage.DeleteIfExistsAsync(previousPath, cancellationToken);
+
+        return Map(settings);
+    }
+
+    public async Task<TenantSettingsDto> RemoveLogoAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        var previousPath = settings.LogoPath;
+        if (string.IsNullOrWhiteSpace(previousPath))
+            return Map(settings);
+
+        settings.LogoPath = null;
+        _db.TenantSettings.Update(settings);
+        await _db.SaveChangesAsync(cancellationToken);
+        await _mediaStorage.DeleteIfExistsAsync(previousPath, cancellationToken);
+        return Map(settings);
+    }
+
     private async Task<TenantSettings> GetOrCreateSettingsAsync(CancellationToken cancellationToken)
     {
         var tenantId = ResolveTenantId();
@@ -133,13 +177,14 @@ public sealed class TenantSettingsService : ITenantSettingsService
         return true;
     }
 
-    private static TenantSettingsDto Map(TenantSettings settings) =>
+    private TenantSettingsDto Map(TenantSettings settings) =>
         new()
         {
             MaxDiscountPercent = settings.MaxDiscountPercent,
             OperationalDayCutoffHour = settings.OperationalDayCutoffHour,
             TradeName = settings.TradeName,
             LegalName = settings.LegalName,
+            LogoUrl = _mediaStorage.GetPublicUrl(settings.LogoPath),
             TaxRegime = settings.TaxRegime,
             TaxId = settings.TaxId,
             LegalRepresentative = settings.LegalRepresentative,

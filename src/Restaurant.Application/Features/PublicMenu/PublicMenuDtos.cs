@@ -4,6 +4,7 @@ public sealed class PublicMenuDto
 {
     public string TenantName { get; set; } = string.Empty;
     public string TenantSlug { get; set; } = string.Empty;
+    public string? LogoUrl { get; set; }
     public string CurrencyCode { get; set; } = "COP";
     public IReadOnlyList<PublicMenuCategoryDto> Categories { get; set; } = [];
 }

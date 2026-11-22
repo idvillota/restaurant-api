@@ -367,6 +367,7 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.ImpoconsumoPercent).HasPrecision(5, 2);
             e.Property(x => x.TradeName).HasMaxLength(200);
             e.Property(x => x.LegalName).HasMaxLength(200);
+            e.Property(x => x.LogoPath).HasMaxLength(260);
             e.Property(x => x.TaxRegime).HasMaxLength(80);
             e.Property(x => x.TaxId).HasMaxLength(40);
             e.Property(x => x.LegalRepresentative).HasMaxLength(200);

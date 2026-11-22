@@ -15,6 +15,12 @@ public class TenantSettings : ITenantScoped
 
     public string TradeName { get; set; } = string.Empty;
     public string LegalName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Relative media path for this tenant’s logo (e.g. logos/{tenantId}/logo.png).
+    /// Null when no logo is uploaded.
+    /// </summary>
+    public string? LogoPath { get; set; }
     public string TaxRegime { get; set; } = "Régimen Simplificado";
     public string TaxId { get; set; } = string.Empty;
     public string? LegalRepresentative { get; set; }

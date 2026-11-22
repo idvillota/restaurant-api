@@ -2012,6 +2012,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("LogoPath")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
                     b.Property<decimal>("MaxDiscountPercent")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");

@@ -9,6 +9,10 @@ public sealed class TenantSettingsDto
     public int OperationalDayCutoffHour { get; set; }
     public string TradeName { get; set; } = string.Empty;
     public string LegalName { get; set; } = string.Empty;
+
+    /// <summary>Public URL of the tenant logo, when uploaded.</summary>
+    public string? LogoUrl { get; set; }
+
     public string TaxRegime { get; set; } = string.Empty;
     public string TaxId { get; set; } = string.Empty;
     public string? LegalRepresentative { get; set; }

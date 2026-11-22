@@ -76,6 +76,34 @@ public sealed class AzureBlobProductImageStorage : IProductImageStorage
         return relativePath;
     }
 
+    public async Task<string> SaveTenantLogoAsync(
+        Guid tenantId,
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        var extension = NormalizeExtension(Path.GetExtension(fileName));
+        if (!_options.AllowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"File type '{extension}' is not allowed.");
+
+        await using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, cancellationToken);
+        if (buffer.Length > _options.MaxBytes)
+            throw new InvalidOperationException($"Image must be {_options.MaxBytes / (1024 * 1024)} MB or smaller.");
+        buffer.Position = 0;
+
+        var relativePath = $"logos/{tenantId:N}/logo{extension}";
+        await EnsureContainerAsync(cancellationToken);
+
+        var blobClient = _container.GetBlobClient(relativePath);
+        await blobClient.UploadAsync(
+            buffer,
+            new BlobUploadOptions { HttpHeaders = new BlobHttpHeaders { ContentType = GetContentType(extension) } },
+            cancellationToken);
+
+        return relativePath;
+    }
+
     public async Task DeleteIfExistsAsync(string? relativePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
