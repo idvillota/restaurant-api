@@ -7,6 +7,7 @@ using Restaurant.Application.Features.Sales.SalesOrders;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
 using Restaurant.Infrastructure.KitchenTickets;
+using Restaurant.Infrastructure.Persistence;
 using System.Text;
 using System.Xml.Serialization;
 
@@ -21,6 +22,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
     private readonly IRepository<User> _users;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IGeneratedFileStorage _fileStorage;
+    private readonly ApplicationDbContext _db;
 
     static KitchenTicketService()
     {
@@ -34,7 +36,8 @@ public sealed class KitchenTicketService : IKitchenTicketService
         IRepository<ProductBundleLine> productBundleLines,
         IRepository<User> users,
         ICurrentTenantContext tenantContext,
-        IGeneratedFileStorage fileStorage)
+        IGeneratedFileStorage fileStorage,
+        ApplicationDbContext db)
     {
         _products = products;
         _ingredients = ingredients;
@@ -43,6 +46,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
         _users = users;
         _tenantContext = tenantContext;
         _fileStorage = fileStorage;
+        _db = db;
     }
 
     public async Task<KitchenTicketModel> BuildTicketModelAsync(
@@ -124,6 +128,8 @@ public sealed class KitchenTicketService : IKitchenTicketService
                 });
         }
 
+        var paperWidthMm = await ResolvePaperWidthMmAsync(cancellationToken);
+
         return new KitchenTicketModel
         {
             TableCode = order.IsDelivery ? "DOMICILIO" : order.DiningTable?.Code ?? "—",
@@ -133,7 +139,22 @@ public sealed class KitchenTicketService : IKitchenTicketService
             SentBy = sentBy,
             SentAtUtc = DateTime.UtcNow,
             Lines = lines,
+            PaperWidthMm = paperWidthMm,
         };
+    }
+
+    private async Task<int> ResolvePaperWidthMmAsync(CancellationToken cancellationToken)
+    {
+        var tenantId = _tenantContext.TenantId;
+        if (tenantId is null || tenantId == Guid.Empty)
+            return (int)ThermalPaperWidthMm.Mm58;
+
+        var raw = await _db.TenantSettings.AsNoTracking()
+            .Where(s => s.TenantId == tenantId)
+            .Select(s => (int?)s.ThermalPaperWidthMm)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return (int)ThermalPaperWidth.Normalize(raw ?? (int)ThermalPaperWidthMm.Mm58);
     }
 
     public async Task<string?> GeneratePdfAsync(

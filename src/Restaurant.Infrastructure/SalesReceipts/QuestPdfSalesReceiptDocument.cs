@@ -4,16 +4,21 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Restaurant.Application.Common;
 using Restaurant.Application.Features.Sales.SalesReceipts;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Infrastructure.SalesReceipts;
 
 internal static class QuestPdfSalesReceiptDocument
 {
-    private const float TicketWidthMm = 80f;
     private static readonly CultureInfo EsCo = CultureInfo.GetCultureInfo("es-CO");
 
     public static byte[] BuildPdf(SalesReceiptModel receipt)
     {
+        var width = ThermalPaperWidth.Normalize(receipt.PaperWidthMm);
+        var widthMm = ThermalPaperWidth.ToMillimetres(width);
+        var narrow = ThermalPaperWidth.IsNarrow(width);
+        var marginH = narrow ? 2f : 2.5f;
+        var moneyCol = narrow ? 56f : 80f;
         var issuedLocal = ColombiaTime.ToBogota(receipt.IssuedAtUtc);
         var tenant = receipt.Tenant;
         var dateText = issuedLocal.ToString("MMM. dd yyyy hh:mm tt", EsCo).ToLowerInvariant();
@@ -25,10 +30,10 @@ internal static class QuestPdfSalesReceiptDocument
             {
                 document.Page(page =>
                 {
-                    page.ContinuousSize(TicketWidthMm, Unit.Millimetre);
-                    page.MarginHorizontal(2.5f, Unit.Millimetre);
+                    page.ContinuousSize(widthMm, Unit.Millimetre);
+                    page.MarginHorizontal(marginH, Unit.Millimetre);
                     page.MarginVertical(3, Unit.Millimetre);
-                    page.DefaultTextStyle(x => x.FontSize(7));
+                    page.DefaultTextStyle(x => x.FontSize(narrow ? 6.5f : 7));
 
                     page.Content().Column(column =>
                     {
@@ -94,39 +99,74 @@ internal static class QuestPdfSalesReceiptDocument
                         // —— Detalle ítems (sin agrupar por categoría) ——
                         column.Item().Table(table =>
                         {
-                            table.ColumnsDefinition(cols =>
+                            if (narrow)
                             {
-                                cols.RelativeColumn(2.8f);
-                                cols.ConstantColumn(14);
-                                cols.ConstantColumn(12);
-                                cols.ConstantColumn(14);
-                                cols.ConstantColumn(14);
-                                cols.ConstantColumn(36);
-                            });
-
-                            table.Header(header =>
-                            {
-                                header.Cell().Text("DESCRIPCIÓN").Bold().FontSize(6);
-                                header.Cell().AlignCenter().Text("CAN").Bold().FontSize(6);
-                                header.Cell().AlignCenter().Text("REF").Bold().FontSize(6);
-                                header.Cell().AlignCenter().Text("UM").Bold().FontSize(6);
-                                header.Cell().AlignCenter().Text("%IMP").Bold().FontSize(6);
-                                header.Cell().AlignRight().Text("VALOR").Bold().FontSize(6);
-                            });
-
-                            foreach (var line in receipt.Lines)
-                            {
-                                table.Cell().Text(line.ProductName).FontSize(7);
-                                table.Cell().AlignCenter().Text(FormatQuantity(line.Quantity)).FontSize(7);
-                                table.Cell().AlignCenter().Text("").FontSize(7);
-                                table.Cell().AlignCenter().Text("uds").FontSize(7);
-                                table.Cell().AlignCenter().Text($"{receipt.ImpoconsumoPercent:N0}").FontSize(7);
-                                table.Cell().AlignRight().Text(ColombianMoneyFormat.Format(line.LineTotal)).FontSize(7);
-
-                                if (!string.IsNullOrWhiteSpace(line.Notes))
+                                table.ColumnsDefinition(cols =>
                                 {
-                                    table.Cell().ColumnSpan(6).PaddingLeft(4)
-                                        .Text($"+ {line.Notes}").Italic().FontSize(6);
+                                    cols.RelativeColumn(3f);
+                                    cols.ConstantColumn(16);
+                                    cols.ConstantColumn(18);
+                                    cols.ConstantColumn(34);
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Text("DESCRIPCIÓN").Bold().FontSize(6);
+                                    header.Cell().AlignCenter().Text("CAN").Bold().FontSize(6);
+                                    header.Cell().AlignCenter().Text("%IMP").Bold().FontSize(6);
+                                    header.Cell().AlignRight().Text("VALOR").Bold().FontSize(6);
+                                });
+
+                                foreach (var line in receipt.Lines)
+                                {
+                                    table.Cell().Text(line.ProductName).FontSize(6.5f);
+                                    table.Cell().AlignCenter().Text(FormatQuantity(line.Quantity)).FontSize(6.5f);
+                                    table.Cell().AlignCenter().Text($"{receipt.ImpoconsumoPercent:N0}").FontSize(6.5f);
+                                    table.Cell().AlignRight().Text(ColombianMoneyFormat.Format(line.LineTotal)).FontSize(6.5f);
+
+                                    if (!string.IsNullOrWhiteSpace(line.Notes))
+                                    {
+                                        table.Cell().ColumnSpan(4).PaddingLeft(4)
+                                            .Text($"+ {line.Notes}").Italic().FontSize(6);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                table.ColumnsDefinition(cols =>
+                                {
+                                    cols.RelativeColumn(2.8f);
+                                    cols.ConstantColumn(14);
+                                    cols.ConstantColumn(12);
+                                    cols.ConstantColumn(14);
+                                    cols.ConstantColumn(14);
+                                    cols.ConstantColumn(36);
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Text("DESCRIPCIÓN").Bold().FontSize(6);
+                                    header.Cell().AlignCenter().Text("CAN").Bold().FontSize(6);
+                                    header.Cell().AlignCenter().Text("REF").Bold().FontSize(6);
+                                    header.Cell().AlignCenter().Text("UM").Bold().FontSize(6);
+                                    header.Cell().AlignCenter().Text("%IMP").Bold().FontSize(6);
+                                    header.Cell().AlignRight().Text("VALOR").Bold().FontSize(6);
+                                });
+
+                                foreach (var line in receipt.Lines)
+                                {
+                                    table.Cell().Text(line.ProductName).FontSize(7);
+                                    table.Cell().AlignCenter().Text(FormatQuantity(line.Quantity)).FontSize(7);
+                                    table.Cell().AlignCenter().Text("").FontSize(7);
+                                    table.Cell().AlignCenter().Text("uds").FontSize(7);
+                                    table.Cell().AlignCenter().Text($"{receipt.ImpoconsumoPercent:N0}").FontSize(7);
+                                    table.Cell().AlignRight().Text(ColombianMoneyFormat.Format(line.LineTotal)).FontSize(7);
+
+                                    if (!string.IsNullOrWhiteSpace(line.Notes))
+                                    {
+                                        table.Cell().ColumnSpan(6).PaddingLeft(4)
+                                            .Text($"+ {line.Notes}").Italic().FontSize(6);
+                                    }
                                 }
                             }
                         });
@@ -136,11 +176,11 @@ internal static class QuestPdfSalesReceiptDocument
                         // —— Total y pagos ——
                         column.Item().Row(row =>
                         {
-                            row.RelativeItem().Text($"{receipt.ArticleCount} Artículos").FontSize(8);
-                            row.ConstantItem(80).AlignRight().Row(totalRow =>
+                            row.RelativeItem().Text($"{receipt.ArticleCount} Artículos").FontSize(narrow ? 7 : 8);
+                            row.ConstantItem(moneyCol).AlignRight().Row(totalRow =>
                             {
-                                totalRow.AutoItem().Text("TOTAL").Bold().FontSize(9);
-                                totalRow.AutoItem().PaddingLeft(4).Text(ColombianMoneyFormat.Format(receipt.Total)).Bold().FontSize(9);
+                                totalRow.AutoItem().Text("TOTAL").Bold().FontSize(narrow ? 8 : 9);
+                                totalRow.AutoItem().PaddingLeft(4).Text(ColombianMoneyFormat.Format(receipt.Total)).Bold().FontSize(narrow ? 8 : 9);
                             });
                         });
 
@@ -149,7 +189,7 @@ internal static class QuestPdfSalesReceiptDocument
                             column.Item().Row(row =>
                             {
                                 row.RelativeItem().Text(payment.MethodLabel).FontSize(7);
-                                row.ConstantItem(80).AlignRight().Row(payRow =>
+                                row.ConstantItem(moneyCol).AlignRight().Row(payRow =>
                                 {
                                     payRow.AutoItem().Text("Entregado").FontSize(7);
                                     payRow.AutoItem().PaddingLeft(4).Text(ColombianMoneyFormat.Format(payment.Amount)).FontSize(7);
@@ -162,7 +202,7 @@ internal static class QuestPdfSalesReceiptDocument
                             column.Item().Row(row =>
                             {
                                 row.RelativeItem().Text("Cambio").FontSize(7);
-                                row.ConstantItem(80).AlignRight().Text(ColombianMoneyFormat.Format(receipt.ChangeDue)).FontSize(7);
+                                row.ConstantItem(moneyCol).AlignRight().Text(ColombianMoneyFormat.Format(receipt.ChangeDue)).FontSize(7);
                             });
                         }
 
@@ -171,7 +211,7 @@ internal static class QuestPdfSalesReceiptDocument
                             column.Item().Row(row =>
                             {
                                 row.RelativeItem().Text("Descuento").FontSize(7);
-                                row.ConstantItem(80).AlignRight().Text($"−{ColombianMoneyFormat.Format(receipt.DiscountAmount)}").FontSize(7);
+                                row.ConstantItem(moneyCol).AlignRight().Text($"−{ColombianMoneyFormat.Format(receipt.DiscountAmount)}").FontSize(7);
                             });
                         }
 
@@ -180,7 +220,7 @@ internal static class QuestPdfSalesReceiptDocument
                             column.Item().Row(row =>
                             {
                                 row.RelativeItem().Text("Propina").FontSize(7);
-                                row.ConstantItem(80).AlignRight().Text(ColombianMoneyFormat.Format(receipt.TipAmount)).FontSize(7);
+                                row.ConstantItem(moneyCol).AlignRight().Text(ColombianMoneyFormat.Format(receipt.TipAmount)).FontSize(7);
                             });
                         }
 
@@ -192,8 +232,8 @@ internal static class QuestPdfSalesReceiptDocument
                             taxTable.ColumnsDefinition(c =>
                             {
                                 c.RelativeColumn();
-                                c.ConstantColumn(42);
-                                c.ConstantColumn(42);
+                                c.ConstantColumn(narrow ? 36 : 42);
+                                c.ConstantColumn(narrow ? 36 : 42);
                             });
 
                             taxTable.Header(h =>

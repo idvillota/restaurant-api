@@ -109,6 +109,7 @@ public sealed class SalesReceiptService : ISalesReceiptService
             AmountTendered = amountTendered,
             ChangeDue = changeDue,
             CurrencyCode = tenantEntity.CurrencyCode,
+            PaperWidthMm = (int)ThermalPaperWidth.Normalize((int)settings.ThermalPaperWidthMm),
         };
     }
 

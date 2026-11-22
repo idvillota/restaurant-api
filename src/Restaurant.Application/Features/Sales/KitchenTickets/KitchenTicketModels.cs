@@ -26,4 +26,7 @@ public sealed class KitchenTicketModel
 
     /// <summary>Human-readable cancel reason printed on anulación tickets.</summary>
     public string? CancelReason { get; set; }
+
+    /// <summary>Thermal paper width in mm (58 or 80). Used by PDF and print XML.</summary>
+    public int PaperWidthMm { get; set; } = 58;
 }

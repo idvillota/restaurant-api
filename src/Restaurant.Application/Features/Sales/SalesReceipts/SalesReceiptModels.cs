@@ -67,6 +67,9 @@ public sealed class SalesReceiptModel
     public decimal TipAmount { get; set; }
     public decimal Total { get; set; }
     public string CurrencyCode { get; set; } = "COP";
+
+    /// <summary>Thermal paper width in mm (58 or 80). Used by PDF and print XML.</summary>
+    public int PaperWidthMm { get; set; } = 58;
 }
 
 public sealed class SalesReceiptFilesDto

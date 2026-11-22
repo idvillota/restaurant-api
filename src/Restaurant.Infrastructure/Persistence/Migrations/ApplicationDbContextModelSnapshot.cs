@@ -2057,6 +2057,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<int>("ThermalPaperWidthMm")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("TiqueterasEnabled")
                         .HasColumnType("boolean");
 

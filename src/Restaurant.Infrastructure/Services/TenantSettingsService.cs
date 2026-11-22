@@ -63,6 +63,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         StockControlHelper.ApplyToSettings(settings, dto.StockControlMode, dto.InventoryEnabled);
         settings.AutoGeneratePurchaseBillNumbers = dto.AutoGeneratePurchaseBillNumbers;
         settings.KitchenTicketPrintMode = NormalizePrintMode(dto.KitchenTicketPrintMode);
+        settings.ThermalPaperWidthMm = ThermalPaperWidth.Normalize(dto.ThermalPaperWidthMm);
         settings.SeparateVitrinaCafeSales = dto.SeparateVitrinaCafeSales;
         settings.RequirePriorDayCloseBeforeNewShift = dto.RequirePriorDayCloseBeforeNewShift;
         if (settings.TiqueterasEnabled && !dto.TiqueterasEnabled)
@@ -144,6 +145,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             StockControlMode = StockControlMode.Ingredients,
             AutoGeneratePurchaseBillNumbers = false,
             KitchenTicketPrintMode = KitchenTicketPrintMode.Always,
+            ThermalPaperWidthMm = ThermalPaperWidthMm.Mm58,
             SeparateVitrinaCafeSales = false,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
@@ -205,6 +207,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             StockControlMode = (int)settings.StockControlMode,
             AutoGeneratePurchaseBillNumbers = settings.AutoGeneratePurchaseBillNumbers,
             KitchenTicketPrintMode = (int)settings.KitchenTicketPrintMode,
+            ThermalPaperWidthMm = (int)ThermalPaperWidth.Normalize((int)settings.ThermalPaperWidthMm),
             SeparateVitrinaCafeSales = settings.SeparateVitrinaCafeSales,
             RequirePriorDayCloseBeforeNewShift = settings.RequirePriorDayCloseBeforeNewShift,
             TiqueterasEnabled = settings.TiqueterasEnabled,

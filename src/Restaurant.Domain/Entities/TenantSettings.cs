@@ -78,6 +78,11 @@ public class TenantSettings : ITenantScoped
     public KitchenTicketPrintMode KitchenTicketPrintMode { get; set; }
 
     /// <summary>
+    /// Thermal paper width for comandas and receipts (PDF + print XML). Default 58 mm.
+    /// </summary>
+    public ThermalPaperWidthMm ThermalPaperWidthMm { get; set; } = ThermalPaperWidthMm.Mm58;
+
+    /// <summary>
     /// When true, cierre lists Vitrina Café apart from general ventas.
     /// Default false; enable per tenant (Nuestro Café).
     /// </summary>
