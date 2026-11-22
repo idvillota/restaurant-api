@@ -11,6 +11,9 @@ public interface IProductProductionDocumentService
 
     Task<ProductProductionDocumentDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Next suggested number for the create dialog (PROD-yyyyMMdd-####).</summary>
+    Task<string> SuggestNextDocumentNumberAsync(CancellationToken cancellationToken = default);
+
     Task<ProductProductionDocumentDto> CreateAsync(
         CreateProductProductionDocumentDto dto,
         CancellationToken cancellationToken = default);

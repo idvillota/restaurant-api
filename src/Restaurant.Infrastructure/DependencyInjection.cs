@@ -46,12 +46,7 @@ public static class DependencyInjection
             services.AddSingleton<IGeneratedFileStorage, AzureBlobGeneratedFileStorage>();
         else
             services.AddSingleton<IGeneratedFileStorage, LocalGeneratedFileStorage>();
-        // Remove Gemini configuration - no longer used
         services.Configure<AzureOpenAiOptions>(configuration.GetSection(AzureOpenAiOptions.SectionName));
-        services.AddHttpClient(nameof(StrategicAiReportService), client =>
-        {
-            client.Timeout = TimeSpan.FromMinutes(3);
-        });
 
         // Configure a named HttpClient for Azure OpenAI interaction. BaseAddress and api-key header are set from configuration at runtime.
         services.AddHttpClient("AzureOpenAiClient", client =>
@@ -115,9 +110,6 @@ public static class DependencyInjection
         services.AddScoped<IPlanillaPdfService, PlanillaPdfService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
-        // Register Azure-based strategic AI report service implementation.
-        // This application uses Azure OpenAI for all strategic report generation.
-        services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
         // Print service centraliza la lógica de resolución y lectura de documentos generados.
         services.AddScoped<IPrintService, PrintService>();
         services.AddScoped<IStrategicAnalyticsService, StrategicAnalyticsService>();

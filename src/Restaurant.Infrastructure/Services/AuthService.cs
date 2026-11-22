@@ -188,6 +188,79 @@ public sealed class AuthService : IAuthService
             throw new MultipleTenantsLoginException(options);
         }
 
+        return await BuildAuthResponseAsync(user, membership, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LoginTenantOptionDto>> ListMyTenantsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var user = await GetCurrentUserOrThrowAsync(cancellationToken);
+        EnsurePlatformAdminEmail(user.Email);
+
+        var memberships = await LoadActiveMembershipsAsync(user.Id, cancellationToken);
+        return memberships
+            .Select(m => new LoginTenantOptionDto
+            {
+                Slug = m.Tenant.Slug,
+                Name = m.Tenant.Name,
+            })
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public async Task<AuthResponseDto> SwitchTenantAsync(
+        SwitchTenantDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await GetCurrentUserOrThrowAsync(cancellationToken);
+        EnsurePlatformAdminEmail(user.Email);
+
+        var slug = dto.TenantSlug?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (slug.Length == 0)
+            throw new InvalidOperationException("Debe indicar el local (tenantSlug).");
+
+        var memberships = await LoadActiveMembershipsAsync(user.Id, cancellationToken);
+        var membership = memberships.FirstOrDefault(m => m.Tenant.Slug == slug)
+            ?? throw new UnauthorizedAccessException("Tenant not found for this account.");
+
+        return await BuildAuthResponseAsync(user, membership, cancellationToken);
+    }
+
+    private async Task<User> GetCurrentUserOrThrowAsync(CancellationToken cancellationToken)
+    {
+        var userId = _tenantContext.UserId;
+        if (userId is null || userId == Guid.Empty)
+            throw new UnauthorizedAccessException("No hay sesión activa.");
+
+        var user = await _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId.Value, cancellationToken);
+
+        return user ?? throw new UnauthorizedAccessException("Usuario no encontrado.");
+    }
+
+    private void EnsurePlatformAdminEmail(string email)
+    {
+        if (!IsPlatformAdminEmail(email))
+            throw new UnauthorizedAccessException("Solo administradores de plataforma pueden cambiar de local.");
+    }
+
+    private async Task<List<TenantUser>> LoadActiveMembershipsAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        await _db.TenantUsers
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Include(tu => tu.Tenant)
+            .Include(tu => tu.TenantUserRoles).ThenInclude(tur => tur.Role)
+            .Where(tu => tu.UserId == userId && tu.IsActive && tu.Tenant.IsActive)
+            .ToListAsync(cancellationToken);
+
+    private async Task<AuthResponseDto> BuildAuthResponseAsync(
+        User user,
+        TenantUser membership,
+        CancellationToken cancellationToken)
+    {
         var roles = membership.TenantUserRoles.Select(tur => tur.Role.Name).Distinct().ToList();
         var permissions = await _rolePermissions.GetPermissionCodesForUserAsync(
             user.Id,

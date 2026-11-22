@@ -11,34 +11,11 @@ namespace Restaurant.Api.Controllers;
 [Route("api/strategic-reports")]
 public sealed class StrategicReportsController : ControllerBase
 {
-    private readonly IStrategicAiReportService _legacyService;
     private readonly IStrategicAnalyticsService _analyticsService;
 
-    public StrategicReportsController(
-        IStrategicAiReportService legacyService,
-        IStrategicAnalyticsService analyticsService)
+    public StrategicReportsController(IStrategicAnalyticsService analyticsService)
     {
-        _legacyService = legacyService;
         _analyticsService = analyticsService;
-    }
-
-    [HttpGet]
-    [ProducesResponseType(typeof(StrategicReportDto), StatusCodes.Status200OK)]
-    public async Task<ActionResult<StrategicReportDto>> GetLegacy(
-        [FromQuery] DateOnly startDate,
-        [FromQuery] DateOnly endDate,
-        [FromQuery] bool refresh = false,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var report = await _legacyService.GetStrategicReportAsync(startDate, endDate, refresh, cancellationToken);
-            return Ok(report);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
     }
 
     [HttpGet("types")]

@@ -38,7 +38,7 @@ public sealed class CreateProductProductionLineDto
 
 public sealed class CreateProductProductionDocumentDto
 {
-    [Required]
+    /// <summary>Optional. When blank, the API assigns PROD-yyyyMMdd-0001 (Colombia day + consecutive).</summary>
     [MaxLength(100)]
     public string DocumentNumber { get; set; } = string.Empty;
 

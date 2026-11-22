@@ -22,6 +22,10 @@ public sealed class ProductProductionDocumentsController : ControllerBase
         CancellationToken cancellationToken = default) =>
         Ok(await _service.ListAsync(query, cancellationToken));
 
+    [HttpGet("next-document-number")]
+    public async Task<ActionResult<object>> SuggestNextDocumentNumber(CancellationToken cancellationToken = default) =>
+        Ok(new { documentNumber = await _service.SuggestNextDocumentNumberAsync(cancellationToken) });
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProductProductionDocumentDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {

@@ -86,9 +86,7 @@ public sealed class ProductProductionDocumentService : IProductProductionDocumen
         if (userId is null || userId == Guid.Empty)
             throw new InvalidOperationException("No se pudo determinar el usuario activo.");
 
-        var documentNumber = dto.DocumentNumber.Trim();
-        if (documentNumber.Length == 0)
-            throw new InvalidOperationException("El número de documento es obligatorio.");
+        var documentNumber = await ResolveDocumentNumberAsync(dto.DocumentNumber, cancellationToken);
 
         var productIds = dto.Lines.Select(l => l.ProductId).ToList();
         var products = await _products.Query()
@@ -139,5 +137,52 @@ public sealed class ProductProductionDocumentService : IProductProductionDocumen
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return (await GetByIdAsync(document.Id, cancellationToken))!;
+    }
+
+    public Task<string> SuggestNextDocumentNumberAsync(CancellationToken cancellationToken = default) =>
+        GenerateProductionDocumentNumberAsync(DateTime.UtcNow, cancellationToken);
+
+    private async Task<string> ResolveDocumentNumberAsync(
+        string? raw,
+        CancellationToken cancellationToken)
+    {
+        var trimmed = raw?.Trim() ?? string.Empty;
+        if (trimmed.Length > 0)
+            return trimmed;
+
+        return await GenerateProductionDocumentNumberAsync(DateTime.UtcNow, cancellationToken);
+    }
+
+    /// <summary>PROD-yyyyMMdd-0001 style, consecutive per tenant and Colombia calendar day.</summary>
+    private async Task<string> GenerateProductionDocumentNumberAsync(
+        DateTime atUtc,
+        CancellationToken cancellationToken)
+    {
+        var dayPrefix = $"PROD-{ColombiaTime.Stamp(atUtc, "yyyyMMdd")}-";
+        var latestNumber = await _documents.Query()
+            .AsNoTracking()
+            .Where(d => d.DocumentNumber.StartsWith(dayPrefix))
+            .OrderByDescending(d => d.DocumentNumber)
+            .Select(d => d.DocumentNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var next = 1;
+        if (latestNumber is not null
+            && latestNumber.Length > dayPrefix.Length
+            && int.TryParse(latestNumber[dayPrefix.Length..], out var parsed)
+            && parsed >= 1)
+        {
+            next = parsed + 1;
+        }
+
+        string candidate;
+        do
+        {
+            candidate = $"{dayPrefix}{next:D4}";
+            next++;
+        }
+        while (await _documents.Query().AnyAsync(d => d.DocumentNumber == candidate, cancellationToken));
+
+        return candidate;
     }
 }
