@@ -10,6 +10,13 @@ public class Product : EntityBase, ITenantScoped
     public EProductType CompositionType { get; set; } = EProductType.Prepared;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Optional product barcode / sticker code (unique per tenant when set).
+    /// Used for sales and production scan entry.
+    /// </summary>
+    public string? Barcode { get; set; }
+
     public string? ImagePath { get; set; }
     public decimal UnitPrice { get; set; }
     /// <summary>Used as product cost when tenant inventory is off. Ignored for COGS while inventory is on.</summary>

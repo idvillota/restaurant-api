@@ -13,15 +13,18 @@ public sealed class TenantSettingsService : ITenantSettingsService
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IProductImageStorage _mediaStorage;
+    private readonly IProductService _products;
 
     public TenantSettingsService(
         ApplicationDbContext db,
         ICurrentTenantContext tenantContext,
-        IProductImageStorage mediaStorage)
+        IProductImageStorage mediaStorage,
+        IProductService products)
     {
         _db = db;
         _tenantContext = tenantContext;
         _mediaStorage = mediaStorage;
+        _products = products;
     }
 
     public async Task<TenantSettingsDto> GetAsync(CancellationToken cancellationToken = default)
@@ -77,13 +80,22 @@ public sealed class TenantSettingsService : ITenantSettingsService
         }
 
         settings.TiqueterasEnabled = dto.TiqueterasEnabled;
+        settings.BarcodesEnabled = dto.BarcodesEnabled;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
 
         _db.TenantSettings.Update(settings);
         await _db.SaveChangesAsync(cancellationToken);
-        return Map(settings);
+
+        // When barcodes are on, fill only products without a code (never overwrite stickers).
+        var assigned = dto.BarcodesEnabled
+            ? await _products.BackfillMissingBarcodesAsync(cancellationToken)
+            : 0;
+
+        var mapped = Map(settings);
+        mapped.ProductBarcodesAssigned = assigned;
+        return mapped;
     }
 
     public async Task<TenantSettingsDto> SetLogoAsync(
@@ -147,6 +159,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             KitchenTicketPrintMode = KitchenTicketPrintMode.Always,
             ThermalPaperWidthMm = ThermalPaperWidthMm.Mm58,
             SeparateVitrinaCafeSales = false,
+            BarcodesEnabled = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -211,6 +224,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
             SeparateVitrinaCafeSales = settings.SeparateVitrinaCafeSales,
             RequirePriorDayCloseBeforeNewShift = settings.RequirePriorDayCloseBeforeNewShift,
             TiqueterasEnabled = settings.TiqueterasEnabled,
+            BarcodesEnabled = settings.BarcodesEnabled,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

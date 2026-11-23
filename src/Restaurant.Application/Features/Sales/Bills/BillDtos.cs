@@ -58,6 +58,14 @@ public sealed class TenantSettingsDto
     /// <summary>When true, tenant can sell/redeem lunch ticket packs (tiqueteras).</summary>
     public bool TiqueterasEnabled { get; set; }
 
+    /// <summary>When true, barcode/QR capture and product labels are available.</summary>
+    public bool BarcodesEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Populated after settings update when barcodes were enabled and missing product codes were filled.
+    /// </summary>
+    public int ProductBarcodesAssigned { get; set; }
+
     public string? BreBKey { get; set; }
 
     public int? BreBKeyType { get; set; }
@@ -140,6 +148,8 @@ public sealed class UpdateTenantSettingsDto
     public bool RequirePriorDayCloseBeforeNewShift { get; set; }
 
     public bool TiqueterasEnabled { get; set; }
+
+    public bool BarcodesEnabled { get; set; } = true;
 
     [MaxLength(40)]
     public string? BreBKey { get; set; }

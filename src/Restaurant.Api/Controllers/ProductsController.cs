@@ -37,6 +37,16 @@ public sealed class ProductsController : ControllerBase
         }
     }
 
+    [HttpGet("by-barcode/{barcode}")]
+    [RequireSalonCatalogProductsRead]
+    public async Task<ActionResult<ProductListItemDto>> GetByBarcode(
+        string barcode,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await _products.GetByBarcodeAsync(barcode, cancellationToken);
+        return item is null ? NotFound(new { message = "No hay un producto activo con ese código." }) : Ok(item);
+    }
+
     [HttpGet("{id:guid}")]
     [RequireSalonCatalogProductsRead]
     public async Task<ActionResult<ProductListItemDto>> GetById(Guid id, CancellationToken cancellationToken = default)

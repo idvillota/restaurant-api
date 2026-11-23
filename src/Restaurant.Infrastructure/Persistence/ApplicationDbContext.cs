@@ -162,7 +162,11 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.ManualCostPrice).HasPrecision(18, 2);
             e.Property(x => x.StockQuantity).HasPrecision(18, 4);
             e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Barcode).HasMaxLength(64);
             e.Property(x => x.ImagePath).HasMaxLength(260);
+            e.HasIndex(x => new { x.TenantId, x.Barcode })
+                .IsUnique()
+                .HasFilter("\"Barcode\" IS NOT NULL");
         });
 
         modelBuilder.Entity<Ingredient>(e =>

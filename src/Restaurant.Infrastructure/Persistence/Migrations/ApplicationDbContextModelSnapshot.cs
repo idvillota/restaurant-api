@@ -1102,6 +1102,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
@@ -1147,6 +1151,10 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProductTypeId");
+
+                    b.HasIndex("TenantId", "Barcode")
+                        .IsUnique()
+                        .HasFilter("\"Barcode\" IS NOT NULL");
 
                     b.ToTable("Products");
                 });
@@ -2061,6 +2069,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<bool>("TiqueterasEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("BarcodesEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<string>("TradeName")

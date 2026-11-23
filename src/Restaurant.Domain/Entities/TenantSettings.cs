@@ -100,5 +100,11 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool TiqueterasEnabled { get; set; }
 
+    /// <summary>
+    /// When true, product barcodes/QR are available in catalog, sales, and production.
+    /// Default true.
+    /// </summary>
+    public bool BarcodesEnabled { get; set; } = true;
+
     public Tenant Tenant { get; set; } = null!;
 }
