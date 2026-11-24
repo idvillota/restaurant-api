@@ -19,15 +19,18 @@ public sealed class SalesReceiptService : ISalesReceiptService
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
     private readonly IGeneratedFileStorage _fileStorage;
+    private readonly IProductImageStorage _mediaStorage;
 
     public SalesReceiptService(
         ApplicationDbContext db,
         ICurrentTenantContext tenantContext,
-        IGeneratedFileStorage fileStorage)
+        IGeneratedFileStorage fileStorage,
+        IProductImageStorage mediaStorage)
     {
         _db = db;
         _tenantContext = tenantContext;
         _fileStorage = fileStorage;
+        _mediaStorage = mediaStorage;
     }
 
     public async Task<SalesReceiptModel> BuildModelAsync(
@@ -65,10 +68,24 @@ public sealed class SalesReceiptService : ISalesReceiptService
                     MidpointRounding.AwayFromZero)
                 : discountedGross;
         var articleCount = (int)lines.Sum(l => l.Quantity);
+        var tenantInfo = MapTenant(settings);
+        // Logo is optional: missing/unreadable media must not block receipt generation.
+        byte[]? logoBytes = null;
+        if (!string.IsNullOrWhiteSpace(tenantInfo.LogoPath))
+        {
+            try
+            {
+                logoBytes = await _mediaStorage.TryReadAsync(tenantInfo.LogoPath, cancellationToken);
+            }
+            catch
+            {
+                logoBytes = null;
+            }
+        }
 
         return new SalesReceiptModel
         {
-            Tenant = MapTenant(settings),
+            Tenant = tenantInfo,
             InvoiceDisplayNumber = BillCheckoutCalculator.FormatInvoiceDisplayNumber(
                 settings.InvoiceNumberPrefix,
                 bill.DianConsecutiveNumber),
@@ -90,11 +107,14 @@ public sealed class SalesReceiptService : ISalesReceiptService
                 ImpoconsumoAmount = l.ImpoconsumoAmount,
                 Notes = l.Notes,
             }).ToList(),
+            // One receipt line per payment method (e.g. five cash payers → one EFECTIVO total).
             Payments = payments
-                .Select(p => new SalesReceiptPaymentModel
+                .GroupBy(p => p.Method)
+                .OrderBy(g => (int)g.Key)
+                .Select(g => new SalesReceiptPaymentModel
                 {
-                    MethodLabel = PaymentMethodLabel(p.Method),
-                    Amount = p.Amount,
+                    MethodLabel = PaymentMethodLabel(g.Key),
+                    Amount = g.Sum(p => p.Amount),
                 })
                 .ToList(),
             Subtotal = bill.Subtotal,
@@ -110,6 +130,7 @@ public sealed class SalesReceiptService : ISalesReceiptService
             ChangeDue = changeDue,
             CurrencyCode = tenantEntity.CurrencyCode,
             PaperWidthMm = (int)ThermalPaperWidth.Normalize((int)settings.ThermalPaperWidthMm),
+            LogoImageBytes = logoBytes,
         };
     }
 
@@ -148,6 +169,7 @@ public sealed class SalesReceiptService : ISalesReceiptService
         {
             TradeName = settings.TradeName,
             LegalName = settings.LegalName,
+            LogoPath = settings.LogoPath,
             TaxRegime = settings.TaxRegime,
             TaxId = settings.TaxId,
             LegalRepresentative = settings.LegalRepresentative,

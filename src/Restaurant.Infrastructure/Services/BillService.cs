@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
@@ -27,6 +28,7 @@ public sealed class BillService : IBillService
     private readonly ILunchTicketBookletService _lunchTickets;
     private readonly IMobileSalePublisher? _salePublisher;
     private readonly IPrintJobQueue? _printJobs;
+    private readonly ILogger<BillService>? _logger;
 
     public BillService(
         ApplicationDbContext db,
@@ -37,7 +39,8 @@ public sealed class BillService : IBillService
         ISalesReceiptService salesReceipts,
         ILunchTicketBookletService lunchTickets,
         IMobileSalePublisher? salePublisher = null,
-        IPrintJobQueue? printJobs = null)
+        IPrintJobQueue? printJobs = null,
+        ILogger<BillService>? logger = null)
     {
         _db = db;
         _tenantContext = tenantContext;
@@ -48,6 +51,7 @@ public sealed class BillService : IBillService
         _lunchTickets = lunchTickets;
         _salePublisher = salePublisher;
         _printJobs = printJobs;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<PayableTableGroupDto>> ListPayableByTableSearchAsync(
@@ -342,14 +346,31 @@ public sealed class BillService : IBillService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await NotifyFreedTablesAsync(orders, cancellationToken);
 
-        var receiptModel = await _salesReceipts.BuildModelAsync(bill, settings, cancellationToken);
-        var receiptFiles = await _salesReceipts.GenerateFilesAsync(receiptModel, cancellationToken);
-        bill.ReceiptPdfRelativePath = receiptFiles.PdfRelativePath;
-        bill.ReceiptXmlRelativePath = receiptFiles.XmlRelativePath;
-        _db.Bills.Update(bill);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        if (dto.PrintReceipt)
-            await EnqueueReceiptPrintAsync(receiptModel, cancellationToken);
+        // Checkout is already committed. Receipt PDF/XML must not roll back payment if generation fails.
+        SalesReceiptModel? receiptModel = null;
+        string? receiptPdfPath = null;
+        string? receiptXmlPath = null;
+        try
+        {
+            receiptModel = await _salesReceipts.BuildModelAsync(bill, settings, cancellationToken);
+            var receiptFiles = await _salesReceipts.GenerateFilesAsync(receiptModel, cancellationToken);
+            receiptPdfPath = receiptFiles.PdfRelativePath;
+            receiptXmlPath = receiptFiles.XmlRelativePath;
+            bill.ReceiptPdfRelativePath = receiptPdfPath;
+            bill.ReceiptXmlRelativePath = receiptXmlPath;
+            _db.Bills.Update(bill);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            if (dto.PrintReceipt)
+                await EnqueueReceiptPrintAsync(receiptModel, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(
+                ex,
+                "Receipt generation failed after checkout for bill {BillId} (paper {PaperWidthMm}mm). Payment kept.",
+                billId,
+                (int)ThermalPaperWidth.Normalize((int)settings.ThermalPaperWidthMm));
+        }
 
         return new BillDto
         {
@@ -370,8 +391,8 @@ public sealed class BillService : IBillService
             InvoiceId = invoiceId,
             InvoiceNumber = invoiceNumber,
             DianConsecutiveNumber = dianConsecutive,
-            ReceiptPdfRelativePath = receiptFiles.PdfRelativePath,
-            ReceiptXmlRelativePath = receiptFiles.XmlRelativePath,
+            ReceiptPdfRelativePath = receiptPdfPath,
+            ReceiptXmlRelativePath = receiptXmlPath,
             SalesOrderIds = orders.Select(o => o.Id).ToList(),
         };
     }

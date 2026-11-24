@@ -102,6 +102,18 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         return Task.CompletedTask;
     }
 
+    public async Task<byte[]?> TryReadAsync(string? relativePath, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return null;
+
+        var absolutePath = GetSafeAbsolutePath(relativePath);
+        if (!File.Exists(absolutePath))
+            return null;
+
+        return await File.ReadAllBytesAsync(absolutePath, cancellationToken);
+    }
+
     public string? GetPublicUrl(string? relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath))

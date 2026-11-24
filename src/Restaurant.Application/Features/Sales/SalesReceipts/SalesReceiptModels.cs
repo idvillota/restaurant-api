@@ -4,6 +4,10 @@ public sealed class SalesReceiptTenantInfo
 {
     public string TradeName { get; set; } = string.Empty;
     public string LegalName { get; set; } = string.Empty;
+
+    /// <summary>Relative media path (e.g. logos/{tenantId}/logo.png). Null when no logo.</summary>
+    public string? LogoPath { get; set; }
+
     public string TaxRegime { get; set; } = string.Empty;
     public string TaxId { get; set; } = string.Empty;
     public string? LegalRepresentative { get; set; }
@@ -70,6 +74,11 @@ public sealed class SalesReceiptModel
 
     /// <summary>Thermal paper width in mm (58 or 80). Used by PDF and print XML.</summary>
     public int PaperWidthMm { get; set; } = 58;
+
+    /// <summary>
+    /// Tenant logo image bytes when available. Populated for PDF generation; null if no logo or read failed.
+    /// </summary>
+    public byte[]? LogoImageBytes { get; set; }
 }
 
 public sealed class SalesReceiptFilesDto

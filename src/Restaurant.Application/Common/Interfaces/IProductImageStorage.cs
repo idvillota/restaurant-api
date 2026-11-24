@@ -21,5 +21,11 @@ public interface IProductImageStorage
 
     Task DeleteIfExistsAsync(string? relativePath, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reads media bytes for a stored relative path (product image or tenant logo).
+    /// Returns null when the path is empty or the file is missing.
+    /// </summary>
+    Task<byte[]?> TryReadAsync(string? relativePath, CancellationToken cancellationToken = default);
+
     string? GetPublicUrl(string? relativePath);
 }

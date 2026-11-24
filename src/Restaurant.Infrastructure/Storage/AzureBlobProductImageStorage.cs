@@ -113,6 +113,20 @@ public sealed class AzureBlobProductImageStorage : IProductImageStorage
         await blobClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
     }
 
+    public async Task<byte[]?> TryReadAsync(string? relativePath, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return null;
+
+        await EnsureContainerAsync(cancellationToken);
+        var blobClient = _container.GetBlobClient(NormalizeBlobName(relativePath));
+        if (!await blobClient.ExistsAsync(cancellationToken))
+            return null;
+
+        var download = await blobClient.DownloadContentAsync(cancellationToken);
+        return download.Value.Content.ToArray();
+    }
+
     public string? GetPublicUrl(string? relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
