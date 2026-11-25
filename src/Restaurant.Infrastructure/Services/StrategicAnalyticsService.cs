@@ -250,27 +250,41 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
         DateOnly endDate,
         CancellationToken cancellationToken)
     {
-        var startUtc = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var endExclusive = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var (startUtc, endExclusive) = ColombiaTime.ToUtcRange(startDate, endDate);
 
-        var lines = await _db.SalesOrderLines
-            .AsNoTracking()
-            .Where(l =>
-                l.TenantId == tenantId
-                && l.CreatedAtUtc >= startUtc
-                && l.CreatedAtUtc < endExclusive
-                && l.SalesOrder.Status == SalesOrderStatus.Paid)
-            .Select(l => new SalesLineRow(
+        var raw = await OperationalDayQueries.PaidBillLinesOnOperationalDays(
+                _db.BillLines.AsNoTracking().Where(l => l.TenantId == tenantId),
+                startDate,
+                endDate,
+                startUtc,
+                endExclusive)
+            .Select(l => new
+            {
                 l.ProductId,
-                l.Product.Name,
-                l.Product.ProductType.Name,
+                l.ProductName,
+                l.ProductTypeName,
                 l.Quantity,
                 l.LineTotal,
                 l.UnitCostPrice,
-                l.SalesOrderId,
-                l.CreatedAtUtc,
-                l.Id))
+                l.BillId,
+                PaidAtUtc = l.Bill.PaidAtUtc ?? l.Bill.IssuedAtUtc,
+                ShiftDate = l.Bill.CashierShift != null ? (DateOnly?)l.Bill.CashierShift.BusinessDate : null,
+                LineId = l.SalesOrderLineId ?? l.Id,
+            })
             .ToListAsync(cancellationToken);
+
+        var lines = raw.Select(l => new SalesLineRow(
+                l.ProductId,
+                l.ProductName,
+                l.ProductTypeName,
+                l.Quantity,
+                l.LineTotal,
+                l.UnitCostPrice,
+                l.BillId,
+                l.PaidAtUtc,
+                l.LineId,
+                l.ShiftDate ?? ColombiaTime.CalendarDate(l.PaidAtUtc)))
+            .ToList();
 
         if (lines.Count == 0)
             return lines;
@@ -442,7 +456,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
         var lines = await LoadPaidSalesLinesAsync(tenantId, startDate, endDate, cancellationToken);
 
         var daily = lines
-            .GroupBy(l => DateOnly.FromDateTime(l.CreatedAtUtc))
+            .GroupBy(l => l.OperationalDate)
             .Select(g => new DailyBucket(g.Key, g.Sum(x => x.LineTotal), g.Sum(x => x.Quantity), g.Select(x => x.SalesOrderId).Distinct().Count()))
             .OrderBy(x => x.Date)
             .ToList();
@@ -760,8 +774,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
         DateOnly endDate,
         CancellationToken cancellationToken)
     {
-        var startUtc = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var endExclusive = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var (startUtc, endExclusive) = ColombiaTime.ToUtcRange(startDate, endDate);
 
         var purchaseLines = await _db.PurchaseLines
             .AsNoTracking()
@@ -858,7 +871,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
 
         foreach (var line in lines)
         {
-            var hour = line.CreatedAtUtc.Hour;
+            var hour = ColombiaTime.Hour(line.CreatedAtUtc);
             var bucket = hourly[hour];
             hourly[hour] = bucket with
             {
@@ -871,7 +884,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
         var totalRevenue = hourly.Values.Sum(x => x.Revenue);
 
         var topProductsByHour = lines
-            .GroupBy(l => (l.CreatedAtUtc.Hour, l.ProductName))
+            .GroupBy(l => (ColombiaTime.Hour(l.CreatedAtUtc), l.ProductName))
             .Select(g => new { g.Key.Item1, g.Key.ProductName, Revenue = g.Sum(x => x.LineTotal), Qty = g.Sum(x => x.Quantity) })
             .OrderByDescending(x => x.Revenue)
             .Take(30)
@@ -882,7 +895,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
             Meta = BuildMeta(
                 StrategicReportTypes.ProductMixByHour,
                 "Mix de productos por hora",
-                "Distribución de ventas por hora del día (UTC) y productos destacados.",
+                "Distribución de ventas por hora del día (America/Bogota) y productos destacados.",
                 startDate,
                 endDate,
                 null),
@@ -890,7 +903,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
             {
                 Kpis =
                 [
-                    Kpi("peak_hour", "Hora pico", $"{peakHour.Hour:00}:00 UTC"),
+                    Kpi("peak_hour", "Hora pico", $"{peakHour.Hour:00}:00"),
                     Kpi("peak_revenue", "Ingresos hora pico", FormatMoney(peakHour.Revenue)),
                     Kpi("total", "Ingresos período", FormatMoney(totalRevenue)),
                     Kpi("lines", "Líneas vendidas", lines.Count.ToString(CultureInfo.InvariantCulture)),
@@ -900,7 +913,7 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
             [
                 TextSection(
                     "Zona horaria",
-                    "Las horas se calculan en UTC según CreatedAtUtc de cada línea de venta."),
+                    "Las horas son America/Bogota, según la hora del cobro en el día operativo."),
                 ChartSection(
                     "Ingresos por hora",
                     "bar",
@@ -1046,7 +1059,8 @@ public sealed class StrategicAnalyticsService : IStrategicAnalyticsService
         decimal? UnitCostPrice,
         Guid SalesOrderId,
         DateTime CreatedAtUtc,
-        Guid LineId)
+        Guid LineId,
+        DateOnly OperationalDate)
     {
         public HashSet<Guid> ExcludedIngredientIds { get; init; } = [];
     }

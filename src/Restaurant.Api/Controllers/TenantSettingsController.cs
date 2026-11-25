@@ -36,4 +36,29 @@ public sealed class TenantSettingsController : ControllerBase
             return Conflict(new { message = ex.Message });
         }
     }
+
+    [HttpPut("logo")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    public async Task<ActionResult<TenantSettingsDto>> SetLogo(
+        IFormFile file,
+        CancellationToken cancellationToken = default)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "Image file is required." });
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            return Ok(await _service.SetLogoAsync(stream, file.FileName, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("logo")]
+    public async Task<ActionResult<TenantSettingsDto>> RemoveLogo(
+        CancellationToken cancellationToken = default) =>
+        Ok(await _service.RemoveLogoAsync(cancellationToken));
 }

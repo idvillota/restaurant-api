@@ -55,6 +55,41 @@ public sealed class LocalProductImageStorage : IProductImageStorage
         return relativePath.Replace('\\', '/');
     }
 
+    public async Task<string> SaveTenantLogoAsync(
+        Guid tenantId,
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        var extension = NormalizeExtension(Path.GetExtension(fileName));
+        if (!_options.AllowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"File type '{extension}' is not allowed.");
+
+        if (content.CanSeek && content.Length > _options.MaxBytes)
+            throw new InvalidOperationException($"Image must be {_options.MaxBytes / (1024 * 1024)} MB or smaller.");
+
+        var relativePath = $"logos/{tenantId:N}/logo{extension}";
+        var absolutePath = Path.Combine(_absoluteRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
+
+        await using var fileStream = new FileStream(
+            absolutePath,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None);
+        await content.CopyToAsync(fileStream, cancellationToken);
+        fileStream.Close();
+
+        var writtenBytes = new FileInfo(absolutePath).Length;
+        if (writtenBytes > _options.MaxBytes)
+        {
+            File.Delete(absolutePath);
+            throw new InvalidOperationException($"Image must be {_options.MaxBytes / (1024 * 1024)} MB or smaller.");
+        }
+
+        return relativePath.Replace('\\', '/');
+    }
+
     public Task DeleteIfExistsAsync(string? relativePath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
@@ -65,6 +100,18 @@ public sealed class LocalProductImageStorage : IProductImageStorage
             File.Delete(absolutePath);
 
         return Task.CompletedTask;
+    }
+
+    public async Task<byte[]?> TryReadAsync(string? relativePath, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return null;
+
+        var absolutePath = GetSafeAbsolutePath(relativePath);
+        if (!File.Exists(absolutePath))
+            return null;
+
+        return await File.ReadAllBytesAsync(absolutePath, cancellationToken);
     }
 
     public string? GetPublicUrl(string? relativePath)

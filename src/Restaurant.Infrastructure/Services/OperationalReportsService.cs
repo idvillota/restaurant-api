@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Reports;
 using Restaurant.Domain.Enums;
+using Restaurant.Domain.Sales;
+using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -28,7 +31,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
         ValidateDateRange(startDate, endDate);
         var tenantId = ResolveTenantId();
         var tenantName = await GetTenantNameAsync(tenantId, cancellationToken);
-        var (startUtc, endExclusive) = ToUtcRange(startDate, endDate);
+        var (startUtc, endExclusive) = ColombiaTime.ToUtcRange(startDate, endDate);
 
         string? productName = null;
         if (productId.HasValue)
@@ -39,29 +42,40 @@ public sealed class OperationalReportsService : IOperationalReportsService
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
-        var query = _db.SalesOrderLines
-            .AsNoTracking()
-            .Where(l =>
-                l.TenantId == tenantId
-                && l.CreatedAtUtc >= startUtc
-                && l.CreatedAtUtc < endExclusive
-                && l.SalesOrder.Status == SalesOrderStatus.Paid);
+        var query = OperationalDayQueries.PaidBillLinesOnOperationalDays(
+            _db.BillLines.AsNoTracking().Where(l => l.TenantId == tenantId),
+            startDate,
+            endDate,
+            startUtc,
+            endExclusive);
 
         if (productId.HasValue)
             query = query.Where(l => l.ProductId == productId.Value);
 
         var totalCount = await query.CountAsync(cancellationToken);
-        var rows = await query
-            .OrderByDescending(l => l.CreatedAtUtc)
-            .Select(l => new SalesReportRowDto
+        var rawRows = await query
+            .OrderByDescending(l => l.Bill.PaidAtUtc)
+            .Select(l => new
             {
-                ProductName = l.Product.Name,
-                UnitPrice = l.UnitPrice,
-                Quantity = l.Quantity,
-                SoldAtUtc = l.CreatedAtUtc,
+                l.ProductName,
+                l.UnitPrice,
+                l.Quantity,
+                SoldAtUtc = l.Bill.PaidAtUtc ?? l.Bill.IssuedAtUtc,
+                ShiftDate = l.Bill.CashierShift != null ? (DateOnly?)l.Bill.CashierShift.BusinessDate : null,
             })
             .Take(MaxRows)
             .ToListAsync(cancellationToken);
+
+        var rows = rawRows
+            .Select(l => new SalesReportRowDto
+            {
+                ProductName = l.ProductName,
+                UnitPrice = l.UnitPrice,
+                Quantity = l.Quantity,
+                SoldAtUtc = l.SoldAtUtc,
+                OperationalDate = l.ShiftDate ?? ColombiaTime.CalendarDate(l.SoldAtUtc),
+            })
+            .ToList();
 
         return new SalesReportDto
         {
@@ -124,7 +138,7 @@ public sealed class OperationalReportsService : IOperationalReportsService
         ValidateDateRange(startDate, endDate);
         var tenantId = ResolveTenantId();
         var tenantName = await GetTenantNameAsync(tenantId, cancellationToken);
-        var (startUtc, endExclusive) = ToUtcRange(startDate, endDate);
+        var (startUtc, endExclusive) = ColombiaTime.ToUtcRange(startDate, endDate);
 
         string? ingredientName = null;
         if (ingredientId.HasValue)
@@ -279,39 +293,103 @@ public sealed class OperationalReportsService : IOperationalReportsService
         ValidateDateRange(startDate, endDate);
         var tenantId = ResolveTenantId();
         var tenantName = await GetTenantNameAsync(tenantId, cancellationToken);
-        var (startUtc, endExclusive) = ToUtcRange(startDate, endDate);
+        var (startUtc, endExclusive) = ColombiaTime.ToUtcRange(startDate, endDate);
 
-        var salesByDate = await _db.SalesOrderLines
-            .AsNoTracking()
-            .Where(l =>
-                l.TenantId == tenantId
-                && l.CreatedAtUtc >= startUtc
-                && l.CreatedAtUtc < endExclusive
-                && l.SalesOrder.Status == SalesOrderStatus.Paid)
-            .GroupBy(l => DateOnly.FromDateTime(l.CreatedAtUtc))
-            .Select(g => new DailySummarySalesBucket
+        var paymentRows = await OperationalDayQueries.CompletedPaymentsOnOperationalDays(
+                _db.Payments.AsNoTracking().Where(p => p.TenantId == tenantId),
+                startDate,
+                endDate,
+                startUtc,
+                endExclusive)
+            .Select(p => new
             {
-                Date = g.Key,
-                TotalSales = g.Sum(x => x.LineTotal),
-                SalesOrderCount = g.Select(x => x.SalesOrderId).Distinct().Count(),
-                ItemsSold = g.Sum(x => x.Quantity),
+                p.Amount,
+                BillId = p.BillId,
+                PaymentShiftDate = p.CashierShift != null ? (DateOnly?)p.CashierShift.BusinessDate : null,
+                BillShiftDate = p.Bill != null && p.Bill.CashierShift != null
+                    ? (DateOnly?)p.Bill.CashierShift.BusinessDate
+                    : null,
+                p.PaidAtUtc,
             })
-            .ToDictionaryAsync(x => x.Date, cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        var purchasesByDate = await _db.Purchases
+        var datedPayments = paymentRows
+            .Select(p => new
+            {
+                p.Amount,
+                p.BillId,
+                Date = OperationalDayQueries.ResolveBusinessDate(p.PaymentShiftDate, p.BillShiftDate, p.PaidAtUtc),
+            })
+            .Where(p => p.Date >= startDate && p.Date <= endDate)
+            .ToList();
+
+        var billIds = datedPayments.Where(p => p.BillId is not null).Select(p => p.BillId!.Value).Distinct().ToList();
+        var billLines = billIds.Count == 0
+            ? []
+            : await _db.BillLines.AsNoTracking()
+                .Where(l => billIds.Contains(l.BillId))
+                .Select(l => new { l.BillId, l.Quantity })
+                .ToListAsync(cancellationToken);
+
+        var billDate = datedPayments
+            .Where(p => p.BillId is not null)
+            .GroupBy(p => p.BillId!.Value)
+            .ToDictionary(g => g.Key, g => g.First().Date);
+
+        var separateVitrina = await VitrinaCafeBillTotals.IsSeparateEnabledAsync(_db, cancellationToken);
+        var vitrinaByBill = separateVitrina
+            ? await VitrinaCafeBillTotals.SumByBillAsync(_db, billIds, cancellationToken)
+            : [];
+
+        var salesByDate = datedPayments
+            .GroupBy(p => p.Date)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var collected = g.Sum(x => x.Amount);
+                    var dayBillIds = g.Where(x => x.BillId is not null).Select(x => x.BillId!.Value).Distinct().ToList();
+                    decimal totalSales;
+                    if (separateVitrina)
+                    {
+                        var vitrina = dayBillIds.Sum(id => vitrinaByBill.GetValueOrDefault(id));
+                        (totalSales, _) = VitrinaCafeProductType.SplitCollected(collected, vitrina);
+                    }
+                    else
+                    {
+                        totalSales = collected;
+                    }
+
+                    return new DailySummarySalesBucket
+                    {
+                        Date = g.Key,
+                        TotalSales = totalSales,
+                        SalesOrderCount = dayBillIds.Count,
+                        ItemsSold = billLines
+                            .Where(l => billDate.TryGetValue(l.BillId, out var date) && date == g.Key)
+                            .Sum(l => l.Quantity),
+                    };
+                });
+
+        var purchaseRows = await _db.Purchases
             .AsNoTracking()
             .Where(p =>
                 p.TenantId == tenantId
                 && p.PurchasedAtUtc >= startUtc
                 && p.PurchasedAtUtc < endExclusive)
-            .GroupBy(p => DateOnly.FromDateTime(p.PurchasedAtUtc))
-            .Select(g => new DailySummaryPurchasesBucket
-            {
-                Date = g.Key,
-                TotalPurchases = g.Sum(x => x.Total),
-                PurchaseCount = g.Count(),
-            })
-            .ToDictionaryAsync(x => x.Date, cancellationToken);
+            .Select(p => new { p.PurchasedAtUtc, p.Total })
+            .ToListAsync(cancellationToken);
+
+        var purchasesByDate = purchaseRows
+            .GroupBy(p => ColombiaTime.CalendarDate(p.PurchasedAtUtc))
+            .ToDictionary(
+                g => g.Key,
+                g => new DailySummaryPurchasesBucket
+                {
+                    Date = g.Key,
+                    TotalPurchases = g.Sum(x => x.Total),
+                    PurchaseCount = g.Count(),
+                });
 
         var cashMovementsInRange = await _db.CashMovements
             .AsNoTracking()
@@ -436,13 +514,6 @@ public sealed class OperationalReportsService : IOperationalReportsService
             .FirstOrDefaultAsync(cancellationToken);
 
         return name ?? string.Empty;
-    }
-
-    private static (DateTime StartUtc, DateTime EndExclusive) ToUtcRange(DateOnly startDate, DateOnly endDate)
-    {
-        var startUtc = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var endExclusive = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        return (startUtc, endExclusive);
     }
 
     private static string CashOutflowTypeLabel(CashMovementType type) =>

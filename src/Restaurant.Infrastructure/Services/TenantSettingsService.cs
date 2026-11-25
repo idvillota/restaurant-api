@@ -3,6 +3,7 @@ using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
+using Restaurant.Infrastructure.Common;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Infrastructure.Services;
@@ -11,11 +12,19 @@ public sealed class TenantSettingsService : ITenantSettingsService
 {
     private readonly ApplicationDbContext _db;
     private readonly ICurrentTenantContext _tenantContext;
+    private readonly IProductImageStorage _mediaStorage;
+    private readonly IProductService _products;
 
-    public TenantSettingsService(ApplicationDbContext db, ICurrentTenantContext tenantContext)
+    public TenantSettingsService(
+        ApplicationDbContext db,
+        ICurrentTenantContext tenantContext,
+        IProductImageStorage mediaStorage,
+        IProductService products)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _mediaStorage = mediaStorage;
+        _products = products;
     }
 
     public async Task<TenantSettingsDto> GetAsync(CancellationToken cancellationToken = default)
@@ -54,17 +63,77 @@ public sealed class TenantSettingsService : ITenantSettingsService
         settings.InvoiceNumberPrefix = dto.InvoiceNumberPrefix?.Trim();
         settings.ImpoconsumoPercent = dto.ImpoconsumoPercent;
         settings.ShowOperationalSalesPanel = dto.ShowOperationalSalesPanel;
-        settings.InventoryEnabled = dto.InventoryEnabled;
+        StockControlHelper.ApplyToSettings(settings, dto.StockControlMode, dto.InventoryEnabled);
         settings.AutoGeneratePurchaseBillNumbers = dto.AutoGeneratePurchaseBillNumbers;
         settings.KitchenTicketPrintMode = NormalizePrintMode(dto.KitchenTicketPrintMode);
+        settings.ThermalPaperWidthMm = ThermalPaperWidth.Normalize(dto.ThermalPaperWidthMm);
         settings.SeparateVitrinaCafeSales = dto.SeparateVitrinaCafeSales;
         settings.RequirePriorDayCloseBeforeNewShift = dto.RequirePriorDayCloseBeforeNewShift;
+        if (settings.TiqueterasEnabled && !dto.TiqueterasEnabled)
+        {
+            var remaining = await _db.LunchTicketBooklets
+                .AsNoTracking()
+                .SumAsync(b => (int?)b.RemainingTickets, cancellationToken) ?? 0;
+            if (remaining > 0)
+                throw new InvalidOperationException(
+                    $"No se pueden desactivar las tiqueteras mientras haya cupos pendientes ({remaining}).");
+        }
+
+        settings.TiqueterasEnabled = dto.TiqueterasEnabled;
+        settings.BarcodesEnabled = dto.BarcodesEnabled;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
 
         _db.TenantSettings.Update(settings);
         await _db.SaveChangesAsync(cancellationToken);
+
+        // When barcodes are on, fill only products without a code (never overwrite stickers).
+        var assigned = dto.BarcodesEnabled
+            ? await _products.BackfillMissingBarcodesAsync(cancellationToken)
+            : 0;
+
+        var mapped = Map(settings);
+        mapped.ProductBarcodesAssigned = assigned;
+        return mapped;
+    }
+
+    public async Task<TenantSettingsDto> SetLogoAsync(
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        var tenantId = ResolveTenantId();
+        var previousPath = settings.LogoPath;
+
+        var relativePath = await _mediaStorage.SaveTenantLogoAsync(
+            tenantId,
+            content,
+            fileName,
+            cancellationToken);
+
+        settings.LogoPath = relativePath;
+        _db.TenantSettings.Update(settings);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        if (!string.Equals(previousPath, relativePath, StringComparison.OrdinalIgnoreCase))
+            await _mediaStorage.DeleteIfExistsAsync(previousPath, cancellationToken);
+
+        return Map(settings);
+    }
+
+    public async Task<TenantSettingsDto> RemoveLogoAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+        var previousPath = settings.LogoPath;
+        if (string.IsNullOrWhiteSpace(previousPath))
+            return Map(settings);
+
+        settings.LogoPath = null;
+        _db.TenantSettings.Update(settings);
+        await _db.SaveChangesAsync(cancellationToken);
+        await _mediaStorage.DeleteIfExistsAsync(previousPath, cancellationToken);
         return Map(settings);
     }
 
@@ -85,9 +154,12 @@ public sealed class TenantSettingsService : ITenantSettingsService
             Country = "Colombia",
             ShowOperationalSalesPanel = true,
             InventoryEnabled = true,
+            StockControlMode = StockControlMode.Ingredients,
             AutoGeneratePurchaseBillNumbers = false,
             KitchenTicketPrintMode = KitchenTicketPrintMode.Always,
+            ThermalPaperWidthMm = ThermalPaperWidthMm.Mm58,
             SeparateVitrinaCafeSales = false,
+            BarcodesEnabled = true,
         };
         await _db.TenantSettings.AddAsync(settings, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -120,13 +192,14 @@ public sealed class TenantSettingsService : ITenantSettingsService
         return true;
     }
 
-    private static TenantSettingsDto Map(TenantSettings settings) =>
+    private TenantSettingsDto Map(TenantSettings settings) =>
         new()
         {
             MaxDiscountPercent = settings.MaxDiscountPercent,
             OperationalDayCutoffHour = settings.OperationalDayCutoffHour,
             TradeName = settings.TradeName,
             LegalName = settings.LegalName,
+            LogoUrl = _mediaStorage.GetPublicUrl(settings.LogoPath),
             TaxRegime = settings.TaxRegime,
             TaxId = settings.TaxId,
             LegalRepresentative = settings.LegalRepresentative,
@@ -144,10 +217,14 @@ public sealed class TenantSettingsService : ITenantSettingsService
             ImpoconsumoPercent = settings.ImpoconsumoPercent,
             ShowOperationalSalesPanel = settings.ShowOperationalSalesPanel,
             InventoryEnabled = settings.InventoryEnabled,
+            StockControlMode = (int)settings.StockControlMode,
             AutoGeneratePurchaseBillNumbers = settings.AutoGeneratePurchaseBillNumbers,
             KitchenTicketPrintMode = (int)settings.KitchenTicketPrintMode,
+            ThermalPaperWidthMm = (int)ThermalPaperWidth.Normalize((int)settings.ThermalPaperWidthMm),
             SeparateVitrinaCafeSales = settings.SeparateVitrinaCafeSales,
             RequirePriorDayCloseBeforeNewShift = settings.RequirePriorDayCloseBeforeNewShift,
+            TiqueterasEnabled = settings.TiqueterasEnabled,
+            BarcodesEnabled = settings.BarcodesEnabled,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

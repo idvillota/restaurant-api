@@ -9,8 +9,15 @@ public interface IProductService
     Task<PagedResult<ProductListItemDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default);
     Task<ProductMenuDto> GetMenuAsync(CancellationToken cancellationToken = default);
     Task<ProductListItemDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ProductListItemDto?> GetByBarcodeAsync(string barcode, CancellationToken cancellationToken = default);
     Task<ProductListItemDto> CreateAsync(CreateProductDto dto, CancellationToken cancellationToken = default);
     Task<ProductListItemDto?> UpdateAsync(Guid id, UpdateProductDto dto, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Assigns a unique barcode to every product that has none. Does not change existing codes.
+    /// Returns how many products were updated.
+    /// </summary>
+    Task<int> BackfillMissingBarcodesAsync(CancellationToken cancellationToken = default);
     Task<bool> SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ProductRecipeDto?> GetRecipeAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<ProductRecipeDto?> SetRecipeAsync(Guid productId, SetProductRecipeDto dto, CancellationToken cancellationToken = default);

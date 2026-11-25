@@ -46,12 +46,7 @@ public static class DependencyInjection
             services.AddSingleton<IGeneratedFileStorage, AzureBlobGeneratedFileStorage>();
         else
             services.AddSingleton<IGeneratedFileStorage, LocalGeneratedFileStorage>();
-        // Remove Gemini configuration - no longer used
         services.Configure<AzureOpenAiOptions>(configuration.GetSection(AzureOpenAiOptions.SectionName));
-        services.AddHttpClient(nameof(StrategicAiReportService), client =>
-        {
-            client.Timeout = TimeSpan.FromMinutes(3);
-        });
 
         // Configure a named HttpClient for Azure OpenAI interaction. BaseAddress and api-key header are set from configuration at runtime.
         services.AddHttpClient("AzureOpenAiClient", client =>
@@ -97,10 +92,14 @@ public static class DependencyInjection
         services.AddScoped<IIngredientService, IngredientService>();
         services.AddScoped<IIngredientMovementTypeService, IngredientMovementTypeService>();
         services.AddScoped<IIngredientMovementDocumentService, IngredientMovementDocumentService>();
+        services.AddScoped<IProductProductionDocumentService, ProductProductionDocumentService>();
         services.AddScoped<IPurchaseService, PurchaseService>();
         services.AddScoped<ISalesOrderService, SalesOrderService>();
         services.AddScoped<IMobileSyncService, MobileSyncService>();
         services.AddScoped<IBillService, BillService>();
+        services.AddScoped<ILunchTicketBookletService, LunchTicketBookletService>();
+        services.AddScoped<ITiqueteraConfigService, TiqueteraConfigService>();
+        services.AddScoped<ITiqueteraSalesService, TiqueteraSalesService>();
         services.AddScoped<IBreBQrService, BreBQrService>();
         services.AddScoped<IPrintJobQueue, PrintJobQueue>();
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
@@ -111,9 +110,6 @@ public static class DependencyInjection
         services.AddScoped<IPlanillaPdfService, PlanillaPdfService>();
         services.AddScoped<IInventoryAvailabilityService, InventoryAvailabilityService>();
         services.AddScoped<IRolePermissionService, RolePermissionService>();
-        // Register Azure-based strategic AI report service implementation.
-        // This application uses Azure OpenAI for all strategic report generation.
-        services.AddScoped<IStrategicAiReportService, AzureStrategicAiReportService>();
         // Print service centraliza la lógica de resolución y lectura de documentos generados.
         services.AddScoped<IPrintService, PrintService>();
         services.AddScoped<IStrategicAnalyticsService, StrategicAnalyticsService>();

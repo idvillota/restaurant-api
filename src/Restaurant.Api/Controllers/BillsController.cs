@@ -4,6 +4,7 @@ using Restaurant.Application.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
+using Restaurant.Application.Features.Sales.LunchTickets;
 using Restaurant.Infrastructure.Persistence;
 
 namespace Restaurant.Api.Controllers;
@@ -15,19 +16,37 @@ public sealed class BillsController : ControllerBase
 {
     private readonly IBillService _service;
     private readonly IBreBQrService _breBQr;
+    private readonly ILunchTicketBookletService _lunchTickets;
     private readonly ApplicationDbContext _db;
     private readonly IGeneratedFileStorage _fileStorage;
 
     public BillsController(
         IBillService service,
         IBreBQrService breBQr,
+        ILunchTicketBookletService lunchTickets,
         ApplicationDbContext db,
         IGeneratedFileStorage fileStorage)
     {
         _service = service;
         _breBQr = breBQr;
+        _lunchTickets = lunchTickets;
         _db = db;
         _fileStorage = fileStorage;
+    }
+
+    [HttpGet("lunch-tickets/{customerId:guid}")]
+    public async Task<ActionResult<LunchTicketBalanceDto>> GetLunchTicketBalance(
+        Guid customerId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return Ok(await _lunchTickets.GetBalanceAsync(customerId, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpGet("payable")]

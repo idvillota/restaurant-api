@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Sales.Bills;
+using Restaurant.Application.Features.Sales.LunchTickets;
 using Restaurant.Application.Features.Sales.SalesReceipts;
 using Restaurant.Domain.Entities;
 using Restaurant.Domain.Enums;
@@ -23,8 +25,10 @@ public sealed class BillService : IBillService
     private readonly IInventoryAvailabilityService _inventory;
     private readonly ICashierShiftService _cashierShifts;
     private readonly ISalesReceiptService _salesReceipts;
+    private readonly ILunchTicketBookletService _lunchTickets;
     private readonly IMobileSalePublisher? _salePublisher;
     private readonly IPrintJobQueue? _printJobs;
+    private readonly ILogger<BillService>? _logger;
 
     public BillService(
         ApplicationDbContext db,
@@ -33,8 +37,10 @@ public sealed class BillService : IBillService
         IInventoryAvailabilityService inventory,
         ICashierShiftService cashierShifts,
         ISalesReceiptService salesReceipts,
+        ILunchTicketBookletService lunchTickets,
         IMobileSalePublisher? salePublisher = null,
-        IPrintJobQueue? printJobs = null)
+        IPrintJobQueue? printJobs = null,
+        ILogger<BillService>? logger = null)
     {
         _db = db;
         _tenantContext = tenantContext;
@@ -42,8 +48,10 @@ public sealed class BillService : IBillService
         _inventory = inventory;
         _cashierShifts = cashierShifts;
         _salesReceipts = salesReceipts;
+        _lunchTickets = lunchTickets;
         _salePublisher = salePublisher;
         _printJobs = printJobs;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<PayableTableGroupDto>> ListPayableByTableSearchAsync(
@@ -82,6 +90,8 @@ public sealed class BillService : IBillService
                     ExcludedIngredientIds = l.ExcludedIngredients
                         .Select(e => e.IngredientId)
                         .ToList(),
+                    l.Product.IsLunchTicketRedeemable,
+                    l.Product.LunchTicketPackSize,
                 }).ToList(),
             })
             .ToListAsync(cancellationToken);
@@ -119,6 +129,8 @@ public sealed class BillService : IBillService
                             LineTotal = l.LineTotal,
                             Notes = l.Notes,
                             ExcludedIngredientIds = l.ExcludedIngredientIds,
+                            IsLunchTicketRedeemable = l.IsLunchTicketRedeemable,
+                            LunchTicketPackSize = l.LunchTicketPackSize,
                         }).ToList(),
                     }).ToList(),
                 };
@@ -140,6 +152,41 @@ public sealed class BillService : IBillService
             throw new InvalidOperationException("Add at least one payment.");
 
         var (totals, orders) = await LoadCheckoutContextAsync(dto, cancellationToken);
+        var settings = await GetOrCreateSettingsAsync(cancellationToken);
+
+        var checkoutCustomerId = dto.CustomerId;
+        var deliveryCustomerIds = orders
+            .Where(o => o.IsDelivery && o.CustomerId is not null)
+            .Select(o => o.CustomerId!.Value)
+            .Distinct()
+            .ToList();
+        if (checkoutCustomerId is null && deliveryCustomerIds.Count == 1)
+            checkoutCustomerId = deliveryCustomerIds[0];
+
+        var productFlags = await LoadProductLunchTicketFlagsAsync(totals.Lines.Select(l => l.ProductId), cancellationToken);
+        var isTiqueteraCheckout = LunchTicketCheckoutRules.UsesTiquetera(
+            dto.Payments.Select(p => new LunchTicketCheckoutRules.PaymentLine(p.Method, p.Amount)));
+
+        var remainingTickets = 0;
+        if (isTiqueteraCheckout && checkoutCustomerId is { } ticketCustomerId)
+            remainingTickets = await _lunchTickets.GetRemainingTicketsAsync(ticketCustomerId, cancellationToken);
+
+        LunchTicketCheckoutRules.ValidatePayments(
+            settings.TiqueterasEnabled,
+            dto.Payments.Select(p => new LunchTicketCheckoutRules.PaymentLine(p.Method, p.Amount)).ToList(),
+            totals.Lines.Select(l => new LunchTicketCheckoutRules.CheckoutLine(
+                l.ProductId,
+                l.ProductName,
+                l.Quantity,
+                productFlags.GetValueOrDefault(l.ProductId)?.IsLunchTicketRedeemable ?? false)).ToList(),
+            checkoutCustomerId,
+            remainingTickets);
+
+        if (isTiqueteraCheckout)
+        {
+            // Revenue already recognized when the pack was sold — bill lunch lines at $0.
+            totals = ZeroTotalsForTiqueteraRedemption(totals);
+        }
 
         var paymentSum = dto.Payments.Sum(p => p.Amount);
         var roundedPaymentSum = decimal.Round(paymentSum, 2, MidpointRounding.AwayFromZero);
@@ -151,19 +198,23 @@ public sealed class BillService : IBillService
             throw new InvalidOperationException(
                 $"Payments ({paymentSum:N2}) exceed the total due ({totals.TotalDue:N2}). Adjust amounts or add a tip instead.");
 
-        var settings = await GetOrCreateSettingsAsync(cancellationToken);
         var (shiftId, processedByUserId) = await _cashierShifts.RequireOpenShiftAsync(cancellationToken);
         var cashierName = await ResolveCashierDisplayNameAsync(processedByUserId, cancellationToken);
 
-        var checkoutCustomerId = dto.CustomerId;
-        var deliveryCustomerIds = orders
-            .Where(o => o.IsDelivery && o.CustomerId is not null)
-            .Select(o => o.CustomerId!.Value)
-            .Distinct()
-            .ToList();
-        if (checkoutCustomerId is null && deliveryCustomerIds.Count == 1)
-            checkoutCustomerId = deliveryCustomerIds[0];
         var customer = await ResolveCustomerAsync(checkoutCustomerId, cancellationToken);
+        EnsureCustomerForLunchTicketPackSale(customer, totals.Lines, productFlags);
+
+        if (isTiqueteraCheckout)
+        {
+            var ticketsNeeded = LunchTicketCheckoutRules.TicketsRequired(
+                totals.Lines.Select(l => new LunchTicketCheckoutRules.CheckoutLine(
+                    l.ProductId,
+                    l.ProductName,
+                    l.Quantity,
+                    true)));
+            await _lunchTickets.RedeemAsync(customer.Id, ticketsNeeded, cancellationToken);
+        }
+
         var now = DateTime.UtcNow;
         var billId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
@@ -227,6 +278,24 @@ public sealed class BillService : IBillService
                 cancellationToken);
         }
 
+        foreach (var line in totals.Lines)
+        {
+            var flags = productFlags.GetValueOrDefault(line.ProductId);
+            if (flags?.LunchTicketPackSize is not { } packSize || packSize <= 0)
+                continue;
+            if (!settings.TiqueterasEnabled)
+                throw new InvalidOperationException("Este local no tiene tiqueteras habilitadas.");
+
+            await _lunchTickets.CreateFromPackSaleAsync(
+                customer.Id,
+                billId,
+                line.ProductId,
+                packSize,
+                line.Quantity,
+                line.UnitPrice,
+                cancellationToken);
+        }
+
         foreach (var order in orders)
         {
             await _db.BillSalesOrders.AddAsync(
@@ -277,14 +346,31 @@ public sealed class BillService : IBillService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await NotifyFreedTablesAsync(orders, cancellationToken);
 
-        var receiptModel = await _salesReceipts.BuildModelAsync(bill, settings, cancellationToken);
-        var receiptFiles = await _salesReceipts.GenerateFilesAsync(receiptModel, cancellationToken);
-        bill.ReceiptPdfRelativePath = receiptFiles.PdfRelativePath;
-        bill.ReceiptXmlRelativePath = receiptFiles.XmlRelativePath;
-        _db.Bills.Update(bill);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        if (dto.PrintReceipt)
-            await EnqueueReceiptPrintAsync(receiptModel, cancellationToken);
+        // Checkout is already committed. Receipt PDF/XML must not roll back payment if generation fails.
+        SalesReceiptModel? receiptModel = null;
+        string? receiptPdfPath = null;
+        string? receiptXmlPath = null;
+        try
+        {
+            receiptModel = await _salesReceipts.BuildModelAsync(bill, settings, cancellationToken);
+            var receiptFiles = await _salesReceipts.GenerateFilesAsync(receiptModel, cancellationToken);
+            receiptPdfPath = receiptFiles.PdfRelativePath;
+            receiptXmlPath = receiptFiles.XmlRelativePath;
+            bill.ReceiptPdfRelativePath = receiptPdfPath;
+            bill.ReceiptXmlRelativePath = receiptXmlPath;
+            _db.Bills.Update(bill);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            if (dto.PrintReceipt)
+                await EnqueueReceiptPrintAsync(receiptModel, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(
+                ex,
+                "Receipt generation failed after checkout for bill {BillId} (paper {PaperWidthMm}mm). Payment kept.",
+                billId,
+                (int)ThermalPaperWidth.Normalize((int)settings.ThermalPaperWidthMm));
+        }
 
         return new BillDto
         {
@@ -305,8 +391,8 @@ public sealed class BillService : IBillService
             InvoiceId = invoiceId,
             InvoiceNumber = invoiceNumber,
             DianConsecutiveNumber = dianConsecutive,
-            ReceiptPdfRelativePath = receiptFiles.PdfRelativePath,
-            ReceiptXmlRelativePath = receiptFiles.XmlRelativePath,
+            ReceiptPdfRelativePath = receiptPdfPath,
+            ReceiptXmlRelativePath = receiptXmlPath,
             SalesOrderIds = orders.Select(o => o.Id).ToList(),
         };
     }
@@ -461,10 +547,8 @@ public sealed class BillService : IBillService
 
     private async Task DeductInventoryForOrderAsync(SalesOrder order, CancellationToken cancellationToken)
     {
-        var inventoryEnabled = await _db.TenantSettings.AsNoTracking()
-            .Select(s => (bool?)s.InventoryEnabled)
-            .FirstOrDefaultAsync(cancellationToken) ?? true;
-        if (!inventoryEnabled)
+        var mode = await StockControlHelper.GetModeAsync(_db, cancellationToken);
+        if (mode == StockControlMode.None)
             return;
 
         var distinctLines = order.Lines
@@ -472,6 +556,12 @@ public sealed class BillService : IBillService
             .Select(g => g.First())
             .Where(l => l.Quantity > 0)
             .ToList();
+
+        if (mode == StockControlMode.ProductUnits)
+        {
+            await DeductProductUnitsForOrderAsync(distinctLines, cancellationToken);
+            return;
+        }
 
         var requirements = new Dictionary<Guid, decimal>();
         var specs = distinctLines
@@ -495,6 +585,32 @@ public sealed class BillService : IBillService
 
             ingredient.StockQuantity = InventoryCosting.SubtractStock(ingredient.StockQuantity, deduct);
             _db.Ingredients.Update(ingredient);
+        }
+    }
+
+    private async Task DeductProductUnitsForOrderAsync(
+        IReadOnlyList<SalesOrderLine> distinctLines,
+        CancellationToken cancellationToken)
+    {
+        var requirements = new Dictionary<Guid, decimal>();
+        var specs = distinctLines.Select(l => (l.ProductId, l.Quantity)).ToList();
+        await ProductInventoryExpansion.AddProductUnitDemandAsync(_db, requirements, specs, cancellationToken);
+
+        if (requirements.Count == 0)
+            return;
+
+        var productIds = requirements.Keys.ToList();
+        var products = await _db.Products
+            .Where(p => productIds.Contains(p.Id) && p.IsActive)
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        foreach (var (productId, deduct) in requirements)
+        {
+            if (!products.TryGetValue(productId, out var product))
+                continue;
+
+            product.StockQuantity = InventoryCosting.SubtractStock(product.StockQuantity, deduct);
+            _db.Products.Update(product);
         }
     }
 
@@ -717,6 +833,8 @@ public sealed class BillService : IBillService
                 LineTotal = l.LineTotal,
                 Notes = l.Notes,
                 ExcludedIngredientIds = l.ExcludedIngredients.Select(e => e.IngredientId).ToList(),
+                IsLunchTicketRedeemable = l.Product.IsLunchTicketRedeemable,
+                LunchTicketPackSize = l.Product.LunchTicketPackSize,
             }).ToList(),
         };
     }
@@ -740,7 +858,83 @@ public sealed class BillService : IBillService
                 LineTotal = l.LineTotal,
                 Notes = l.Notes,
                 ExcludedIngredientIds = l.ExcludedIngredients.Select(e => e.IngredientId).ToList(),
+                IsLunchTicketRedeemable = l.Product.IsLunchTicketRedeemable,
+                LunchTicketPackSize = l.Product.LunchTicketPackSize,
             });
+
+    private async Task<Dictionary<Guid, ProductLunchTicketFlags>> LoadProductLunchTicketFlagsAsync(
+        IEnumerable<Guid> productIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = productIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return new Dictionary<Guid, ProductLunchTicketFlags>();
+
+        return await _db.Products.AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .ToDictionaryAsync(
+                p => p.Id,
+                p => new ProductLunchTicketFlags(p.LunchTicketPackSize, p.IsLunchTicketRedeemable),
+                cancellationToken);
+    }
+
+    private static CheckoutTotalsDto ZeroTotalsForTiqueteraRedemption(CheckoutTotalsDto totals)
+    {
+        var zeroLines = totals.Lines
+            .Select(l => new PayableOrderLineDto
+            {
+                LineId = l.LineId,
+                OrderId = l.OrderId,
+                OrderNumber = l.OrderNumber,
+                TableCode = l.TableCode,
+                ProductId = l.ProductId,
+                ProductName = l.ProductName,
+                ProductTypeName = l.ProductTypeName,
+                Quantity = l.Quantity,
+                UnitPrice = 0m,
+                LineTotal = 0m,
+                Notes = l.Notes,
+                ExcludedIngredientIds = l.ExcludedIngredientIds,
+                IsLunchTicketRedeemable = l.IsLunchTicketRedeemable,
+                LunchTicketPackSize = l.LunchTicketPackSize,
+            })
+            .ToList();
+
+        return new CheckoutTotalsDto
+        {
+            Subtotal = 0m,
+            DiscountAmount = 0m,
+            DiscountPercent = null,
+            MaxDiscountPercent = totals.MaxDiscountPercent,
+            TipAmount = 0m,
+            ImpoconsumoPercent = totals.ImpoconsumoPercent,
+            ImpoconsumoBase = 0m,
+            ImpoconsumoAmount = 0m,
+            TaxAmount = 0m,
+            TotalDue = 0m,
+            Lines = zeroLines,
+            CategoryTotals = BillCheckoutCalculator.BuildCategoryTotals(zeroLines),
+        };
+    }
+
+    private static void EnsureCustomerForLunchTicketPackSale(
+        Customer customer,
+        IReadOnlyList<PayableOrderLineDto> lines,
+        IReadOnlyDictionary<Guid, ProductLunchTicketFlags> productFlags)
+    {
+        var sellsPack = lines.Any(l => productFlags.GetValueOrDefault(l.ProductId)?.LunchTicketPackSize > 0);
+        if (!sellsPack)
+            return;
+
+        if (string.Equals(customer.TaxId, DefaultCustomerTaxId, StringComparison.Ordinal)
+            || string.Equals(customer.Name, DefaultCustomerName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Para vender una tiquetera debes seleccionar el cliente dueño del paquete.");
+        }
+    }
+
+    private sealed record ProductLunchTicketFlags(int? LunchTicketPackSize, bool IsLunchTicketRedeemable);
 
     private async Task<string> GenerateBillNumberAsync(CancellationToken cancellationToken)
     {

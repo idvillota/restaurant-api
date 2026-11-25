@@ -8,6 +8,8 @@ public static class StrategicReportTypes
     public const string FoodCostMargin = "food_cost_margin";
     public const string SupplierAbc = "supplier_abc";
     public const string ProductMixByHour = "product_mix_by_hour";
+
+    /// <summary>Retired HTML Informe IA cache key; rejected by analytics.</summary>
     public const string LegacyAi = "legacy_ai";
 
     public static IReadOnlyList<string> All { get; } =
@@ -18,7 +20,6 @@ public static class StrategicReportTypes
         FoodCostMargin,
         SupplierAbc,
         ProductMixByHour,
-        LegacyAi,
     ];
 }
 

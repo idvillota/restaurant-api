@@ -8,6 +8,7 @@ public sealed class ProductListItemDto
     public EProductType CompositionType { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string? Barcode { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal CostPrice { get; set; }
     public Guid ProductTypeId { get; set; }
@@ -15,6 +16,10 @@ public sealed class ProductListItemDto
     public string? ImagePath { get; set; }
     public string? ImageUrl { get; set; }
     public bool IsActive { get; set; }
+    public int? LunchTicketPackSize { get; set; }
+    public bool IsLunchTicketRedeemable { get; set; }
+    /// <summary>Finished-goods units when tenant uses ProductUnits stock mode.</summary>
+    public decimal StockQuantity { get; set; }
 }
 
 public sealed class ProductMenuDto

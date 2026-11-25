@@ -5,6 +5,7 @@ public static class FeatureAuthorizationPolicies
     public const string SalonCatalogProductsRead = "Feature:SalonCatalogProductsRead";
     public const string SalonCatalogProductTypesRead = "Feature:SalonCatalogProductTypesRead";
     public const string OperationalCashierContextRead = "Feature:OperationalCashierContextRead";
+    public const string TiqueterasAccess = "Feature:TiqueterasAccess";
 
     public static string For(string featureCode) => $"Feature:{featureCode}";
 }

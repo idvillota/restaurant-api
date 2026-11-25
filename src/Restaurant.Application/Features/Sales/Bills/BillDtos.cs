@@ -9,6 +9,10 @@ public sealed class TenantSettingsDto
     public int OperationalDayCutoffHour { get; set; }
     public string TradeName { get; set; } = string.Empty;
     public string LegalName { get; set; } = string.Empty;
+
+    /// <summary>Public URL of the tenant logo, when uploaded.</summary>
+    public string? LogoUrl { get; set; }
+
     public string TaxRegime { get; set; } = string.Empty;
     public string TaxId { get; set; } = string.Empty;
     public string? LegalRepresentative { get; set; }
@@ -27,14 +31,20 @@ public sealed class TenantSettingsDto
     /// <summary>Show dashboard panel with bill-level sales for today / current shift.</summary>
     public bool ShowOperationalSalesPanel { get; set; } = true;
 
-    /// <summary>When true, products use ingredients for inventory/cost. Default true.</summary>
+    /// <summary>When true, products use ingredients for inventory/cost. Default true. Synced from StockControlMode.</summary>
     public bool InventoryEnabled { get; set; } = true;
+
+    /// <summary>0 Ingredients, 1 None, 2 ProductUnits.</summary>
+    public int StockControlMode { get; set; }
 
     /// <summary>When true, blank purchase bill numbers are auto-assigned. Default false.</summary>
     public bool AutoGeneratePurchaseBillNumbers { get; set; }
 
     /// <summary>0 Always (default), 1 Never, 2 Ask.</summary>
     public int KitchenTicketPrintMode { get; set; }
+
+    /// <summary>Thermal paper width in mm: 58 (narrow) or 80.</summary>
+    public int ThermalPaperWidthMm { get; set; } = 58;
 
     /// <summary>When true, cierre splits Vitrina Café out of general ventas.</summary>
     public bool SeparateVitrinaCafeSales { get; set; }
@@ -44,6 +54,17 @@ public sealed class TenantSettingsDto
     /// Default false.
     /// </summary>
     public bool RequirePriorDayCloseBeforeNewShift { get; set; }
+
+    /// <summary>When true, tenant can sell/redeem lunch ticket packs (tiqueteras).</summary>
+    public bool TiqueterasEnabled { get; set; }
+
+    /// <summary>When true, barcode/QR capture and product labels are available.</summary>
+    public bool BarcodesEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Populated after settings update when barcodes were enabled and missing product codes were filled.
+    /// </summary>
+    public int ProductBarcodesAssigned { get; set; }
 
     public string? BreBKey { get; set; }
 
@@ -110,14 +131,25 @@ public sealed class UpdateTenantSettingsDto
 
     public bool InventoryEnabled { get; set; } = true;
 
+    /// <summary>0 Ingredients, 1 None, 2 ProductUnits. When null, InventoryEnabled drives mode (legacy clients).</summary>
+    [Range(0, 2)]
+    public int? StockControlMode { get; set; }
+
     public bool AutoGeneratePurchaseBillNumbers { get; set; }
 
     [Range(0, 2)]
     public int KitchenTicketPrintMode { get; set; }
 
+    /// <summary>58 or 80. Other values normalize to 58.</summary>
+    public int ThermalPaperWidthMm { get; set; } = 58;
+
     public bool SeparateVitrinaCafeSales { get; set; }
 
     public bool RequirePriorDayCloseBeforeNewShift { get; set; }
+
+    public bool TiqueterasEnabled { get; set; }
+
+    public bool BarcodesEnabled { get; set; } = true;
 
     [MaxLength(40)]
     public string? BreBKey { get; set; }
@@ -161,6 +193,9 @@ public sealed class PayableOrderLineDto
 
     /// <summary>Ingredient exclusions for display grouping (same product + notes + exclusions).</summary>
     public List<Guid> ExcludedIngredientIds { get; set; } = [];
+
+    public bool IsLunchTicketRedeemable { get; set; }
+    public int? LunchTicketPackSize { get; set; }
 }
 
 public sealed class CheckoutCategoryTotalDto
@@ -171,7 +206,8 @@ public sealed class CheckoutCategoryTotalDto
 
 public sealed class CheckoutPaymentLineDto
 {
-    [Range(0.01, double.MaxValue)]
+    /// <summary>Must be &gt; 0 for cash/card/transfer/other. Must be 0 for Tiquetera redemptions.</summary>
+    [Range(0, double.MaxValue)]
     public decimal Amount { get; set; }
 
     public PaymentMethod Method { get; set; }

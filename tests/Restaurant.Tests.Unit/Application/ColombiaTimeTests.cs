@@ -19,4 +19,16 @@ public sealed class ColombiaTimeTests
         Assert.Equal(new DateOnly(2026, 11, 13), ColombiaTime.CalendarDate(utc));
         Assert.Equal("20261113", ColombiaTime.Stamp(utc, "yyyyMMdd"));
     }
+
+    [Fact]
+    public void ToUtcRange_uses_bogota_midnight_not_utc_midnight()
+    {
+        var (startUtc, endExclusive) = ColombiaTime.ToUtcRange(
+            new DateOnly(2026, 11, 13),
+            new DateOnly(2026, 11, 13));
+
+        Assert.Equal(new DateTime(2026, 11, 13, 5, 0, 0, DateTimeKind.Utc), startUtc);
+        Assert.Equal(new DateTime(2026, 11, 14, 5, 0, 0, DateTimeKind.Utc), endExclusive);
+        Assert.Equal(21, ColombiaTime.Hour(new DateTime(2026, 11, 16, 2, 0, 0, DateTimeKind.Utc)));
+    }
 }

@@ -19,6 +19,7 @@ public static class FeatureCodes
     public const string CatalogIngredients = "catalog.ingredients";
     public const string InventoryIngredientMovementTypes = "inventory.ingredient-movement-types";
     public const string InventoryIngredientMovements = "inventory.ingredient-movements";
+    public const string InventoryProductProductions = "inventory.product-productions";
     public const string CatalogPublicMenuQr = "catalog.public_menu_qr";
     public const string SettingsTenant = "settings.tenant";
     public const string ProcurementPurchases = "procurement.purchases";
@@ -52,6 +53,7 @@ public static class FeatureCodes
         CatalogIngredients,
         InventoryIngredientMovementTypes,
         InventoryIngredientMovements,
+        InventoryProductProductions,
         CatalogPublicMenuQr,
         SettingsTenant,
         ProcurementPurchases,

@@ -115,6 +115,53 @@ internal static class PagedEntityQueries
         return ApplyIngredientMovementTypeSort(query, q);
     }
 
+    public static IQueryable<ProductProductionDocument> ShapeProductProductionDocuments(
+        IQueryable<ProductProductionDocument> query,
+        ListQuery q)
+    {
+        query = query
+            .Include(d => d.CreatedByUser)
+            .Include(d => d.Lines)
+            .ThenInclude(l => l.Product);
+
+        var search = ListQueryHelpers.SearchTerm(q);
+        if (search.Length > 0)
+        {
+            query = query.Where(d =>
+                EF.Functions.ILike(d.DocumentNumber, EfTextSearch.LikePattern(search)) ||
+                (d.Notes != null && EF.Functions.ILike(d.Notes, EfTextSearch.LikePattern(search))) ||
+                EF.Functions.ILike(d.CreatedByUser.Email, EfTextSearch.LikePattern(search)) ||
+                d.Lines.Any(l => EF.Functions.ILike(l.Product.Name, EfTextSearch.LikePattern(search))));
+        }
+
+        if (q.FilterValue("documentNumber") is { } documentNumber)
+            query = query.Where(d => EF.Functions.ILike(d.DocumentNumber, EfTextSearch.LikePattern(documentNumber)));
+
+        return ApplyProductProductionDocumentSort(query, q);
+    }
+
+    private static IQueryable<ProductProductionDocument> ApplyProductProductionDocumentSort(
+        IQueryable<ProductProductionDocument> query,
+        ListQuery q)
+    {
+        var desc = string.Equals(q.SortDir, "desc", StringComparison.OrdinalIgnoreCase);
+        return (q.SortBy?.Trim().ToLowerInvariant()) switch
+        {
+            "documentnumber" => desc
+                ? query.OrderByDescending(d => d.DocumentNumber).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.DocumentNumber).ThenByDescending(d => d.OccurredAtUtc),
+            "createdbyuseremail" => desc
+                ? query.OrderByDescending(d => d.CreatedByUser.Email).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.CreatedByUser.Email).ThenByDescending(d => d.OccurredAtUtc),
+            "linecount" => desc
+                ? query.OrderByDescending(d => d.Lines.Count).ThenByDescending(d => d.OccurredAtUtc)
+                : query.OrderBy(d => d.Lines.Count).ThenByDescending(d => d.OccurredAtUtc),
+            _ => desc
+                ? query.OrderByDescending(d => d.OccurredAtUtc).ThenByDescending(d => d.DocumentNumber)
+                : query.OrderBy(d => d.OccurredAtUtc).ThenByDescending(d => d.DocumentNumber),
+        };
+    }
+
     public static IQueryable<IngredientMovementDocument> ShapeIngredientMovementDocuments(
         IQueryable<IngredientMovementDocument> query,
         ListQuery q)

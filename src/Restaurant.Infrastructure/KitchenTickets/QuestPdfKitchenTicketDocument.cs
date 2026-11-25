@@ -3,71 +3,79 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Restaurant.Application.Common;
 using Restaurant.Application.Features.Sales.KitchenTickets;
+using Restaurant.Domain.Enums;
 
 namespace Restaurant.Infrastructure.KitchenTickets;
 
 internal static class QuestPdfKitchenTicketDocument
 {
-    private const float TicketWidthMm = 80f;
-
     public static byte[] BuildPdf(KitchenTicketModel ticket)
     {
+        var width = ThermalPaperWidth.Normalize(ticket.PaperWidthMm);
+        var widthMm = ThermalPaperWidth.ToMillimetres(width);
+        var narrow = ThermalPaperWidth.IsNarrow(width);
+        var marginH = narrow ? 3f : 4f;
+        var titleSize = narrow ? 12f : 14f;
+        var lineQtySize = narrow ? 10f : 11f;
+        var lineNameSize = narrow ? 9f : 10f;
+        var metaSize = narrow ? 7f : 8f;
+        var defaultSize = narrow ? 8f : 9f;
         var sentLocal = ColombiaTime.ToBogota(ticket.SentAtUtc);
 
         return Document.Create(document =>
             {
                 document.Page(page =>
                 {
-                    page.ContinuousSize(TicketWidthMm, Unit.Millimetre);
-                    page.MarginHorizontal(4, Unit.Millimetre);
+                    page.ContinuousSize(widthMm, Unit.Millimetre);
+                    page.MarginHorizontal(marginH, Unit.Millimetre);
                     page.MarginVertical(5, Unit.Millimetre);
-                    page.DefaultTextStyle(x => x.FontSize(9));
+                    page.DefaultTextStyle(x => x.FontSize(defaultSize));
 
                     page.Content().Column(column =>
                     {
-                        column.Spacing(4);
+                        column.Spacing(narrow ? 3 : 4);
 
                         column.Item().AlignCenter().Text(
-                            ticket.IsDelivery ? "DOMICILIO" : $"MESA {ticket.TableCode}").Bold().FontSize(14);
+                            ticket.IsDelivery ? "DOMICILIO" : $"MESA {ticket.TableCode}").Bold().FontSize(titleSize);
                         if (ticket.IsDelivery && !string.IsNullOrWhiteSpace(ticket.DeliveryAddress))
-                            column.Item().AlignCenter().Text(ticket.DeliveryAddress).FontSize(8);
+                            column.Item().AlignCenter().Text(ticket.DeliveryAddress).FontSize(metaSize);
 
                         if (ticket.IsCancellation)
                         {
-                            column.Item().AlignCenter().Text("*** ANULACIÓN ***").Bold().FontSize(12);
+                            column.Item().AlignCenter().Text("*** ANULACIÓN ***").Bold().FontSize(narrow ? 11 : 12);
                         }
 
                         if (!string.IsNullOrWhiteSpace(ticket.PrinterStationName))
                         {
-                            column.Item().Text($"Estación: {ticket.PrinterStationName}").Bold().FontSize(9);
+                            column.Item().Text($"Estación: {ticket.PrinterStationName}").Bold().FontSize(defaultSize);
                         }
 
                         column.Item().Text(
                             ticket.IsCancellation
                                 ? $"Solicitado por: {ticket.SentBy}"
                                 : $"Mesero/a: {ticket.SentBy}");
-                        column.Item().Text($"Pedido: {ticket.OrderNumber}").FontSize(8);
+                        column.Item().Text($"Pedido: {ticket.OrderNumber}").FontSize(metaSize);
                         column.Item()
                             .Text(
                                 ticket.IsCancellation
                                     ? $"Anulado: {sentLocal:dd/MM/yyyy HH:mm}"
                                     : $"Enviado: {sentLocal:dd/MM/yyyy HH:mm}")
-                            .FontSize(8);
+                            .FontSize(metaSize);
 
                         if (ticket.IsCancellation && !string.IsNullOrWhiteSpace(ticket.CancelReason))
                         {
-                            column.Item().Text($"Motivo: {ticket.CancelReason}").Bold().FontSize(9);
+                            column.Item().Text($"Motivo: {ticket.CancelReason}").Bold().FontSize(defaultSize);
                         }
 
                         column.Item().PaddingTop(4).LineHorizontal(0.5f);
 
                         foreach (var line in ticket.Lines)
                         {
-                            column.Item().PaddingTop(6).Text(text =>
+                            column.Item().PaddingTop(narrow ? 4 : 6).Text(text =>
                             {
-                                text.Span(FormatQuantity(line.Quantity)).Bold().FontSize(11);
+                                text.Span(FormatQuantity(line.Quantity)).Bold().FontSize(lineQtySize);
                                 text.Span("  ");
-                                text.Span(line.ProductName).Bold().FontSize(10);
+                                text.Span(line.ProductName).Bold().FontSize(lineNameSize);
                             });
 
                             if (line.ExcludedIngredientNames.Count > 0)
@@ -76,7 +84,7 @@ internal static class QuestPdfKitchenTicketDocument
                                     .PaddingLeft(8)
                                     .Text($"Sin: {string.Join(", ", line.ExcludedIngredientNames)}")
                                     .Italic()
-                                    .FontSize(9);
+                                    .FontSize(defaultSize);
                             }
 
                             if (!string.IsNullOrWhiteSpace(line.Notes))
@@ -84,7 +92,7 @@ internal static class QuestPdfKitchenTicketDocument
                                 column.Item()
                                     .PaddingLeft(8)
                                     .Text($"Nota: {line.Notes}")
-                                    .FontSize(9);
+                                    .FontSize(defaultSize);
                             }
 
                             column.Item().PaddingTop(2).LineHorizontal(0.25f);

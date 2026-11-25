@@ -7,4 +7,11 @@ public interface ITenantSettingsService
     Task<TenantSettingsDto> GetAsync(CancellationToken cancellationToken = default);
 
     Task<TenantSettingsDto> UpdateAsync(UpdateTenantSettingsDto dto, CancellationToken cancellationToken = default);
+
+    Task<TenantSettingsDto> SetLogoAsync(
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default);
+
+    Task<TenantSettingsDto> RemoveLogoAsync(CancellationToken cancellationToken = default);
 }

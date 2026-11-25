@@ -20,44 +20,21 @@ public sealed class OperationalReportsServiceTests
         fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
 
         var productId = DevelopmentSeedIds.ProductIds[0];
-        var soldAt = DateTime.UtcNow.AddDays(-5);
-        var orderId = Guid.NewGuid();
-        var lineId = Guid.NewGuid();
-
-        fx.Db.SalesOrders.Add(
-            new SalesOrder
-            {
-                Id = orderId,
-                TenantId = DevelopmentSeedIds.TenantId,
-                Number = "TEST-SO-1",
-                OpenedAtUtc = soldAt,
-                Status = SalesOrderStatus.Paid,
-                Subtotal = 32000m,
-                TaxAmount = 0m,
-                Total = 32000m,
-                ClosedAtUtc = soldAt,
-            });
-        fx.Db.SalesOrderLines.Add(
-            new SalesOrderLine
-            {
-                Id = lineId,
-                TenantId = DevelopmentSeedIds.TenantId,
-                SalesOrderId = orderId,
-                ProductId = productId,
-                Quantity = 2m,
-                UnitPrice = 32000m,
-                LineTotal = 64000m,
-                SentToKitchenAtUtc = soldAt,
-            });
-        await fx.Db.SaveChangesAsync();
-
-        fx.Db.Entry(fx.Db.SalesOrderLines.Single(l => l.Id == lineId)).Property(nameof(SalesOrderLine.CreatedAtUtc))
-            .CurrentValue = soldAt;
-        await fx.Db.SaveChangesAsync();
+        var soldAt = new DateTime(2026, 1, 15, 20, 0, 0, DateTimeKind.Utc);
+        var businessDate = new DateOnly(2026, 1, 15);
+        await SeedPaidBillAsync(
+            fx,
+            businessDate,
+            soldAt,
+            productId,
+            "Pizza margarita",
+            quantity: 2m,
+            unitPrice: 32000m,
+            attachShift: true);
 
         var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
-        var start = DateOnly.FromDateTime(soldAt.Date.AddDays(-1));
-        var end = DateOnly.FromDateTime(soldAt.Date.AddDays(1));
+        var start = businessDate.AddDays(-1);
+        var end = businessDate.AddDays(1);
 
         var allProducts = await sut.GetSalesReportAsync(start, end, productId: null);
         var oneProduct = await sut.GetSalesReportAsync(start, end, productId);
@@ -205,42 +182,17 @@ public sealed class OperationalReportsServiceTests
         await DevelopmentDataSeeder.SeedAsync(fx.Db, hasher, NullLogger.Instance, fx.TenantContext);
         fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
 
-        var soldAt = DateTime.UtcNow.AddDays(-5);
-        var orderId = Guid.NewGuid();
-        var lineId = Guid.NewGuid();
-
-        fx.Db.SalesOrders.Add(
-            new SalesOrder
-            {
-                Id = orderId,
-                TenantId = DevelopmentSeedIds.TenantId,
-                Number = "TEST-SO-DS-1",
-                OpenedAtUtc = soldAt,
-                Status = SalesOrderStatus.Paid,
-                Subtotal = 50000m,
-                TaxAmount = 0m,
-                Total = 50000m,
-                ClosedAtUtc = soldAt,
-            });
-        fx.Db.SalesOrderLines.Add(
-            new SalesOrderLine
-            {
-                Id = lineId,
-                TenantId = DevelopmentSeedIds.TenantId,
-                SalesOrderId = orderId,
-                ProductId = DevelopmentSeedIds.ProductIds[0],
-                Quantity = 1m,
-                UnitPrice = 50000m,
-                LineTotal = 50000m,
-                SentToKitchenAtUtc = soldAt,
-            });
-        await fx.Db.SaveChangesAsync();
-
-        fx.Db.Entry(fx.Db.SalesOrderLines.Single(l => l.Id == lineId)).Property(nameof(SalesOrderLine.CreatedAtUtc))
-            .CurrentValue = soldAt;
-        await fx.Db.SaveChangesAsync();
-
-        var businessDate = DateOnly.FromDateTime(soldAt);
+        var soldAt = new DateTime(2026, 1, 16, 21, 0, 0, DateTimeKind.Utc);
+        var businessDate = new DateOnly(2026, 1, 16);
+        await SeedPaidBillAsync(
+            fx,
+            businessDate,
+            soldAt,
+            DevelopmentSeedIds.ProductIds[0],
+            "Pizza margarita",
+            quantity: 1m,
+            unitPrice: 50000m,
+            attachShift: true);
         fx.Db.CashMovements.Add(
             new CashMovement
             {
@@ -357,5 +309,144 @@ public sealed class OperationalReportsServiceTests
 
         Assert.Equal(15000m, row.TotalCashOutflows);
         Assert.Equal(1, row.CashOutflowCount);
+    }
+
+    [Fact]
+    public async Task GetSalesReport_sunday_evening_bogota_stays_on_sunday_without_shift()
+    {
+        using var fx = new TenantDbFixture();
+        var hasher = new BcryptPasswordHasher();
+        await DevelopmentDataSeeder.SeedAsync(fx.Db, hasher, NullLogger.Instance, fx.TenantContext);
+        fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
+
+        // Sunday 21:00 Bogota = Monday 02:00 UTC — calendar Bogotá still Sunday.
+        // Keep outside historical seed window so the assertion is exact.
+        var paidAtUtc = new DateTime(2024, 3, 4, 2, 0, 0, DateTimeKind.Utc);
+        var sunday = new DateOnly(2024, 3, 3);
+        await SeedPaidBillAsync(
+            fx,
+            sunday,
+            paidAtUtc,
+            DevelopmentSeedIds.ProductIds[0],
+            "Pizza margarita",
+            quantity: 1m,
+            unitPrice: 18000m,
+            attachShift: false);
+
+        var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
+        var sundayReport = await sut.GetSalesReportAsync(sunday, sunday, productId: null);
+        var mondayReport = await sut.GetSalesReportAsync(sunday.AddDays(1), sunday.AddDays(1), productId: null);
+
+        Assert.Contains(sundayReport.Rows, r => r.Quantity == 1m && r.OperationalDate == sunday);
+        Assert.DoesNotContain(mondayReport.Rows, r => r.UnitPrice == 18000m);
+    }
+
+    [Fact]
+    public async Task GetDailySummaryReport_post_close_cobro_belongs_to_next_operational_day()
+    {
+        using var fx = new TenantDbFixture();
+        var hasher = new BcryptPasswordHasher();
+        await DevelopmentDataSeeder.SeedAsync(fx.Db, hasher, NullLogger.Instance, fx.TenantContext);
+        fx.TenantContext.TenantId = DevelopmentSeedIds.TenantId;
+
+        // Use dates outside DevelopmentHistoricalDataSeeder's rolling window so totals are exact.
+        var monday = new DateOnly(2024, 3, 4);
+        var tuesday = monday.AddDays(1);
+        // Monday 20:00 Bogota = Tuesday 01:00 UTC, after a 19:00 close → Tuesday shift.
+        var paidAtUtc = new DateTime(2024, 3, 5, 1, 0, 0, DateTimeKind.Utc);
+        await SeedPaidBillAsync(
+            fx,
+            tuesday,
+            paidAtUtc,
+            DevelopmentSeedIds.ProductIds[0],
+            "Pizza margarita",
+            quantity: 1m,
+            unitPrice: 91000m,
+            attachShift: true);
+
+        var sut = new OperationalReportsService(fx.Db, fx.TenantContext);
+        var mondaySummary = await sut.GetDailySummaryReportAsync(monday, monday);
+        var tuesdaySummary = await sut.GetDailySummaryReportAsync(tuesday, tuesday);
+        var sales = await sut.GetSalesReportAsync(monday, tuesday, productId: null);
+
+        Assert.DoesNotContain(mondaySummary.Rows, r => r.TotalSales == 91000m);
+        var tuesdayRow = Assert.Single(tuesdaySummary.Rows, r => r.TotalSales == 91000m);
+        Assert.Equal(1, tuesdayRow.SalesOrderCount);
+        Assert.Contains(sales.Rows, r => r.OperationalDate == tuesday && r.UnitPrice == 91000m);
+        Assert.DoesNotContain(sales.Rows, r => r.OperationalDate == monday && r.UnitPrice == 91000m);
+    }
+
+    private static async Task SeedPaidBillAsync(
+        TenantDbFixture fx,
+        DateOnly businessDate,
+        DateTime paidAtUtc,
+        Guid productId,
+        string productName,
+        decimal quantity,
+        decimal unitPrice,
+        bool attachShift)
+    {
+        var tenantId = DevelopmentSeedIds.TenantId;
+        var lineTotal = quantity * unitPrice;
+        Guid? shiftId = null;
+        if (attachShift)
+        {
+            shiftId = Guid.NewGuid();
+            fx.Db.CashierShifts.Add(
+                new CashierShift
+                {
+                    Id = shiftId.Value,
+                    TenantId = tenantId,
+                    CashierUserId = DevelopmentSeedIds.AdminUserId,
+                    Status = CashierShiftStatus.Open,
+                    BusinessDate = businessDate,
+                    OpenedAtUtc = paidAtUtc.AddHours(-8),
+                    OpeningFloat = 0m,
+                });
+        }
+
+        var billId = Guid.NewGuid();
+        fx.Db.Bills.Add(
+            new Bill
+            {
+                Id = billId,
+                TenantId = tenantId,
+                CustomerId = DevelopmentSeedIds.CustomerIds[0],
+                Number = $"BILL-{billId.ToString("N")[..8]}",
+                Status = BillStatus.Paid,
+                Subtotal = lineTotal,
+                Total = lineTotal,
+                IssuedAtUtc = paidAtUtc.AddMinutes(-5),
+                PaidAtUtc = paidAtUtc,
+                CashierShiftId = shiftId,
+                ProcessedByUserId = DevelopmentSeedIds.AdminUserId,
+            });
+        fx.Db.BillLines.Add(
+            new BillLine
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                BillId = billId,
+                ProductId = productId,
+                ProductName = productName,
+                ProductTypeName = "Plato",
+                Quantity = quantity,
+                UnitPrice = unitPrice,
+                LineTotal = lineTotal,
+            });
+        fx.Db.Payments.Add(
+            new Payment
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                BillId = billId,
+                Amount = lineTotal,
+                Method = PaymentMethod.Cash,
+                Status = PaymentStatus.Completed,
+                PaidAtUtc = paidAtUtc,
+                CashierShiftId = shiftId,
+                ProcessedByUserId = DevelopmentSeedIds.AdminUserId,
+            });
+        await fx.Db.SaveChangesAsync();
     }
 }

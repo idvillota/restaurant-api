@@ -36,6 +36,11 @@ public sealed class PublicMenuService : IPublicMenuService
         // Anonymous public menu has no JWT tenant — set context so fail-closed filters apply.
         _tenantContext.TenantId = tenant.Id;
 
+        var logoPath = await _db.TenantSettings.AsNoTracking()
+            .Where(s => s.TenantId == tenant.Id)
+            .Select(s => s.LogoPath)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var categories = await _db.ProductTypes.AsNoTracking()
             .Where(pt => pt.TenantId == tenant.Id && pt.IsActive)
             .OrderBy(pt => pt.Name)
@@ -89,6 +94,7 @@ public sealed class PublicMenuService : IPublicMenuService
         {
             TenantName = tenant.Name,
             TenantSlug = tenant.Slug,
+            LogoUrl = _productImages.GetPublicUrl(logoPath),
             CurrencyCode = tenant.CurrencyCode,
             Categories = categories.Where(c => c.Products.Count > 0).ToList(),
         };

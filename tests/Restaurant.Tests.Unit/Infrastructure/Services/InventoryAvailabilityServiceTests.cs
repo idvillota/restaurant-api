@@ -106,4 +106,97 @@ public sealed class InventoryAvailabilityServiceTests
         Assert.True(result.IsAvailable);
         Assert.Empty(result.Shortages);
     }
+
+    [Fact]
+    public async Task CheckLinesAsync_product_units_reports_shortage()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        fx.Db.TenantSettings.Add(
+            new TenantSettings
+            {
+                TenantId = fx.TenantId,
+                InventoryEnabled = false,
+                StockControlMode = StockControlMode.ProductUnits,
+            });
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Ajiaco",
+                CompositionType = EProductType.Prepared,
+                UnitPrice = 20m,
+                StockQuantity = 2m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new InventoryAvailabilityService(fx.Db);
+        var result = await sut.CheckLinesAsync(
+            new StockAvailabilityCheckDto
+            {
+                Lines =
+                [
+                    new StockCheckLineDto { ProductId = productId, Quantity = 5m },
+                ],
+            });
+
+        Assert.False(result.IsAvailable);
+        var shortage = Assert.Single(result.Shortages);
+        Assert.Equal(productId, shortage.IngredientId);
+        Assert.Equal("Ajiaco", shortage.IngredientName);
+        Assert.Equal(5m, shortage.Required);
+        Assert.Equal(2m, shortage.Available);
+        Assert.Equal(3m, shortage.Missing);
+    }
+
+    [Fact]
+    public async Task CheckLinesAsync_product_units_available_when_enough_stock()
+    {
+        using var fx = new TenantDbFixture();
+        var typeId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+
+        fx.Db.TenantSettings.Add(
+            new TenantSettings
+            {
+                TenantId = fx.TenantId,
+                InventoryEnabled = false,
+                StockControlMode = StockControlMode.ProductUnits,
+            });
+        fx.Db.ProductTypes.Add(
+            new ProductType { Id = typeId, TenantId = fx.TenantId, Name = "Food", IsActive = true });
+        fx.Db.Products.Add(
+            new Product
+            {
+                Id = productId,
+                TenantId = fx.TenantId,
+                ProductTypeId = typeId,
+                Name = "Bandeja",
+                CompositionType = EProductType.Prepared,
+                UnitPrice = 25m,
+                StockQuantity = 10m,
+                IsActive = true,
+            });
+        await fx.Db.SaveChangesAsync();
+
+        var sut = new InventoryAvailabilityService(fx.Db);
+        var result = await sut.CheckLinesAsync(
+            new StockAvailabilityCheckDto
+            {
+                Lines =
+                [
+                    new StockCheckLineDto { ProductId = productId, Quantity = 3m },
+                ],
+            });
+
+        Assert.True(result.IsAvailable);
+        Assert.Empty(result.Shortages);
+    }
 }

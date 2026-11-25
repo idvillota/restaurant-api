@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using Restaurant.Api.Authorization;
 using Restaurant.Api.Middleware;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Common.Options;
@@ -87,12 +88,70 @@ public sealed class AuthController : ControllerBase
         }
     }
 
+    /// <summary>Platform admin only: tenants the current user can enter.</summary>
+    [Authorize]
+    [RequirePlatformAdmin]
+    [HttpGet("my-tenants")]
+    public async Task<ActionResult<IReadOnlyList<LoginTenantOptionDto>>> ListMyTenants(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _authService.ListMyTenantsAsync(cancellationToken));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = MapSwitchErrorMessage(ex.Message) });
+        }
+    }
+
+    /// <summary>Platform admin only: switch active tenant without re-entering password.</summary>
+    [Authorize]
+    [RequirePlatformAdmin]
+    [HttpPost("switch-tenant")]
+    public async Task<ActionResult<AuthResponseDto>> SwitchTenant(
+        [FromBody] SwitchTenantDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var result = await _authService.SwitchTenantAsync(dto, cancellationToken);
+            _logger.LogInformation(
+                "Platform admin switched tenant to {TenantSlug} for {Email}",
+                result.TenantSlug,
+                result.Email);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = MapSwitchErrorMessage(ex.Message) });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     private static string MapLoginErrorMessage(string message) =>
         message switch
         {
             "Invalid credentials." => "Correo o contraseña incorrectos.",
             "No active tenant memberships." => "No tiene acceso activo a ningún local.",
             "Tenant not found for this account." => "Ese local no está asociado a su cuenta.",
+            _ => message,
+        };
+
+    private static string MapSwitchErrorMessage(string message) =>
+        message switch
+        {
+            "Tenant not found for this account." => "Ese local no está asociado a su cuenta.",
+            "No hay sesión activa." => "No hay sesión activa.",
+            "Usuario no encontrado." => "Usuario no encontrado.",
+            "Solo administradores de plataforma pueden cambiar de local." =>
+                "Solo administradores de plataforma pueden cambiar de local.",
             _ => message,
         };
 }

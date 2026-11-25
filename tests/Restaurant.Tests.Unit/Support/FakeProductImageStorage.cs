@@ -26,6 +26,23 @@ public sealed class FakeProductImageStorage : IProductImageStorage
         return relativePath;
     }
 
+    public async Task<string> SaveTenantLogoAsync(
+        Guid tenantId,
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken = default)
+    {
+        await using var ms = new MemoryStream();
+        await content.CopyToAsync(ms, cancellationToken);
+        var extension = Path.GetExtension(fileName);
+        if (string.IsNullOrEmpty(extension))
+            extension = ".jpg";
+
+        var relativePath = $"logos/{tenantId:N}/logo{extension.ToLowerInvariant()}";
+        _files[relativePath] = ms.ToArray();
+        return relativePath;
+    }
+
     public Task DeleteIfExistsAsync(string? relativePath, CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(relativePath))
@@ -34,9 +51,21 @@ public sealed class FakeProductImageStorage : IProductImageStorage
         return Task.CompletedTask;
     }
 
+    public Task<byte[]?> TryReadAsync(string? relativePath, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return Task.FromResult<byte[]?>(null);
+
+        return Task.FromResult(
+            _files.TryGetValue(relativePath, out var bytes) ? bytes : null);
+    }
+
     public string? GetPublicUrl(string? relativePath) =>
         string.IsNullOrWhiteSpace(relativePath) ? null : $"/media/{relativePath.Replace('\\', '/')}";
 
     public bool FileExists(string? relativePath) =>
         !string.IsNullOrWhiteSpace(relativePath) && _files.ContainsKey(relativePath);
+
+    public void Seed(string relativePath, byte[] bytes) =>
+        _files[relativePath] = bytes;
 }

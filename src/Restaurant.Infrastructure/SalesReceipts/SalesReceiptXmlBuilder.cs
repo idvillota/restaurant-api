@@ -95,6 +95,7 @@ internal static class SalesReceiptXmlBuilder
             Ns + "FacturaVenta",
             new XAttribute("version", "1.0"),
             Content(
+                new XElement(Ns + "PaperWidthMm", receipt.PaperWidthMm.ToString(inv)),
                 emisor,
                 resolucion,
                 factura,

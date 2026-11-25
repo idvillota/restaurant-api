@@ -79,6 +79,8 @@ public sealed class ProductService : IProductService
         {
             Products = products
                 .Where(p => p.ProductType is { IsActive: true })
+                // Packs are sold from Tiqueteras (customer-first), not from salon orders.
+                .Where(p => p.LunchTicketPackSize is null or <= 0)
                 .Select(p => MapProduct(p, costPrice: 0m))
                 .ToList(),
         };
@@ -94,6 +96,23 @@ public sealed class ProductService : IProductService
         return MapProduct(entity, costPrice);
     }
 
+    public async Task<ProductListItemDto?> GetByBarcodeAsync(string barcode, CancellationToken cancellationToken = default)
+    {
+        var code = NormalizeBarcode(barcode);
+        if (code is null)
+            return null;
+
+        var entity = await _products.Query()
+            .AsNoTracking()
+            .Include(p => p.ProductType)
+            .FirstOrDefaultAsync(p => p.IsActive && p.Barcode == code, cancellationToken);
+        if (entity is null)
+            return null;
+
+        var costPrice = await GetCostPriceAsync(entity.Id, cancellationToken);
+        return MapProduct(entity, costPrice);
+    }
+
     public async Task<ProductListItemDto> CreateAsync(CreateProductDto dto, CancellationToken cancellationToken = default)
     {
         if (!await _productTypes.Query().AnyAsync(t => t.Id == dto.ProductTypeId && t.IsActive, cancellationToken))
@@ -103,6 +122,11 @@ public sealed class ProductService : IProductService
         if (await _products.Query().AnyAsync(p => p.IsActive && p.Name == name, cancellationToken))
             throw new InvalidOperationException("An active product with this name already exists.");
 
+        var barcode = NormalizeBarcode(dto.Barcode);
+        if (barcode is null && await IsBarcodesEnabledAsync(cancellationToken))
+            barcode = await AllocateUniqueBarcodeAsync(name, excludeProductId: null, cancellationToken);
+        await EnsureBarcodeAvailableAsync(barcode, excludeProductId: null, cancellationToken);
+
         var entity = new Product
         {
             Id = Guid.NewGuid(),
@@ -110,6 +134,7 @@ public sealed class ProductService : IProductService
             CompositionType = dto.CompositionType,
             Name = name,
             Description = NormalizeDescription(dto.Description),
+            Barcode = barcode,
             UnitPrice = dto.UnitPrice,
             IsActive = true,
         };
@@ -142,13 +167,29 @@ public sealed class ProductService : IProductService
         if (await _products.Query().AnyAsync(p => p.Id != id && p.IsActive && p.Name == name, cancellationToken))
             throw new InvalidOperationException("Another active product already uses this name.");
 
+        // Keep existing codes stable on edit. Only fill when the product still has none
+        // and barcodes are enabled (never silent-regenerate a printed sticker code).
+        var barcode = NormalizeBarcode(dto.Barcode);
+        if (barcode is null)
+        {
+            var existing = NormalizeBarcode(entity.Barcode);
+            if (existing is not null)
+                barcode = existing;
+            else if (await IsBarcodesEnabledAsync(cancellationToken))
+                barcode = await AllocateUniqueBarcodeAsync(name, excludeProductId: id, cancellationToken);
+        }
+
+        await EnsureBarcodeAvailableAsync(barcode, excludeProductId: id, cancellationToken);
+
         var compositionTypeChanged = entity.CompositionType != dto.CompositionType;
         entity.ProductTypeId = dto.ProductTypeId;
         entity.CompositionType = dto.CompositionType;
         entity.Name = name;
         entity.Description = NormalizeDescription(dto.Description);
+        entity.Barcode = barcode;
         entity.UnitPrice = dto.UnitPrice;
         entity.IsActive = dto.IsActive;
+        // Lunch-ticket pack/redeemable flags are managed only via Tiqueteras config.
         await ApplyPostedCostAsync(entity, dto.CostPrice, cancellationToken);
 
         if (compositionTypeChanged)
@@ -664,6 +705,74 @@ public sealed class ProductService : IProductService
         return dto;
     }
 
+    public async Task<int> BackfillMissingBarcodesAsync(CancellationToken cancellationToken = default)
+    {
+        var missing = await _products.Query()
+            .Where(p => p.Barcode == null || p.Barcode == "")
+            .OrderBy(p => p.Name)
+            .ToListAsync(cancellationToken);
+        if (missing.Count == 0)
+            return 0;
+
+        var assigned = 0;
+        foreach (var product in missing)
+        {
+            product.Barcode = await AllocateUniqueBarcodeAsync(product.Name, product.Id, cancellationToken);
+            assigned++;
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return assigned;
+    }
+
+    private async Task<bool> IsBarcodesEnabledAsync(CancellationToken cancellationToken)
+    {
+        var tenantId = ResolveTenantId();
+        var enabled = await _db.TenantSettings.AsNoTracking()
+            .Where(s => s.TenantId == tenantId)
+            .Select(s => (bool?)s.BarcodesEnabled)
+            .FirstOrDefaultAsync(cancellationToken);
+        return enabled ?? true;
+    }
+
+    private async Task<string> AllocateUniqueBarcodeAsync(
+        string productName,
+        Guid? excludeProductId,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            var candidate = ProductBarcodeCodes.Generate(productName);
+            var taken = await _products.Query()
+                .AnyAsync(
+                    p => p.Barcode == candidate && (excludeProductId == null || p.Id != excludeProductId),
+                    cancellationToken);
+            if (!taken)
+                return candidate;
+        }
+
+        throw new InvalidOperationException("No se pudo generar un código de barras único. Intente de nuevo.");
+    }
+
     private static string? NormalizeDescription(string? description) =>
         string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+
+    private static string? NormalizeBarcode(string? barcode) =>
+        string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim().ToUpperInvariant();
+
+    private async Task EnsureBarcodeAvailableAsync(
+        string? barcode,
+        Guid? excludeProductId,
+        CancellationToken cancellationToken)
+    {
+        if (barcode is null)
+            return;
+
+        var taken = await _products.Query()
+            .AnyAsync(
+                p => p.Barcode == barcode && (excludeProductId == null || p.Id != excludeProductId),
+                cancellationToken);
+        if (taken)
+            throw new InvalidOperationException("Otro producto ya usa este código de barras.");
+    }
 }

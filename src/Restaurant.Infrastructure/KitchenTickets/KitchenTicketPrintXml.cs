@@ -34,7 +34,8 @@ internal static class KitchenTicketPrintXml
                         "ExcludedIngredients",
                         line.ExcludedIngredientNames.Select(name => Text("Ingredient", name)))))),
             Text("IsCancellation", model.IsCancellation ? "true" : "false"),
-            Text("CancelReason", model.CancelReason ?? string.Empty));
+            Text("CancelReason", model.CancelReason ?? string.Empty),
+            Text("PaperWidthMm", model.PaperWidthMm.ToString(culture)));
 
         return new XDocument(ticket).ToString();
     }

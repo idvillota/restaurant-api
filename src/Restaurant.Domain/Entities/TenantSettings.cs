@@ -15,6 +15,12 @@ public class TenantSettings : ITenantScoped
 
     public string TradeName { get; set; } = string.Empty;
     public string LegalName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Relative media path for this tenant’s logo (e.g. logos/{tenantId}/logo.png).
+    /// Null when no logo is uploaded.
+    /// </summary>
+    public string? LogoPath { get; set; }
     public string TaxRegime { get; set; } = "Régimen Simplificado";
     public string TaxId { get; set; } = string.Empty;
     public string? LegalRepresentative { get; set; }
@@ -50,8 +56,14 @@ public class TenantSettings : ITenantScoped
     /// <summary>
     /// When true, Resale/Prepared products use ingredients for stock and cost.
     /// When false, catalog is sell-only (recipes optional). Default true for existing tenants.
+    /// Synced from <see cref="StockControlMode"/>: true only when mode is Ingredients.
     /// </summary>
     public bool InventoryEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Transversal stock strategy: Ingredients, None, or ProductUnits.
+    /// </summary>
+    public StockControlMode StockControlMode { get; set; } = StockControlMode.Ingredients;
 
     /// <summary>
     /// When true, a blank purchase bill number is replaced with COMPRA-yyyyMMdd-0001.
@@ -66,6 +78,11 @@ public class TenantSettings : ITenantScoped
     public KitchenTicketPrintMode KitchenTicketPrintMode { get; set; }
 
     /// <summary>
+    /// Thermal paper width for comandas and receipts (PDF + print XML). Default 58 mm.
+    /// </summary>
+    public ThermalPaperWidthMm ThermalPaperWidthMm { get; set; } = ThermalPaperWidthMm.Mm58;
+
+    /// <summary>
     /// When true, cierre lists Vitrina Café apart from general ventas.
     /// Default false; enable per tenant (Nuestro Café).
     /// </summary>
@@ -76,6 +93,18 @@ public class TenantSettings : ITenantScoped
     /// date that had cashier activity to be Closed. Default false (manual close only).
     /// </summary>
     public bool RequirePriorDayCloseBeforeNewShift { get; set; }
+
+    /// <summary>
+    /// When true, the tenant may sell lunch-ticket packs and redeem lunches with payment method Tiquetera.
+    /// Default false.
+    /// </summary>
+    public bool TiqueterasEnabled { get; set; }
+
+    /// <summary>
+    /// When true, product barcodes/QR are available in catalog, sales, and production.
+    /// Default true.
+    /// </summary>
+    public bool BarcodesEnabled { get; set; } = true;
 
     public Tenant Tenant { get; set; } = null!;
 }
