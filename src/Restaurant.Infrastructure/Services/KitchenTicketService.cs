@@ -135,6 +135,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
             TableCode = order.IsDelivery ? "DOMICILIO" : order.DiningTable?.Code ?? "—",
             IsDelivery = order.IsDelivery,
             DeliveryAddress = order.DeliveryAddress,
+            DeliveryPhone = order.DeliveryPhone,
             OrderNumber = order.Number,
             SentBy = sentBy,
             SentAtUtc = DateTime.UtcNow,

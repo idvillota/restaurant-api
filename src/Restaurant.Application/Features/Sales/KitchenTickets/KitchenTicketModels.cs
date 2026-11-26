@@ -13,7 +13,30 @@ public sealed class KitchenTicketModel
 {
     public string TableCode { get; set; } = string.Empty;
     public bool IsDelivery { get; set; }
+
+    /// <summary>Address captured on the delivery dialog, including a one-time address.</summary>
     public string? DeliveryAddress { get; set; }
+
+    /// <summary>Phone captured on the delivery dialog.</summary>
+    public string? DeliveryPhone { get; set; }
+
+    /// <summary>
+    /// One line for the comanda: "address - phone". Either part is omitted when blank.
+    /// </summary>
+    public static string? FormatDeliveryDestination(string? address, string? phone)
+    {
+        var trimmedAddress = address?.Trim();
+        var trimmedPhone = phone?.Trim();
+        var hasAddress = !string.IsNullOrEmpty(trimmedAddress);
+        var hasPhone = !string.IsNullOrEmpty(trimmedPhone);
+        if (hasAddress && hasPhone)
+            return $"{trimmedAddress} - {trimmedPhone}";
+        if (hasAddress)
+            return trimmedAddress;
+        if (hasPhone)
+            return trimmedPhone;
+        return null;
+    }
     public string OrderNumber { get; set; } = string.Empty;
     public string SentBy { get; set; } = string.Empty;
     public DateTime SentAtUtc { get; set; }

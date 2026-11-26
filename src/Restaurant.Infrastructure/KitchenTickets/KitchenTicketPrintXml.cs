@@ -15,6 +15,12 @@ internal static class KitchenTicketPrintXml
         var ticket = new XElement(
             "KitchenTicket",
             Text("TableCode", model.TableCode),
+            Text("IsDelivery", model.IsDelivery ? "true" : "false"),
+            Text(
+                "DeliveryDestination",
+                model.IsDelivery
+                    ? KitchenTicketModel.FormatDeliveryDestination(model.DeliveryAddress, model.DeliveryPhone) ?? string.Empty
+                    : string.Empty),
             Text("OrderNumber", model.OrderNumber),
             Text("SentBy", model.SentBy),
             Text("SentAtUtc", model.SentAtUtc.ToString("o", culture)),
