@@ -195,6 +195,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
     private TenantSettingsDto Map(TenantSettings settings) =>
         new()
         {
+            TenantId = settings.TenantId,
             MaxDiscountPercent = settings.MaxDiscountPercent,
             OperationalDayCutoffHour = settings.OperationalDayCutoffHour,
             TradeName = settings.TradeName,

@@ -5,6 +5,7 @@ namespace Restaurant.Application.Features.Sales.Bills;
 
 public sealed class TenantSettingsDto
 {
+    public Guid TenantId { get; set; }
     public decimal MaxDiscountPercent { get; set; }
     public int OperationalDayCutoffHour { get; set; }
     public string TradeName { get; set; } = string.Empty;
