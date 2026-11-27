@@ -46,6 +46,16 @@ public sealed class SalesOrderLineDto
     public string? CancelReason { get; set; }
 
     public List<SalesOrderLineExcludedIngredientDto> ExcludedIngredients { get; set; } = [];
+
+    public List<SalesOrderLineChoiceDto> Choices { get; set; } = [];
+}
+
+public sealed class SalesOrderLineChoiceDto
+{
+    public Guid GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public Guid ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
 }
 
 public sealed class SalesOrderLineExcludedIngredientDto
@@ -72,6 +82,18 @@ public sealed class AddSalesOrderLineDto
     public string? Notes { get; set; }
 
     public List<Guid> ExcludedIngredientIds { get; set; } = [];
+
+    /// <summary>One product per topic when the line is a choice combo.</summary>
+    public List<AddSalesOrderChoiceDto> Choices { get; set; } = [];
+
+    /// <summary>Set by the kitchen expansion so the ticket reads "Combo · option".</summary>
+    public string? TicketNamePrefix { get; set; }
+}
+
+public sealed class AddSalesOrderChoiceDto
+{
+    public Guid GroupId { get; set; }
+    public Guid ProductId { get; set; }
 }
 
 /// <summary>Legacy optional payload; confirmation uses pending (unsent) lines on the order.</summary>

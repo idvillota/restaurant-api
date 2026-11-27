@@ -564,9 +564,11 @@ public sealed class BillService : IBillService
         }
 
         var requirements = new Dictionary<Guid, decimal>();
-        var specs = distinctLines
-            .Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet()))
-            .ToList();
+        var specs = await ExpandChoiceSpecsAsync(
+            distinctLines
+                .Select(l => (l.Id, l.ProductId, l.Quantity, l.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet()))
+                .ToList(),
+            cancellationToken);
 
         await ProductInventoryExpansion.AddIngredientDemandAsync(_db, requirements, specs, cancellationToken);
 
@@ -593,7 +595,12 @@ public sealed class BillService : IBillService
         CancellationToken cancellationToken)
     {
         var requirements = new Dictionary<Guid, decimal>();
-        var specs = distinctLines.Select(l => (l.ProductId, l.Quantity)).ToList();
+        var expanded = await ExpandChoiceSpecsAsync(
+            distinctLines
+                .Select(l => (l.Id, l.ProductId, l.Quantity, new HashSet<Guid>()))
+                .ToList(),
+            cancellationToken);
+        var specs = expanded.Select(l => (l.ProductId, l.Quantity)).ToList();
         await ProductInventoryExpansion.AddProductUnitDemandAsync(_db, requirements, specs, cancellationToken);
 
         if (requirements.Count == 0)
@@ -612,6 +619,38 @@ public sealed class BillService : IBillService
             product.StockQuantity = InventoryCosting.SubtractStock(product.StockQuantity, deduct);
             _db.Products.Update(product);
         }
+    }
+
+    private async Task<List<(Guid ProductId, decimal Quantity, HashSet<Guid> Excluded)>> ExpandChoiceSpecsAsync(
+        IReadOnlyList<(Guid LineId, Guid ProductId, decimal Quantity, HashSet<Guid> Excluded)> lines,
+        CancellationToken cancellationToken)
+    {
+        if (lines.Count == 0)
+            return [];
+
+        var lineIds = lines.Select(l => l.LineId).ToList();
+        var picks = await _db.SalesOrderLineChoices.AsNoTracking()
+            .Where(c => lineIds.Contains(c.SalesOrderLineId))
+            .Select(c => new { c.SalesOrderLineId, c.ProductId })
+            .ToListAsync(cancellationToken);
+        var byLine = picks
+            .GroupBy(c => c.SalesOrderLineId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.ProductId).ToList());
+
+        var specs = new List<(Guid ProductId, decimal Quantity, HashSet<Guid> Excluded)>();
+        foreach (var line in lines)
+        {
+            if (byLine.TryGetValue(line.LineId, out var chosen) && chosen.Count > 0)
+            {
+                foreach (var productId in chosen)
+                    specs.Add((productId, line.Quantity, []));
+                continue;
+            }
+
+            specs.Add((line.ProductId, line.Quantity, line.Excluded));
+        }
+
+        return specs;
     }
 
     private async Task EnqueueReceiptPrintAsync(

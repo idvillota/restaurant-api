@@ -31,6 +31,12 @@ public class Product : EntityBase, ITenantScoped
     public bool IsActive { get; set; } = true;
 
     /// <summary>
+    /// When true, the product is hidden from the menu and cannot be sold on its own.
+    /// It can still be chosen inside a combo.
+    /// </summary>
+    public bool ComboOnly { get; set; }
+
+    /// <summary>
     /// When set (e.g. 10 or 20), selling this product creates a prepaid lunch-ticket booklet.
     /// Null means the product is not a tiquetera pack.
     /// </summary>

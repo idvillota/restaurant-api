@@ -120,7 +120,7 @@ public sealed class KitchenTicketService : IKitchenTicketService
             lines.Add(
                 new KitchenTicketLineModel
                 {
-                    ProductName = product.Name,
+                    ProductName = FormatKitchenName(lineDto.TicketNamePrefix, product.Name),
                     ProductTypeId = product.ProductTypeId.ToString(),
                     Quantity = lineDto.Quantity,
                     Notes = NormalizeNotes(lineDto.Notes),
@@ -294,6 +294,12 @@ public sealed class KitchenTicketService : IKitchenTicketService
         return distinct
             .Select(id => ingredientNameById.TryGetValue(id, out var name) ? name : id.ToString())
             .ToList();
+    }
+
+    private static string FormatKitchenName(string? prefix, string productName)
+    {
+        var trimmed = prefix?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? productName : $"{trimmed} · {productName}";
     }
 
     private static string? NormalizeNotes(string? notes)

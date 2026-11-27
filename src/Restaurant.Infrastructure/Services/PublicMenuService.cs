@@ -53,7 +53,7 @@ public sealed class PublicMenuService : IPublicMenuService
             .ToListAsync(cancellationToken);
 
         var products = await _db.Products.AsNoTracking()
-            .Where(p => p.TenantId == tenant.Id && p.IsActive)
+            .Where(p => p.TenantId == tenant.Id && p.IsActive && !p.ComboOnly)
             .OrderBy(p => p.Name)
             .Select(p => new
             {

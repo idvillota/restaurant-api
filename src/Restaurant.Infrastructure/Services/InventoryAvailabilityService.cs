@@ -138,11 +138,33 @@ public sealed class InventoryAvailabilityService : IInventoryAvailabilityService
         StockControlMode mode,
         CancellationToken cancellationToken)
     {
-        var lineSpecs = orders
+        var sentLines = orders
             .SelectMany(o => o.Lines.GroupBy(l => l.Id).Select(g => g.First()))
             .Where(l => l.SentToKitchenAtUtc is not null)
-            .Select(l => (l.ProductId, l.Quantity, l.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet()))
             .ToList();
+        var lineIds = sentLines.Select(l => l.Id).ToList();
+        var picks = lineIds.Count == 0
+            ? []
+            : await _db.SalesOrderLineChoices.AsNoTracking()
+                .Where(c => lineIds.Contains(c.SalesOrderLineId))
+                .Select(c => new { c.SalesOrderLineId, c.ProductId })
+                .ToListAsync(cancellationToken);
+        var byLine = picks
+            .GroupBy(c => c.SalesOrderLineId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.ProductId).ToList());
+
+        var lineSpecs = new List<(Guid ProductId, decimal Quantity, HashSet<Guid> Excluded)>();
+        foreach (var line in sentLines)
+        {
+            if (byLine.TryGetValue(line.Id, out var chosen) && chosen.Count > 0)
+            {
+                foreach (var productId in chosen)
+                    lineSpecs.Add((productId, line.Quantity, []));
+                continue;
+            }
+
+            lineSpecs.Add((line.ProductId, line.Quantity, line.ExcludedIngredients.Select(e => e.IngredientId).ToHashSet()));
+        }
 
         await AddDemandFromSpecsAsync(requirements, lineSpecs, mode, cancellationToken);
     }

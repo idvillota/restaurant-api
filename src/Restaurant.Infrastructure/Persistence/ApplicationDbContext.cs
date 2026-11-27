@@ -37,6 +37,9 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<ProductProductionLine> ProductProductionLines => Set<ProductProductionLine>();
     public DbSet<ProductIngredient> ProductIngredients => Set<ProductIngredient>();
     public DbSet<ProductBundleLine> ProductBundleLines => Set<ProductBundleLine>();
+    public DbSet<ComboGroup> ComboGroups => Set<ComboGroup>();
+    public DbSet<ComboGroupOption> ComboGroupOptions => Set<ComboGroupOption>();
+    public DbSet<SalesOrderLineChoice> SalesOrderLineChoices => Set<SalesOrderLineChoice>();
     public DbSet<Provider> Providers => Set<Provider>();
     public DbSet<Purchase> Purchases => Set<Purchase>();
     public DbSet<PurchaseLine> PurchaseLines => Set<PurchaseLine>();
@@ -354,6 +357,46 @@ public sealed class ApplicationDbContext : DbContext
             e.HasIndex(x => new { x.SalesOrderId, x.SentToKitchenAtUtc });
         });
 
+        modelBuilder.Entity<ComboGroup>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(80);
+            e.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ProductId, x.SortOrder });
+        });
+
+        modelBuilder.Entity<ComboGroupOption>(e =>
+        {
+            e.HasOne(x => x.ComboGroup)
+                .WithMany(x => x.Options)
+                .HasForeignKey(x => x.ComboGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.ComboGroupId, x.ProductId }).IsUnique();
+        });
+
+        modelBuilder.Entity<SalesOrderLineChoice>(e =>
+        {
+            e.HasOne(x => x.SalesOrderLine)
+                .WithMany(x => x.Choices)
+                .HasForeignKey(x => x.SalesOrderLineId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Group)
+                .WithMany()
+                .HasForeignKey(x => x.ComboGroupId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.SalesOrderLineId, x.ComboGroupId }).IsUnique();
+        });
+
         modelBuilder.Entity<SalesOrderLineExcludedIngredient>(e =>
         {
             e.HasOne(x => x.SalesOrderLine)
@@ -598,6 +641,12 @@ public sealed class ApplicationDbContext : DbContext
         modelBuilder.Entity<ProductBundleLine>().HasQueryFilter(e =>
             e.TenantId == _currentTenant.TenantId);
 
+        modelBuilder.Entity<ComboGroup>().HasQueryFilter(e =>
+            e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<ComboGroupOption>().HasQueryFilter(e =>
+            e.TenantId == _currentTenant.TenantId);
+
         modelBuilder.Entity<Provider>().HasQueryFilter(e =>
             e.TenantId == _currentTenant.TenantId);
 
@@ -629,6 +678,9 @@ public sealed class ApplicationDbContext : DbContext
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<SalesOrderLineExcludedIngredient>().HasQueryFilter(e =>
+            e.TenantId == _currentTenant.TenantId);
+
+        modelBuilder.Entity<SalesOrderLineChoice>().HasQueryFilter(e =>
             e.TenantId == _currentTenant.TenantId);
 
         modelBuilder.Entity<TenantSettings>().HasQueryFilter(e =>

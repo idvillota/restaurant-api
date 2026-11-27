@@ -32,4 +32,6 @@ public class SalesOrderLine : EntityBase, ITenantScoped
     public Product Product { get; set; } = null!;
     public ICollection<SalesOrderLineExcludedIngredient> ExcludedIngredients { get; set; } =
         new List<SalesOrderLineExcludedIngredient>();
+
+    public ICollection<SalesOrderLineChoice> Choices { get; set; } = new List<SalesOrderLineChoice>();
 }

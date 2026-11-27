@@ -81,6 +81,7 @@ public sealed class ProductService : IProductService
                 .Where(p => p.ProductType is { IsActive: true })
                 // Packs are sold from Tiqueteras (customer-first), not from salon orders.
                 .Where(p => p.LunchTicketPackSize is null or <= 0)
+                .Where(p => !p.ComboOnly)
                 .Select(p => MapProduct(p, costPrice: 0m))
                 .ToList(),
         };
@@ -137,6 +138,7 @@ public sealed class ProductService : IProductService
             Barcode = barcode,
             UnitPrice = dto.UnitPrice,
             IsActive = true,
+            ComboOnly = NormalizeComboOnly(dto.CompositionType, dto.ComboOnly),
         };
         await ApplyPostedCostAsync(entity, dto.CostPrice, cancellationToken);
         await _products.AddAsync(entity, cancellationToken);
@@ -146,6 +148,9 @@ public sealed class ProductService : IProductService
 
         if (dto.CompositionType == EProductType.Bundle)
             await ApplyBundleFromDtoAsync(entity.Id, dto.BundleLines, cancellationToken);
+
+        if (dto.CompositionType == EProductType.ChoiceCombo)
+            await ApplyChoiceGroupsAsync(entity.Id, dto.ChoiceGroups, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -189,17 +194,20 @@ public sealed class ProductService : IProductService
         entity.Barcode = barcode;
         entity.UnitPrice = dto.UnitPrice;
         entity.IsActive = dto.IsActive;
+        entity.ComboOnly = NormalizeComboOnly(dto.CompositionType, dto.ComboOnly);
         // Lunch-ticket pack/redeemable flags are managed only via Tiqueteras config.
         await ApplyPostedCostAsync(entity, dto.CostPrice, cancellationToken);
 
         if (compositionTypeChanged)
         {
-            if (dto.CompositionType == EProductType.Bundle)
+            if (dto.CompositionType != EProductType.Bundle)
+                await ClearBundleLinesAsync(id, cancellationToken);
+            if (dto.CompositionType != EProductType.ChoiceCombo)
+                await ClearChoiceGroupsAsync(id, cancellationToken);
+
+            if (dto.CompositionType is EProductType.Bundle or EProductType.ChoiceCombo)
                 await ClearRecipeLinesAsync(id, cancellationToken);
             else
-                await ClearBundleLinesAsync(id, cancellationToken);
-
-            if (dto.CompositionType != EProductType.Bundle)
                 await ValidateExistingRecipeMatchesCompositionTypeAsync(id, entity.CompositionType, cancellationToken);
         }
 
@@ -210,6 +218,9 @@ public sealed class ProductService : IProductService
 
         if (dto.CompositionType == EProductType.Bundle)
             await ApplyBundleFromDtoAsync(id, dto.BundleLines, cancellationToken);
+
+        if (dto.CompositionType == EProductType.ChoiceCombo)
+            await ApplyChoiceGroupsAsync(id, dto.ChoiceGroups, cancellationToken);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -349,6 +360,45 @@ public sealed class ProductService : IProductService
         return await GetBundleAsync(productId, cancellationToken);
     }
 
+    public async Task<ChoiceComboDto?> GetChoiceComboAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        var product = await _products.Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+        if (product is null || product.CompositionType != EProductType.ChoiceCombo)
+            return null;
+
+        var groups = await _db.ComboGroups
+            .AsNoTracking()
+            .Where(g => g.ProductId == productId && !g.IsRetired)
+            .Include(g => g.Options)
+            .ThenInclude(o => o.Product)
+            .OrderBy(g => g.SortOrder)
+            .ThenBy(g => g.Name)
+            .ToListAsync(cancellationToken);
+
+        return new ChoiceComboDto
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            UnitPrice = product.UnitPrice,
+            Groups = groups.Select(g => new ChoiceComboGroupDto
+            {
+                Id = g.Id,
+                Name = g.Name,
+                SortOrder = g.SortOrder,
+                Options = g.Options
+                    .OrderBy(o => o.SortOrder)
+                    .ThenBy(o => o.Product.Name)
+                    .Select(o => new ChoiceComboOptionDto
+                    {
+                        ProductId = o.ProductId,
+                        ProductName = o.Product.Name,
+                        SortOrder = o.SortOrder,
+                    })
+                    .ToList(),
+            }).ToList(),
+        };
+    }
+
     private async Task ApplyResaleRecipeFromDtoAsync(
         Guid productId,
         EProductType compositionType,
@@ -479,8 +529,173 @@ public sealed class ProductService : IProductService
         if (components.Any(p => !p.IsActive))
             throw new InvalidOperationException("Todos los productos incluidos deben estar activos.");
 
-        if (components.Any(p => p.CompositionType == EProductType.Bundle))
-            throw new InvalidOperationException("Un combo no puede incluir otro combo.");
+        if (components.Any(p => p.CompositionType is EProductType.Bundle or EProductType.ChoiceCombo))
+            throw new InvalidOperationException("Un combo fijo no puede incluir otro combo.");
+    }
+
+    private static bool NormalizeComboOnly(EProductType compositionType, bool requested)
+    {
+        if (compositionType is EProductType.Bundle or EProductType.ChoiceCombo)
+            return false;
+        return requested;
+    }
+
+    private async Task ApplyChoiceGroupsAsync(
+        Guid productId,
+        IReadOnlyList<SetChoiceComboGroupDto>? groups,
+        CancellationToken cancellationToken)
+    {
+        if (groups is null || groups.Count == 0)
+            throw new InvalidOperationException("Agregue al menos un tema al combo.");
+
+        var normalized = groups
+            .Select((group, index) => new SetChoiceComboGroupDto
+            {
+                Name = group.Name.Trim(),
+                SortOrder = index,
+                OptionProductIds = group.OptionProductIds.Where(id => id != Guid.Empty).Distinct().ToList(),
+            })
+            .ToList();
+
+        if (normalized.Any(g => g.Name.Length == 0))
+            throw new InvalidOperationException("Cada tema necesita un nombre.");
+        if (normalized.Select(g => g.Name.ToUpperInvariant()).Distinct().Count() != normalized.Count)
+            throw new InvalidOperationException("Los temas no pueden repetir el nombre.");
+        if (normalized.Any(g => g.OptionProductIds.Count == 0))
+            throw new InvalidOperationException("Cada tema necesita al menos un producto.");
+
+        var optionIds = normalized.SelectMany(g => g.OptionProductIds).Distinct().ToList();
+        if (optionIds.Contains(productId))
+            throw new InvalidOperationException("Un combo no puede incluirse a sí mismo.");
+
+        var products = await _products.Query()
+            .AsNoTracking()
+            .Where(p => optionIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.IsActive, p.CompositionType, p.Name })
+            .ToListAsync(cancellationToken);
+        if (products.Count != optionIds.Count)
+            throw new InvalidOperationException("Uno o más productos del combo no existen.");
+        if (products.Any(p => !p.IsActive))
+            throw new InvalidOperationException("Todos los productos del combo deben estar activos.");
+        if (products.Any(p => p.CompositionType is EProductType.Bundle or EProductType.ChoiceCombo))
+            throw new InvalidOperationException("Un tema solo puede incluir preparados o reventa, no otro combo.");
+
+        var existing = await _db.ComboGroups
+            .Include(g => g.Options)
+            .Where(g => g.ProductId == productId)
+            .OrderBy(g => g.SortOrder)
+            .ThenBy(g => g.Id)
+            .ToListAsync(cancellationToken);
+
+        var tenantId = ResolveTenantId();
+        var unmatched = existing.ToList();
+        foreach (var incoming in normalized)
+        {
+            var group = TakeMatchingGroup(unmatched, incoming.Name);
+            if (group is null)
+            {
+                group = new ComboGroup
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    ProductId = productId,
+                };
+                await _db.ComboGroups.AddAsync(group, cancellationToken);
+            }
+
+            group.IsRetired = false;
+            group.Name = incoming.Name;
+            group.SortOrder = incoming.SortOrder;
+            SyncChoiceGroupOptions(group, incoming.OptionProductIds, tenantId);
+        }
+
+        if (unmatched.Count > 0)
+            await RetireOrRemoveGroupsAsync(unmatched, cancellationToken);
+    }
+
+    private static ComboGroup? TakeMatchingGroup(List<ComboGroup> available, string name)
+    {
+        var index = available.FindIndex(g =>
+            !g.IsRetired && string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+        {
+            index = available.FindIndex(g =>
+                string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (index < 0)
+            return null;
+
+        var group = available[index];
+        available.RemoveAt(index);
+        return group;
+    }
+
+    private void SyncChoiceGroupOptions(ComboGroup group, IReadOnlyList<Guid> optionProductIds, Guid tenantId)
+    {
+        var desired = optionProductIds.ToList();
+        var removed = group.Options.Where(option => !desired.Contains(option.ProductId)).ToList();
+        foreach (var option in removed)
+        {
+            group.Options.Remove(option);
+            _db.ComboGroupOptions.Remove(option);
+        }
+
+        for (var i = 0; i < desired.Count; i++)
+        {
+            var productId = desired[i];
+            var option = group.Options.FirstOrDefault(row => row.ProductId == productId);
+            if (option is null)
+            {
+                group.Options.Add(new ComboGroupOption
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    ComboGroupId = group.Id,
+                    ProductId = productId,
+                    SortOrder = i,
+                });
+                continue;
+            }
+
+            option.SortOrder = i;
+        }
+    }
+
+    private async Task RetireOrRemoveGroupsAsync(
+        IReadOnlyList<ComboGroup> groups,
+        CancellationToken cancellationToken)
+    {
+        var groupIds = groups.Select(g => g.Id).ToList();
+        var usedIds = await _db.SalesOrderLineChoices
+            .AsNoTracking()
+            .Where(c => groupIds.Contains(c.ComboGroupId))
+            .Select(c => c.ComboGroupId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var used = usedIds.ToHashSet();
+
+        foreach (var group in groups)
+        {
+            if (used.Contains(group.Id))
+            {
+                group.IsRetired = true;
+                continue;
+            }
+
+            _db.ComboGroups.Remove(group);
+        }
+    }
+
+    private async Task ClearChoiceGroupsAsync(Guid productId, CancellationToken cancellationToken)
+    {
+        var groups = await _db.ComboGroups
+            .Where(g => g.ProductId == productId)
+            .ToListAsync(cancellationToken);
+        if (groups.Count == 0)
+            return;
+
+        await RetireOrRemoveGroupsAsync(groups, cancellationToken);
     }
 
     private async Task ClearRecipeLinesAsync(Guid productId, CancellationToken cancellationToken)
@@ -595,6 +810,7 @@ public sealed class ProductService : IProductService
             case EProductType.Prepared:
                 break;
             case EProductType.Bundle:
+            case EProductType.ChoiceCombo:
                 throw new InvalidOperationException("Los combos usan productos incluidos, no ingredientes.");
             default:
                 throw new InvalidOperationException("Unknown product composition type.");

@@ -161,6 +161,14 @@ public sealed class ProductsController : ControllerBase
         }
     }
 
+    [HttpGet("{id:guid}/choices")]
+    [RequireSalonCatalogProductsRead]
+    public async Task<ActionResult<ChoiceComboDto>> GetChoices(Guid id, CancellationToken cancellationToken = default)
+    {
+        var combo = await _products.GetChoiceComboAsync(id, cancellationToken);
+        return combo is null ? NotFound() : Ok(combo);
+    }
+
     [HttpGet("{id:guid}/bundle")]
     [RequireSalonCatalogProductsRead]
     public async Task<ActionResult<ProductBundleDto>> GetBundle(Guid id, CancellationToken cancellationToken = default)

@@ -17,5 +17,10 @@ public sealed class SalesOrderMappingProfile : Profile
 
         CreateMap<SalesOrderLineExcludedIngredient, SalesOrderLineExcludedIngredientDto>()
             .ForMember(d => d.IngredientName, o => o.MapFrom(s => s.Ingredient.Name));
+
+        CreateMap<SalesOrderLineChoice, SalesOrderLineChoiceDto>()
+            .ForMember(d => d.GroupId, o => o.MapFrom(s => s.ComboGroupId))
+            .ForMember(d => d.GroupName, o => o.MapFrom(s => s.Group.Name))
+            .ForMember(d => d.ProductName, o => o.MapFrom(s => s.Product.Name));
     }
 }

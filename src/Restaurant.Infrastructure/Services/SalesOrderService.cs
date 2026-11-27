@@ -357,20 +357,10 @@ public sealed class SalesOrderService : ISalesOrderService
         if (pendingLines.Count == 0)
             throw new InvalidOperationException("No hay productos pendientes de envío a cocina.");
 
-        var batchDtos = pendingLines
-            .Select(l => new AddSalesOrderLineDto
-            {
-                ProductId = l.ProductId,
-                Quantity = l.Quantity,
-                Notes = l.Notes,
-                ExcludedIngredientIds = l.ExcludedIngredients
-                    .Select(e => e.IngredientId)
-                    .OrderBy(id => id)
-                    .ToList(),
-            })
-            .ToList();
-
-        var stockCheck = await _inventory.CheckKitchenBatchAsync(orderId, batchDtos, cancellationToken);
+        var batchDtos = pendingLines.Select(l => ToKitchenLineDto(l, l.Quantity)).ToList();
+        var stockBatch = ExpandChoicesForStock(batchDtos);
+        var stockCheck = await _inventory.CheckKitchenBatchAsync(orderId, stockBatch, cancellationToken);
+        batchDtos = await ExpandChoiceCombosForKitchenAsync(batchDtos, cancellationToken);
         _inventory.EnsureAvailable(stockCheck);
 
         var sentAt = DateTime.UtcNow;
@@ -609,19 +599,7 @@ public sealed class SalesOrderService : ISalesOrderService
             _lines.Update(line);
 
             if (wasSent)
-            {
-                kitchenBatch.Add(
-                    new AddSalesOrderLineDto
-                    {
-                        ProductId = line.ProductId,
-                        Quantity = cancelQty,
-                        Notes = line.Notes,
-                        ExcludedIngredientIds = line.ExcludedIngredients
-                            .Select(e => e.IngredientId)
-                            .OrderBy(id => id)
-                            .ToList(),
-                    });
-            }
+                kitchenBatch.Add(ToKitchenLineDto(line, cancelQty));
         }
 
         RecalculateOrderTotals(order);
@@ -643,6 +621,7 @@ public sealed class SalesOrderService : ISalesOrderService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        kitchenBatch = await ExpandChoiceCombosForKitchenAsync(kitchenBatch, cancellationToken);
         var kitchenTickets = await GenerateCancellationTicketsAsync(
             order,
             kitchenBatch,
@@ -694,19 +673,7 @@ public sealed class SalesOrderService : ISalesOrderService
             var wasSent = line.SentToKitchenAtUtc is not null;
 
             if (wasSent)
-            {
-                kitchenBatch.Add(
-                    new AddSalesOrderLineDto
-                    {
-                        ProductId = line.ProductId,
-                        Quantity = cancelQty,
-                        Notes = line.Notes,
-                        ExcludedIngredientIds = line.ExcludedIngredients
-                            .Select(e => e.IngredientId)
-                            .OrderBy(id => id)
-                            .ToList(),
-                    });
-            }
+                kitchenBatch.Add(ToKitchenLineDto(line, cancelQty));
 
             line.CancelledQuantity += cancelQty;
             line.Quantity = 0;
@@ -730,6 +697,7 @@ public sealed class SalesOrderService : ISalesOrderService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        kitchenBatch = await ExpandChoiceCombosForKitchenAsync(kitchenBatch, cancellationToken);
         var kitchenTickets = await GenerateCancellationTicketsAsync(
             order,
             kitchenBatch,
@@ -764,7 +732,11 @@ public sealed class SalesOrderService : ISalesOrderService
         if (product is null)
             throw new InvalidOperationException("Product was not found or is inactive.");
 
+        if (product.ComboOnly)
+            throw new InvalidOperationException("Este producto solo se vende dentro de un combo.");
+
         var notes = NormalizeNotes(dto.Notes);
+        var choices = await NormalizeChoicesAsync(product, dto.Choices ?? [], cancellationToken);
         var excludedIds = await NormalizeExcludedIngredientsAsync(
             product.Id,
             product.CompositionType,
@@ -773,7 +745,7 @@ public sealed class SalesOrderService : ISalesOrderService
 
         if (!HasCustomization(notes, excludedIds))
         {
-            var match = FindMergeablePendingLine(order.Lines, product.Id, notes, excludedIds);
+            var match = FindMergeablePendingLine(order.Lines, product.Id, notes, excludedIds, choices);
             if (match is not null)
             {
                 match.Quantity += dto.Quantity;
@@ -806,6 +778,19 @@ public sealed class SalesOrderService : ISalesOrderService
                     Id = Guid.NewGuid(),
                     SalesOrderLineId = lineId,
                     IngredientId = ingredientId,
+                });
+        }
+
+        for (var i = 0; i < choices.Count; i++)
+        {
+            line.Choices.Add(
+                new SalesOrderLineChoice
+                {
+                    Id = Guid.NewGuid(),
+                    SalesOrderLineId = lineId,
+                    ComboGroupId = choices[i].GroupId,
+                    ProductId = choices[i].ProductId,
+                    SortOrder = i,
                 });
         }
 
@@ -877,7 +862,13 @@ public sealed class SalesOrderService : ISalesOrderService
             .ThenInclude(l => l.Product)
             .Include(o => o.Lines)
             .ThenInclude(l => l.ExcludedIngredients)
-            .ThenInclude(e => e.Ingredient);
+            .ThenInclude(e => e.Ingredient)
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.Choices)
+            .ThenInclude(c => c.Group)
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.Choices)
+            .ThenInclude(c => c.Product);
     }
 
     /// <summary>
@@ -991,7 +982,8 @@ public sealed class SalesOrderService : ISalesOrderService
         IEnumerable<SalesOrderLine> lines,
         Guid productId,
         string? notes,
-        IReadOnlyList<Guid> excludedIds)
+        IReadOnlyList<Guid> excludedIds,
+        IReadOnlyList<AddSalesOrderChoiceDto> choices)
     {
         foreach (var line in DistinctLines(lines).Where(l => l.SentToKitchenAtUtc is null && l.Quantity > 0))
         {
@@ -1005,11 +997,175 @@ public sealed class SalesOrderService : ISalesOrderService
             if (lineExcluded.Count != excludedIds.Count)
                 continue;
 
-            if (lineExcluded.Zip(excludedIds).All(pair => pair.First == pair.Second))
-                return line;
+            if (!lineExcluded.Zip(excludedIds).All(pair => pair.First == pair.Second))
+                continue;
+
+            if (!SameChoices(line.Choices, choices))
+                continue;
+
+            return line;
         }
 
         return null;
+    }
+
+    private static bool SameChoices(
+        IEnumerable<SalesOrderLineChoice> left,
+        IReadOnlyList<AddSalesOrderChoiceDto> right)
+    {
+        var a = left.OrderBy(c => c.ComboGroupId).Select(c => (c.ComboGroupId, c.ProductId)).ToList();
+        var b = right.OrderBy(c => c.GroupId).Select(c => (c.GroupId, c.ProductId)).ToList();
+        return a.Count == b.Count && a.Zip(b).All(pair => pair.First == pair.Second);
+    }
+
+    private static AddSalesOrderLineDto ToKitchenLineDto(SalesOrderLine line, decimal quantity) =>
+        new()
+        {
+            ProductId = line.ProductId,
+            Quantity = quantity,
+            Notes = line.Notes,
+            ExcludedIngredientIds = line.ExcludedIngredients
+                .Select(e => e.IngredientId)
+                .OrderBy(id => id)
+                .ToList(),
+            Choices = line.Choices
+                .OrderBy(c => c.SortOrder)
+                .Select(c => new AddSalesOrderChoiceDto
+                {
+                    GroupId = c.ComboGroupId,
+                    ProductId = c.ProductId,
+                })
+                .ToList(),
+        };
+
+    private async Task<List<AddSalesOrderChoiceDto>> NormalizeChoicesAsync(
+        Product product,
+        List<AddSalesOrderChoiceDto> requested,
+        CancellationToken cancellationToken)
+    {
+        if (product.CompositionType != EProductType.ChoiceCombo)
+        {
+            if (requested.Count > 0)
+                throw new InvalidOperationException("Solo un combo con opciones lleva elecciones.");
+            return [];
+        }
+
+        var groups = await _db.ComboGroups
+            .AsNoTracking()
+            .Where(g => g.ProductId == product.Id && !g.IsRetired)
+            .Include(g => g.Options)
+            .OrderBy(g => g.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        if (groups.Count == 0)
+            throw new InvalidOperationException("Este combo no tiene temas configurados.");
+
+        if (requested.Count != groups.Count)
+            throw new InvalidOperationException("Elija una opción en cada tema del combo.");
+
+        var picks = new List<AddSalesOrderChoiceDto>();
+        foreach (var group in groups)
+        {
+            var matches = requested.Where(c => c.GroupId == group.Id).ToList();
+            if (matches.Count != 1)
+                throw new InvalidOperationException($"Elija una sola opción para {group.Name}.");
+
+            var optionIds = group.Options.Select(o => o.ProductId).ToHashSet();
+            if (!optionIds.Contains(matches[0].ProductId))
+                throw new InvalidOperationException($"La opción de {group.Name} no pertenece a ese tema.");
+
+            picks.Add(matches[0]);
+        }
+
+        var productIds = picks.Select(p => p.ProductId).Distinct().ToList();
+        var products = await _products.Query()
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.IsActive, p.CompositionType })
+            .ToListAsync(cancellationToken);
+        if (products.Count != productIds.Count || products.Any(p => !p.IsActive))
+            throw new InvalidOperationException("Una opción del combo no existe o está inactiva.");
+        if (products.Any(p => p.CompositionType is EProductType.Bundle or EProductType.ChoiceCombo))
+            throw new InvalidOperationException("Una opción del combo no puede ser otro combo.");
+
+        return picks;
+    }
+
+    private async Task<List<AddSalesOrderLineDto>> ExpandChoiceCombosForKitchenAsync(
+        List<AddSalesOrderLineDto> batch,
+        CancellationToken cancellationToken)
+    {
+        if (batch.All(l => l.Choices is not { Count: > 0 }))
+            return batch;
+
+        var comboIds = batch.Where(l => l.Choices is { Count: > 0 }).Select(l => l.ProductId).Distinct().ToList();
+        var optionIds = batch.SelectMany(l => l.Choices ?? []).Select(c => c.ProductId).Distinct().ToList();
+        var ids = comboIds.Concat(optionIds).Distinct().ToList();
+        var products = await _products.Query()
+            .AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        var expanded = new List<AddSalesOrderLineDto>();
+        foreach (var line in batch)
+        {
+            if (line.Choices is not { Count: > 0 } || !products.TryGetValue(line.ProductId, out var combo))
+            {
+                expanded.Add(line);
+                continue;
+            }
+
+            var prepared = line.Choices
+                .Select(c => products.GetValueOrDefault(c.ProductId))
+                .Where(p => p is { CompositionType: EProductType.Prepared })
+                .ToList();
+
+            if (prepared.Count == 0)
+            {
+                expanded.Add(line);
+                continue;
+            }
+
+            foreach (var option in prepared)
+            {
+                expanded.Add(new AddSalesOrderLineDto
+                {
+                    ProductId = option!.Id,
+                    Quantity = line.Quantity,
+                    Notes = line.Notes,
+                    TicketNamePrefix = combo.Name,
+                });
+            }
+        }
+
+        return expanded;
+    }
+
+    /// <summary>
+    /// Stock follows every chosen product. Kitchen tickets only print prepared picks.
+    /// </summary>
+    private static List<AddSalesOrderLineDto> ExpandChoicesForStock(List<AddSalesOrderLineDto> batch)
+    {
+        var expanded = new List<AddSalesOrderLineDto>();
+        foreach (var line in batch)
+        {
+            if (line.Choices is not { Count: > 0 })
+            {
+                expanded.Add(line);
+                continue;
+            }
+
+            foreach (var choice in line.Choices)
+            {
+                expanded.Add(new AddSalesOrderLineDto
+                {
+                    ProductId = choice.ProductId,
+                    Quantity = line.Quantity,
+                });
+            }
+        }
+
+        return expanded;
     }
 
     private static void RecalculateOrderTotals(SalesOrder order)
