@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Restaurant.Api.Authorization;
 using Restaurant.Application.Authorization;
@@ -12,8 +13,15 @@ namespace Restaurant.Api.Controllers;
 public sealed class KitchenPrintersController : ControllerBase
 {
     private readonly IKitchenPrinterService _service;
+    private readonly IHostPrintAgentPackageService _agentPackages;
 
-    public KitchenPrintersController(IKitchenPrinterService service) => _service = service;
+    public KitchenPrintersController(
+        IKitchenPrinterService service,
+        IHostPrintAgentPackageService agentPackages)
+    {
+        _service = service;
+        _agentPackages = agentPackages;
+    }
 
     [HttpGet("stations")]
     public async Task<ActionResult<IReadOnlyList<PrinterStationDto>>> ListStations(
@@ -88,6 +96,55 @@ public sealed class KitchenPrintersController : ControllerBase
         try
         {
             return Ok(await _service.UpdateRoutingAsync(dto, cancellationToken));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("pc-agent")]
+    public async Task<IActionResult> DownloadPcAgent(
+        [FromBody] HostPrintAgentPackageRequest dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var apiUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}".TrimEnd('/');
+            var package = await _agentPackages.BuildSetupAsync(dto, apiUrl, cancellationToken);
+            return Ok(new HostPrintAgentSetupLinkDto
+            {
+                Token = package.Token ?? string.Empty,
+                FileName = package.FileName,
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpGet("pc-agent/setup")]
+    public IActionResult DownloadSetup([FromQuery] string token, [FromServices] IHostPrintInstallTicketStore tickets)
+    {
+        if (!tickets.TryGetSetup(token, out var setupExe))
+            return NotFound(new { message = "El instalador expiró. Descargue de nuevo desde HOST." });
+
+        return File(setupExe, "application/octet-stream", "HostPrint-Setup.exe");
+    }
+
+    [AllowAnonymous]
+    [HttpGet("pc-agent/runtime")]
+    public IActionResult DownloadRuntime([FromQuery] string token)
+    {
+        try
+        {
+            var package = _agentPackages.BuildRuntime(token);
+            return File(package.Content, package.ContentType, package.FileName);
         }
         catch (InvalidOperationException ex)
         {
