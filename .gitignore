@@ -46,3 +46,9 @@ uploads/
 
 # Generated files (comandas, receipts)
 files/
+
+# Binarios del agente de cocina (se copian en local para pruebas)
+src/Restaurant.Api/HostPrintAgent/payload/*
+!src/Restaurant.Api/HostPrintAgent/payload/.gitkeep
+src/Restaurant.Api/HostPrintAgent/setup/*
+!src/Restaurant.Api/HostPrintAgent/setup/.gitkeep
