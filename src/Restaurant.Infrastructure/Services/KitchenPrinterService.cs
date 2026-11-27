@@ -68,8 +68,8 @@ public sealed class KitchenPrinterService : IKitchenPrinterService
         await EnsureDefaultStationAsync(tenantId, cancellationToken);
 
         var code = NormalizeStationCode(dto.Code);
-        if (KitchenPrinterDefaults.IsReservedStationCode(code))
-            throw new InvalidOperationException($"El código {code} está reservado para una estación del sistema.");
+        if (code == KitchenPrinterDefaults.DefaultStationCode)
+            throw new InvalidOperationException("El código DEFAULT está reservado para la estación del sistema.");
 
         if (await StationCodeExistsAsync(tenantId, code, excludeId: null, cancellationToken))
             throw new InvalidOperationException($"Ya existe una estación con el código {code}.");
@@ -107,8 +107,8 @@ public sealed class KitchenPrinterService : IKitchenPrinterService
         if (!isDefault && !string.IsNullOrWhiteSpace(dto.Code))
         {
             var code = NormalizeStationCode(dto.Code);
-            if (KitchenPrinterDefaults.IsReservedStationCode(code))
-                throw new InvalidOperationException($"El código {code} está reservado para una estación del sistema.");
+            if (code == KitchenPrinterDefaults.DefaultStationCode)
+                throw new InvalidOperationException("El código DEFAULT está reservado para la estación del sistema.");
 
             if (await StationCodeExistsAsync(tenantId, code, station.Id, cancellationToken))
                 throw new InvalidOperationException($"Ya existe una estación con el código {code}.");

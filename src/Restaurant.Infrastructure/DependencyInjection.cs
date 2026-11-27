@@ -39,7 +39,6 @@ public static class DependencyInjection
         services.AddScoped<ITenantUserInviteService, TenantUserInviteService>();
         services.Configure<ProductImageOptions>(configuration.GetSection(ProductImageOptions.SectionName));
         services.Configure<GeneratedFileStorageOptions>(configuration.GetSection(GeneratedFileStorageOptions.SectionName));
-        services.Configure<HostPrintAgentOptions>(configuration.GetSection(HostPrintAgentOptions.SectionName));
 
         var storageProvider = configuration
             .GetSection(GeneratedFileStorageOptions.SectionName)["Provider"];
@@ -80,8 +79,6 @@ public static class DependencyInjection
         else
             services.AddScoped<IProductImageStorage, LocalProductImageStorage>();
         services.AddScoped<IKitchenPrinterService, KitchenPrinterService>();
-        services.AddSingleton<IHostPrintInstallTicketStore, HostPrintInstallTicketStore>();
-        services.AddScoped<IHostPrintAgentPackageService, HostPrintAgentPackageService>();
         services.AddScoped<IKitchenTicketService, KitchenTicketService>();
         services.AddScoped<ISalesReceiptService, SalesReceiptService>();
         services.AddScoped<IProductService, ProductService>();
