@@ -350,6 +350,76 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.ToTable("CashierShifts");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.ComboGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRetired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.ToTable("ComboGroups");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.ComboGroupOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComboGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ComboGroupId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("ComboGroupOptions");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1096,15 +1166,18 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("ComboOnly")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("CompositionType")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Barcode")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
@@ -1683,6 +1756,39 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ClosedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("CounterAbandonedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CounterCustomerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("CounterHandedOverAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CounterNotificationError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("CounterNotifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CounterPagerNumber")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
+                    b.Property<string>("CounterPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("CounterReadyAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("CounterUsesPager")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1703,6 +1809,11 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("DiningTableId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsCounterPickup")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("IsDelivery")
                         .ValueGeneratedOnAdd()
@@ -1827,6 +1938,45 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "CreatedAtUtc");
 
                     b.ToTable("SalesOrderLines");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.SalesOrderLineChoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComboGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SalesOrderLineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComboGroupId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("SalesOrderLineId", "ComboGroupId")
+                        .IsUnique();
+
+                    b.ToTable("SalesOrderLineChoices");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.SalesOrderLineExcludedIngredient", b =>
@@ -1964,6 +2114,9 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<bool>("AutoGeneratePurchaseBillNumbers")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("BarcodesEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("BreBKey")
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)");
@@ -1975,6 +2128,12 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("CounterServiceEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CounterUsesPager")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Country")
                         .IsRequired()
@@ -2069,9 +2228,6 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<bool>("TiqueterasEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("BarcodesEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<string>("TradeName")
@@ -2321,6 +2477,36 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("CashierUser");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.ComboGroup", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Restaurant.Domain.Entities.ComboGroupOption", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.ComboGroup", "ComboGroup")
+                        .WithMany("Options")
+                        .HasForeignKey("ComboGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ComboGroup");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Restaurant.Domain.Entities.DailyClosure", b =>
@@ -2686,6 +2872,33 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("SalesOrder");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.SalesOrderLineChoice", b =>
+                {
+                    b.HasOne("Restaurant.Domain.Entities.ComboGroup", "Group")
+                        .WithMany()
+                        .HasForeignKey("ComboGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Restaurant.Domain.Entities.SalesOrderLine", "SalesOrderLine")
+                        .WithMany("Choices")
+                        .HasForeignKey("SalesOrderLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("SalesOrderLine");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.SalesOrderLineExcludedIngredient", b =>
                 {
                     b.HasOne("Restaurant.Domain.Entities.Ingredient", "Ingredient")
@@ -2791,6 +3004,11 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Navigation("Payments");
                 });
 
+            modelBuilder.Entity("Restaurant.Domain.Entities.ComboGroup", b =>
+                {
+                    b.Navigation("Options");
+                });
+
             modelBuilder.Entity("Restaurant.Domain.Entities.DiningTable", b =>
                 {
                     b.Navigation("ReservationTables");
@@ -2878,6 +3096,8 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Restaurant.Domain.Entities.SalesOrderLine", b =>
                 {
+                    b.Navigation("Choices");
+
                     b.Navigation("ExcludedIngredients");
                 });
 

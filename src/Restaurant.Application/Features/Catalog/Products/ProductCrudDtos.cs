@@ -37,6 +37,12 @@ public sealed class CreateProductDto
 
     /// <summary>Required when <see cref="CompositionType"/> is <see cref="EProductType.Bundle"/>.</summary>
     public List<SetProductBundleLineDto>? BundleLines { get; set; }
+
+    /// <summary>When true, the product is not sold on its own. Ignored for combos.</summary>
+    public bool ComboOnly { get; set; }
+
+    /// <summary>Required when <see cref="CompositionType"/> is <see cref="EProductType.ChoiceCombo"/>.</summary>
+    public List<SetChoiceComboGroupDto>? ChoiceGroups { get; set; }
 }
 
 public sealed class UpdateProductDto
@@ -75,4 +81,10 @@ public sealed class UpdateProductDto
 
     /// <summary>Required when <see cref="CompositionType"/> is <see cref="EProductType.Bundle"/>.</summary>
     public List<SetProductBundleLineDto>? BundleLines { get; set; }
+
+    /// <summary>When true, the product is not sold on its own. Ignored for combos.</summary>
+    public bool ComboOnly { get; set; }
+
+    /// <summary>Required when <see cref="CompositionType"/> is <see cref="EProductType.ChoiceCombo"/>.</summary>
+    public List<SetChoiceComboGroupDto>? ChoiceGroups { get; set; }
 }

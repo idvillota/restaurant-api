@@ -55,6 +55,31 @@ public sealed class CustomerService : ICustomerService
         return entity is null ? null : _mapper.Map<CustomerDto>(entity);
     }
 
+    public async Task<IReadOnlyList<CustomerDto>> FindByPhoneAsync(
+        string phone,
+        CancellationToken cancellationToken = default)
+    {
+        var key = CounterPhoneNumbers.MatchKey(phone);
+        if (key.Length < 7)
+            return [];
+
+        var matches = await _customers.Query()
+            .AsNoTracking()
+            .Where(c => c.Phone != null && c.Phone != "")
+            .ToListAsync(cancellationToken);
+
+        var found = matches
+            .Where(c =>
+                !CustomerTaxId.IsConsumidorFinal(CustomerTaxId.Normalize(c.TaxId)) &&
+                CounterPhoneNumbers.MatchKey(c.Phone) == key &&
+                CounterPhoneNumbers.MatchKey(c.Phone).Length >= 7)
+            .OrderByDescending(c => c.IsActive)
+            .ThenBy(c => c.Name)
+            .ToList();
+
+        return _mapper.Map<IReadOnlyList<CustomerDto>>(found);
+    }
+
     public async Task<CustomerDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default)
     {
         var month = dto.BirthMonth;

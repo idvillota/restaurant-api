@@ -8,6 +8,9 @@ public interface ICustomerService
     Task<PagedResult<CustomerDto>> ListAsync(ListQuery query, CancellationToken cancellationToken = default);
     Task<CustomerDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<CustomerDto?> FindByTaxIdAsync(string taxId, CancellationToken cancellationToken = default);
+
+    /// <summary>Active and inactive clients whose phone matches. Clients without a usable phone are omitted.</summary>
+    Task<IReadOnlyList<CustomerDto>> FindByPhoneAsync(string phone, CancellationToken cancellationToken = default);
     Task<CustomerDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default);
     Task<CustomerDto> UpsertDeliveryProfileAsync(StartDeliveryCustomerDto dto, CancellationToken cancellationToken = default);
     Task<CustomerDto?> UpdateAsync(Guid id, UpdateCustomerDto dto, CancellationToken cancellationToken = default);

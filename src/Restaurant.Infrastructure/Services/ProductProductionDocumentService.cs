@@ -98,7 +98,7 @@ public sealed class ProductProductionDocumentService : IProductProductionDocumen
             if (!products.TryGetValue(line.ProductId, out var product) || !product.IsActive)
                 throw new InvalidOperationException("Uno de los productos no existe o está inactivo.");
 
-            if (product.CompositionType == EProductType.Bundle)
+            if (product.CompositionType is EProductType.Bundle or EProductType.ChoiceCombo)
                 throw new InvalidOperationException(
                     $"No se puede producir el combo «{product.Name}». Produce sus componentes por separado.");
         }

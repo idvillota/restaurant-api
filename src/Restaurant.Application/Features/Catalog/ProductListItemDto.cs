@@ -16,6 +16,9 @@ public sealed class ProductListItemDto
     public string? ImagePath { get; set; }
     public string? ImageUrl { get; set; }
     public bool IsActive { get; set; }
+
+    /// <summary>Hidden from the menu. Can be chosen inside a combo.</summary>
+    public bool ComboOnly { get; set; }
     public int? LunchTicketPackSize { get; set; }
     public bool IsLunchTicketRedeemable { get; set; }
     /// <summary>Finished-goods units when tenant uses ProductUnits stock mode.</summary>

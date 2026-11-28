@@ -16,6 +16,8 @@ internal static class KitchenTicketPrintXml
             "KitchenTicket",
             Text("TableCode", model.TableCode),
             Text("IsDelivery", model.IsDelivery ? "true" : "false"),
+            Text("IsCounterPickup", model.IsCounterPickup ? "true" : "false"),
+            Text("CounterPagerNumber", model.CounterPagerNumber ?? string.Empty),
             Text(
                 "DeliveryDestination",
                 model.IsDelivery

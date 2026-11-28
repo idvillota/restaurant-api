@@ -36,8 +36,22 @@ internal static class QuestPdfKitchenTicketDocument
                         column.Spacing(narrow ? 3 : 4);
 
                         column.Item().AlignCenter().Text(
-                            ticket.IsDelivery ? "DOMICILIO" : $"MESA {ticket.TableCode}").Bold().FontSize(titleSize);
-                        if (ticket.IsDelivery)
+                            ticket.IsCounterPickup
+                                ? "MOSTRADOR"
+                                : ticket.IsDelivery ? "DOMICILIO" : $"MESA {ticket.TableCode}").Bold().FontSize(titleSize);
+                        if (ticket.IsCounterPickup)
+                        {
+                            var call = string.IsNullOrWhiteSpace(ticket.CounterPagerNumber)
+                                ? ticket.CounterPhone
+                                : $"Localizador {ticket.CounterPagerNumber}";
+                            var who = string.Join(
+                                " · ",
+                                new[] { ticket.CounterCustomerName, call }
+                                    .Where(part => !string.IsNullOrWhiteSpace(part)));
+                            if (who.Length > 0)
+                                column.Item().AlignCenter().Text(who).FontSize(metaSize);
+                        }
+                        else if (ticket.IsDelivery)
                         {
                             var destination = KitchenTicketModel.FormatDeliveryDestination(
                                 ticket.DeliveryAddress,

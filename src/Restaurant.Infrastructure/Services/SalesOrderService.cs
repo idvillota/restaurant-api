@@ -1,5 +1,6 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Restaurant.Application.Common;
 using Restaurant.Application.Common.Interfaces;
 using Restaurant.Application.Features.Crm.Customers;
@@ -32,6 +33,8 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly ICustomerService _customers;
     private readonly IMobileSalePublisher? _salePublisher;
     private readonly IPrintJobQueue? _printJobs;
+    private readonly ICounterReadyNotifier? _counterNotifier;
+    private readonly ILogger<SalesOrderService>? _logger;
 
     public SalesOrderService(
         IRepository<SalesOrder> orders,
@@ -50,7 +53,9 @@ public sealed class SalesOrderService : ISalesOrderService
         ApplicationDbContext db,
         ICustomerService customers,
         IMobileSalePublisher? salePublisher = null,
-        IPrintJobQueue? printJobs = null)
+        IPrintJobQueue? printJobs = null,
+        ICounterReadyNotifier? counterNotifier = null,
+        ILogger<SalesOrderService>? logger = null)
     {
         _orders = orders;
         _lines = lines;
@@ -69,6 +74,8 @@ public sealed class SalesOrderService : ISalesOrderService
         _customers = customers;
         _salePublisher = salePublisher;
         _printJobs = printJobs;
+        _counterNotifier = counterNotifier;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<TableServiceSummaryDto>> ListTableSummariesAsync(
@@ -154,6 +161,7 @@ public sealed class SalesOrderService : ISalesOrderService
     public async Task<SalesOrderDto> StartOrderForTableAsync(Guid tableId, CancellationToken cancellationToken = default)
     {
         await EnsureSalonOperationsAllowedAsync(cancellationToken);
+        await EnsureTableServiceTenantAsync(cancellationToken);
 
         var table = await _tables.GetByIdAsync(tableId, cancellationToken);
         if (table is null || !table.IsActive)
@@ -203,6 +211,7 @@ public sealed class SalesOrderService : ISalesOrderService
         CancellationToken cancellationToken = default)
     {
         await EnsureSalonOperationsAllowedAsync(cancellationToken);
+        await EnsureTableServiceTenantAsync(cancellationToken);
 
         var customer = await _customers.UpsertDeliveryProfileAsync(dto, cancellationToken);
         var slot = await AllocateDeliverySlotAsync(cancellationToken);
@@ -236,6 +245,242 @@ public sealed class SalesOrderService : ISalesOrderService
         await _orders.AddAsync(order, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return (await GetByIdAsync(orderId, cancellationToken))!;
+    }
+
+    public async Task<SalesOrderDto> StartCounterOrderAsync(
+        StartCounterOrderDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+        var counterMode = await LoadCounterModeAsync(cancellationToken);
+        if (!counterMode.Enabled)
+            throw new InvalidOperationException("Este local no tiene servicio de mostrador.");
+
+        var name = NormalizeCounterName(dto.CustomerName);
+        string? phone = null;
+        string? pager = null;
+        if (counterMode.UsesPager)
+        {
+            pager = NormalizePagerNumber(dto.PagerNumber);
+            await EnsurePagerAvailableAsync(pager, cancellationToken);
+        }
+        else
+        {
+            phone = NormalizeCounterPhone(dto.Phone);
+        }
+
+        var orderId = Guid.NewGuid();
+        var order = new SalesOrder
+        {
+            Id = orderId,
+            DiningTableId = null,
+            IsCounterPickup = true,
+            CounterCustomerName = name,
+            CounterPhone = phone,
+            CounterUsesPager = counterMode.UsesPager,
+            CounterPagerNumber = pager,
+            Number = await GenerateOrderNumberAsync(cancellationToken),
+            Status = SalesOrderStatus.Draft,
+            OpenedAtUtc = DateTime.UtcNow,
+            Subtotal = 0,
+            TaxAmount = 0,
+            Total = 0,
+        };
+
+        await _orders.AddAsync(order, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return (await GetByIdAsync(orderId, cancellationToken))!;
+    }
+
+    public async Task<IReadOnlyList<CounterOrderSummaryDto>> ListCounterOrdersAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var orders = await _orders.Query()
+            .AsNoTracking()
+            .Where(o =>
+                o.IsCounterPickup &&
+                o.CounterHandedOverAtUtc == null &&
+                o.CounterAbandonedAtUtc == null &&
+                o.Status != SalesOrderStatus.Voided)
+            .OrderBy(o => o.CounterReadyAtUtc == null)
+            .ThenBy(o => o.OpenedAtUtc)
+            .Select(o => new
+            {
+                o.Id,
+                o.Number,
+                o.CounterCustomerName,
+                o.CounterPhone,
+                o.CounterUsesPager,
+                o.CounterPagerNumber,
+                o.Status,
+                o.Total,
+                o.CounterReadyAtUtc,
+                o.CounterNotifiedAtUtc,
+                o.CounterNotificationError,
+            })
+            .ToListAsync(cancellationToken);
+
+        if (orders.Count == 0)
+            return [];
+
+        var ids = orders.Select(o => o.Id).ToList();
+        var lineStats = await _lines.Query()
+            .AsNoTracking()
+            .Where(l => ids.Contains(l.SalesOrderId) && l.Quantity > 0)
+            .GroupBy(l => l.SalesOrderId)
+            .Select(g => new
+            {
+                OrderId = g.Key,
+                Total = g.Count(),
+                Sent = g.Count(l => l.SentToKitchenAtUtc != null),
+                SentAtUtc = g.Min(l => l.SentToKitchenAtUtc),
+            })
+            .ToListAsync(cancellationToken);
+        var sentByOrder = lineStats.ToDictionary(x => x.OrderId);
+
+        return orders
+            .Select(o =>
+            {
+                sentByOrder.TryGetValue(o.Id, out var stats);
+                var sent = stats is not null && stats.Total > 0 && stats.Sent == stats.Total;
+                return new CounterOrderSummaryDto
+                {
+                    Id = o.Id,
+                    Number = o.Number,
+                    CustomerName = o.CounterCustomerName ?? string.Empty,
+                    Phone = o.CounterPhone ?? string.Empty,
+                    UsesPager = o.CounterUsesPager,
+                    PagerNumber = o.CounterPagerNumber,
+                    Status = o.Status,
+                    Total = o.Total,
+                    Paid = o.Status == SalesOrderStatus.Paid,
+                    SentToKitchen = sent,
+                    SentToKitchenAtUtc = sent ? stats?.SentAtUtc : null,
+                    ReadyAtUtc = o.CounterReadyAtUtc,
+                    NotifiedAtUtc = o.CounterNotifiedAtUtc,
+                    NotificationError = o.CounterNotificationError,
+                };
+            })
+            .ToList();
+    }
+
+    public async Task DispatchPaidCounterOrdersToKitchenAsync(
+        IReadOnlyList<Guid> orderIds,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var orderId in orderIds.Distinct())
+        {
+            var order = await _orders.Query()
+                .AsNoTracking()
+                .Where(o => o.Id == orderId)
+                .Select(o => new
+                {
+                    o.IsCounterPickup,
+                    o.Status,
+                    o.CounterHandedOverAtUtc,
+                    o.CounterAbandonedAtUtc,
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (order is null ||
+                !order.IsCounterPickup ||
+                order.Status != SalesOrderStatus.Paid ||
+                order.CounterHandedOverAtUtc is not null ||
+                order.CounterAbandonedAtUtc is not null)
+                continue;
+
+            var pendingLineIds = await _lines.Query()
+                .AsNoTracking()
+                .Where(l => l.SalesOrderId == orderId && l.SentToKitchenAtUtc == null && l.Quantity > 0)
+                .Select(l => l.Id)
+                .ToListAsync(cancellationToken);
+            if (pendingLineIds.Count == 0)
+                continue;
+
+            try
+            {
+                await ConfirmOrderAsync(orderId, new ConfirmSalesOrderDto { PrintKitchen = true }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(
+                    ex,
+                    "Paid counter order {OrderId} stayed charged, but the kitchen ticket was not sent.",
+                    orderId);
+                await RevertCounterKitchenSendAsync(pendingLineIds, cancellationToken);
+            }
+        }
+    }
+
+    public async Task<SalesOrderDto?> MarkCounterReadyAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+        var order = await _orders.Query().FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+        if (order is null)
+            return null;
+
+        EnsureCounterStillOpen(order);
+        if (order.Status != SalesOrderStatus.Paid)
+            throw new InvalidOperationException("Cobre el pedido antes de marcarlo listo.");
+
+        var pending = await _lines.Query()
+            .AnyAsync(
+                l => l.SalesOrderId == orderId && l.Quantity > 0 && l.SentToKitchenAtUtc == null,
+                cancellationToken);
+        var hasLines = await _lines.Query()
+            .AnyAsync(l => l.SalesOrderId == orderId && l.Quantity > 0, cancellationToken);
+        if (!hasLines || pending)
+            throw new InvalidOperationException("Envíe todo el pedido a cocina antes de marcarlo listo.");
+
+        if (order.CounterReadyAtUtc is null)
+            order.CounterReadyAtUtc = DateTime.UtcNow;
+
+        if (!order.CounterUsesPager && order.CounterNotifiedAtUtc is null)
+            await TryNotifyCounterReadyAsync(order, cancellationToken);
+
+        _orders.Update(order);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await GetByIdAsync(orderId, cancellationToken);
+    }
+
+    public async Task<SalesOrderDto?> HandOverCounterOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+        var order = await _orders.Query().FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+        if (order is null)
+            return null;
+
+        EnsureCounterStillOpen(order);
+        if (order.CounterReadyAtUtc is null)
+            throw new InvalidOperationException("Marque el pedido como listo antes de entregarlo.");
+
+        order.CounterHandedOverAtUtc = DateTime.UtcNow;
+        _orders.Update(order);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await GetByIdAsync(orderId, cancellationToken);
+    }
+
+    public async Task<SalesOrderDto?> AbandonCounterOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSalonOperationsAllowedAsync(cancellationToken);
+        var order = await _orders.Query().FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+        if (order is null)
+            return null;
+
+        EnsureCounterStillOpen(order);
+        if (order.Status != SalesOrderStatus.Paid)
+            throw new InvalidOperationException("Solo se archiva un pedido de mostrador ya cobrado.");
+
+        order.CounterAbandonedAtUtc = DateTime.UtcNow;
+        _orders.Update(order);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await GetByIdAsync(orderId, cancellationToken);
     }
 
     public async Task<SalesOrderDto?> AddLineAsync(
@@ -344,11 +589,26 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order is null)
             return null;
 
-        if (order.Status == SalesOrderStatus.Paid || order.Status == SalesOrderStatus.Voided)
-            throw new InvalidOperationException("Paid or voided orders cannot be modified.");
+        // Counter orders are paid before the kitchen. Table and delivery orders stay blocked once paid.
+        var counterKitchen = order.IsCounterPickup && order.Status == SalesOrderStatus.Paid;
+        if (order.IsCounterPickup)
+        {
+            if (order.Status == SalesOrderStatus.Voided ||
+                order.CounterHandedOverAtUtc is not null ||
+                order.CounterAbandonedAtUtc is not null)
+                throw new InvalidOperationException("Este pedido de mostrador ya se cerró.");
 
-        if (order.Status != SalesOrderStatus.Draft && order.Status != SalesOrderStatus.Open)
+            if (!counterKitchen)
+                throw new InvalidOperationException("Cobre el pedido de mostrador antes de enviarlo a cocina.");
+        }
+        else if (order.Status == SalesOrderStatus.Paid || order.Status == SalesOrderStatus.Voided)
+        {
+            throw new InvalidOperationException("Paid or voided orders cannot be modified.");
+        }
+        else if (order.Status != SalesOrderStatus.Draft && order.Status != SalesOrderStatus.Open)
+        {
             throw new InvalidOperationException("Only active table orders can be sent to the kitchen.");
+        }
 
         var pendingLines = DistinctLines(order.Lines)
             .Where(l => l.SentToKitchenAtUtc is null && l.Quantity > 0)
@@ -357,21 +617,15 @@ public sealed class SalesOrderService : ISalesOrderService
         if (pendingLines.Count == 0)
             throw new InvalidOperationException("No hay productos pendientes de envío a cocina.");
 
-        var batchDtos = pendingLines
-            .Select(l => new AddSalesOrderLineDto
-            {
-                ProductId = l.ProductId,
-                Quantity = l.Quantity,
-                Notes = l.Notes,
-                ExcludedIngredientIds = l.ExcludedIngredients
-                    .Select(e => e.IngredientId)
-                    .OrderBy(id => id)
-                    .ToList(),
-            })
-            .ToList();
-
-        var stockCheck = await _inventory.CheckKitchenBatchAsync(orderId, batchDtos, cancellationToken);
-        _inventory.EnsureAvailable(stockCheck);
+        var batchDtos = pendingLines.Select(l => ToKitchenLineDto(l, l.Quantity)).ToList();
+        var stockBatch = ExpandChoicesForStock(batchDtos);
+        batchDtos = await ExpandChoiceCombosForKitchenAsync(batchDtos, cancellationToken);
+        if (!counterKitchen)
+        {
+            // Payment already deducted stock for a counter order. Checking again would demand it twice.
+            var stockCheck = await _inventory.CheckKitchenBatchAsync(orderId, stockBatch, cancellationToken);
+            _inventory.EnsureAvailable(stockCheck);
+        }
 
         var sentAt = DateTime.UtcNow;
         foreach (var line in pendingLines)
@@ -420,6 +674,9 @@ public sealed class SalesOrderService : ISalesOrderService
 
         if (sourceOrder is null)
             return null;
+
+        if (sourceOrder.IsCounterPickup)
+            throw new InvalidOperationException("Un pedido de mostrador no se asigna a una mesa.");
 
         if (sourceOrder.Status is not (SalesOrderStatus.Draft or SalesOrderStatus.Open))
             throw new InvalidOperationException("Solo se pueden mover pedidos activos (borrador o abiertos).");
@@ -609,19 +866,7 @@ public sealed class SalesOrderService : ISalesOrderService
             _lines.Update(line);
 
             if (wasSent)
-            {
-                kitchenBatch.Add(
-                    new AddSalesOrderLineDto
-                    {
-                        ProductId = line.ProductId,
-                        Quantity = cancelQty,
-                        Notes = line.Notes,
-                        ExcludedIngredientIds = line.ExcludedIngredients
-                            .Select(e => e.IngredientId)
-                            .OrderBy(id => id)
-                            .ToList(),
-                    });
-            }
+                kitchenBatch.Add(ToKitchenLineDto(line, cancelQty));
         }
 
         RecalculateOrderTotals(order);
@@ -643,6 +888,7 @@ public sealed class SalesOrderService : ISalesOrderService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        kitchenBatch = await ExpandChoiceCombosForKitchenAsync(kitchenBatch, cancellationToken);
         var kitchenTickets = await GenerateCancellationTicketsAsync(
             order,
             kitchenBatch,
@@ -694,19 +940,7 @@ public sealed class SalesOrderService : ISalesOrderService
             var wasSent = line.SentToKitchenAtUtc is not null;
 
             if (wasSent)
-            {
-                kitchenBatch.Add(
-                    new AddSalesOrderLineDto
-                    {
-                        ProductId = line.ProductId,
-                        Quantity = cancelQty,
-                        Notes = line.Notes,
-                        ExcludedIngredientIds = line.ExcludedIngredients
-                            .Select(e => e.IngredientId)
-                            .OrderBy(id => id)
-                            .ToList(),
-                    });
-            }
+                kitchenBatch.Add(ToKitchenLineDto(line, cancelQty));
 
             line.CancelledQuantity += cancelQty;
             line.Quantity = 0;
@@ -730,6 +964,7 @@ public sealed class SalesOrderService : ISalesOrderService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        kitchenBatch = await ExpandChoiceCombosForKitchenAsync(kitchenBatch, cancellationToken);
         var kitchenTickets = await GenerateCancellationTicketsAsync(
             order,
             kitchenBatch,
@@ -745,7 +980,9 @@ public sealed class SalesOrderService : ISalesOrderService
             Order = orderDto,
             KitchenTickets = kitchenTickets,
             OrderVoided = true,
-            Message = "Pedido anulado y mesa liberada.",
+            Message = order.IsCounterPickup
+                ? "Pedido de mostrador anulado."
+                : "Pedido anulado y mesa liberada.",
         };
     }
 
@@ -764,7 +1001,11 @@ public sealed class SalesOrderService : ISalesOrderService
         if (product is null)
             throw new InvalidOperationException("Product was not found or is inactive.");
 
+        if (product.ComboOnly)
+            throw new InvalidOperationException("Este producto solo se vende dentro de un combo.");
+
         var notes = NormalizeNotes(dto.Notes);
+        var choices = await NormalizeChoicesAsync(product, dto.Choices ?? [], cancellationToken);
         var excludedIds = await NormalizeExcludedIngredientsAsync(
             product.Id,
             product.CompositionType,
@@ -773,7 +1014,7 @@ public sealed class SalesOrderService : ISalesOrderService
 
         if (!HasCustomization(notes, excludedIds))
         {
-            var match = FindMergeablePendingLine(order.Lines, product.Id, notes, excludedIds);
+            var match = FindMergeablePendingLine(order.Lines, product.Id, notes, excludedIds, choices);
             if (match is not null)
             {
                 match.Quantity += dto.Quantity;
@@ -806,6 +1047,19 @@ public sealed class SalesOrderService : ISalesOrderService
                     Id = Guid.NewGuid(),
                     SalesOrderLineId = lineId,
                     IngredientId = ingredientId,
+                });
+        }
+
+        for (var i = 0; i < choices.Count; i++)
+        {
+            line.Choices.Add(
+                new SalesOrderLineChoice
+                {
+                    Id = Guid.NewGuid(),
+                    SalesOrderLineId = lineId,
+                    ComboGroupId = choices[i].GroupId,
+                    ProductId = choices[i].ProductId,
+                    SortOrder = i,
                 });
         }
 
@@ -877,7 +1131,13 @@ public sealed class SalesOrderService : ISalesOrderService
             .ThenInclude(l => l.Product)
             .Include(o => o.Lines)
             .ThenInclude(l => l.ExcludedIngredients)
-            .ThenInclude(e => e.Ingredient);
+            .ThenInclude(e => e.Ingredient)
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.Choices)
+            .ThenInclude(c => c.Group)
+            .Include(o => o.Lines)
+            .ThenInclude(l => l.Choices)
+            .ThenInclude(c => c.Product);
     }
 
     /// <summary>
@@ -991,7 +1251,8 @@ public sealed class SalesOrderService : ISalesOrderService
         IEnumerable<SalesOrderLine> lines,
         Guid productId,
         string? notes,
-        IReadOnlyList<Guid> excludedIds)
+        IReadOnlyList<Guid> excludedIds,
+        IReadOnlyList<AddSalesOrderChoiceDto> choices)
     {
         foreach (var line in DistinctLines(lines).Where(l => l.SentToKitchenAtUtc is null && l.Quantity > 0))
         {
@@ -1005,11 +1266,175 @@ public sealed class SalesOrderService : ISalesOrderService
             if (lineExcluded.Count != excludedIds.Count)
                 continue;
 
-            if (lineExcluded.Zip(excludedIds).All(pair => pair.First == pair.Second))
-                return line;
+            if (!lineExcluded.Zip(excludedIds).All(pair => pair.First == pair.Second))
+                continue;
+
+            if (!SameChoices(line.Choices, choices))
+                continue;
+
+            return line;
         }
 
         return null;
+    }
+
+    private static bool SameChoices(
+        IEnumerable<SalesOrderLineChoice> left,
+        IReadOnlyList<AddSalesOrderChoiceDto> right)
+    {
+        var a = left.OrderBy(c => c.ComboGroupId).Select(c => (c.ComboGroupId, c.ProductId)).ToList();
+        var b = right.OrderBy(c => c.GroupId).Select(c => (c.GroupId, c.ProductId)).ToList();
+        return a.Count == b.Count && a.Zip(b).All(pair => pair.First == pair.Second);
+    }
+
+    private static AddSalesOrderLineDto ToKitchenLineDto(SalesOrderLine line, decimal quantity) =>
+        new()
+        {
+            ProductId = line.ProductId,
+            Quantity = quantity,
+            Notes = line.Notes,
+            ExcludedIngredientIds = line.ExcludedIngredients
+                .Select(e => e.IngredientId)
+                .OrderBy(id => id)
+                .ToList(),
+            Choices = line.Choices
+                .OrderBy(c => c.SortOrder)
+                .Select(c => new AddSalesOrderChoiceDto
+                {
+                    GroupId = c.ComboGroupId,
+                    ProductId = c.ProductId,
+                })
+                .ToList(),
+        };
+
+    private async Task<List<AddSalesOrderChoiceDto>> NormalizeChoicesAsync(
+        Product product,
+        List<AddSalesOrderChoiceDto> requested,
+        CancellationToken cancellationToken)
+    {
+        if (product.CompositionType != EProductType.ChoiceCombo)
+        {
+            if (requested.Count > 0)
+                throw new InvalidOperationException("Solo un combo con opciones lleva elecciones.");
+            return [];
+        }
+
+        var groups = await _db.ComboGroups
+            .AsNoTracking()
+            .Where(g => g.ProductId == product.Id && !g.IsRetired)
+            .Include(g => g.Options)
+            .OrderBy(g => g.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        if (groups.Count == 0)
+            throw new InvalidOperationException("Este combo no tiene temas configurados.");
+
+        if (requested.Count != groups.Count)
+            throw new InvalidOperationException("Elija una opción en cada tema del combo.");
+
+        var picks = new List<AddSalesOrderChoiceDto>();
+        foreach (var group in groups)
+        {
+            var matches = requested.Where(c => c.GroupId == group.Id).ToList();
+            if (matches.Count != 1)
+                throw new InvalidOperationException($"Elija una sola opción para {group.Name}.");
+
+            var optionIds = group.Options.Select(o => o.ProductId).ToHashSet();
+            if (!optionIds.Contains(matches[0].ProductId))
+                throw new InvalidOperationException($"La opción de {group.Name} no pertenece a ese tema.");
+
+            picks.Add(matches[0]);
+        }
+
+        var productIds = picks.Select(p => p.ProductId).Distinct().ToList();
+        var products = await _products.Query()
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.IsActive, p.CompositionType })
+            .ToListAsync(cancellationToken);
+        if (products.Count != productIds.Count || products.Any(p => !p.IsActive))
+            throw new InvalidOperationException("Una opción del combo no existe o está inactiva.");
+        if (products.Any(p => p.CompositionType is EProductType.Bundle or EProductType.ChoiceCombo))
+            throw new InvalidOperationException("Una opción del combo no puede ser otro combo.");
+
+        return picks;
+    }
+
+    private async Task<List<AddSalesOrderLineDto>> ExpandChoiceCombosForKitchenAsync(
+        List<AddSalesOrderLineDto> batch,
+        CancellationToken cancellationToken)
+    {
+        if (batch.All(l => l.Choices is not { Count: > 0 }))
+            return batch;
+
+        var comboIds = batch.Where(l => l.Choices is { Count: > 0 }).Select(l => l.ProductId).Distinct().ToList();
+        var optionIds = batch.SelectMany(l => l.Choices ?? []).Select(c => c.ProductId).Distinct().ToList();
+        var ids = comboIds.Concat(optionIds).Distinct().ToList();
+        var products = await _products.Query()
+            .AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        var expanded = new List<AddSalesOrderLineDto>();
+        foreach (var line in batch)
+        {
+            if (line.Choices is not { Count: > 0 } || !products.TryGetValue(line.ProductId, out var combo))
+            {
+                expanded.Add(line);
+                continue;
+            }
+
+            var prepared = line.Choices
+                .Select(c => products.GetValueOrDefault(c.ProductId))
+                .Where(p => p is { CompositionType: EProductType.Prepared })
+                .ToList();
+
+            if (prepared.Count == 0)
+            {
+                expanded.Add(line);
+                continue;
+            }
+
+            foreach (var option in prepared)
+            {
+                expanded.Add(new AddSalesOrderLineDto
+                {
+                    ProductId = option!.Id,
+                    Quantity = line.Quantity,
+                    Notes = line.Notes,
+                    TicketNamePrefix = combo.Name,
+                });
+            }
+        }
+
+        return expanded;
+    }
+
+    /// <summary>
+    /// Stock follows every chosen product. Kitchen tickets only print prepared picks.
+    /// </summary>
+    private static List<AddSalesOrderLineDto> ExpandChoicesForStock(List<AddSalesOrderLineDto> batch)
+    {
+        var expanded = new List<AddSalesOrderLineDto>();
+        foreach (var line in batch)
+        {
+            if (line.Choices is not { Count: > 0 })
+            {
+                expanded.Add(line);
+                continue;
+            }
+
+            foreach (var choice in line.Choices)
+            {
+                expanded.Add(new AddSalesOrderLineDto
+                {
+                    ProductId = choice.ProductId,
+                    Quantity = line.Quantity,
+                });
+            }
+        }
+
+        return expanded;
     }
 
     private static void RecalculateOrderTotals(SalesOrder order)
@@ -1165,6 +1590,128 @@ public sealed class SalesOrderService : ISalesOrderService
         }
 
         return kitchenTickets;
+    }
+
+    private async Task RevertCounterKitchenSendAsync(
+        IReadOnlyList<Guid> lineIds,
+        CancellationToken cancellationToken)
+    {
+        var lines = await _lines.Query()
+            .Where(l => lineIds.Contains(l.Id) && l.SentToKitchenAtUtc != null)
+            .ToListAsync(cancellationToken);
+        if (lines.Count == 0)
+            return;
+
+        foreach (var line in lines)
+        {
+            line.SentToKitchenAtUtc = null;
+            _lines.Update(line);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureTableServiceTenantAsync(CancellationToken cancellationToken)
+    {
+        if (await IsCounterServiceEnabledAsync(cancellationToken))
+            throw new InvalidOperationException("Este local atiende en mostrador y no usa mesas ni domicilios.");
+    }
+
+    private async Task<bool> IsCounterServiceEnabledAsync(CancellationToken cancellationToken)
+    {
+        var enabled = await _db.TenantSettings.AsNoTracking()
+            .Select(s => (bool?)s.CounterServiceEnabled)
+            .FirstOrDefaultAsync(cancellationToken);
+        return enabled == true;
+    }
+
+    private static void EnsureCounterStillOpen(SalesOrder order)
+    {
+        if (!order.IsCounterPickup)
+            throw new InvalidOperationException("Este pedido no es de mostrador.");
+
+        if (order.CounterHandedOverAtUtc is not null || order.CounterAbandonedAtUtc is not null)
+            throw new InvalidOperationException("Este pedido de mostrador ya se cerró.");
+    }
+
+    private static string NormalizeCounterName(string? name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Length < 2)
+            throw new InvalidOperationException("Indique el nombre de quien recoge el pedido.");
+        if (trimmed.Length > 200)
+            throw new InvalidOperationException("El nombre es demasiado largo.");
+        return trimmed;
+    }
+
+    private async Task<(bool Enabled, bool UsesPager)> LoadCounterModeAsync(CancellationToken cancellationToken)
+    {
+        var row = await _db.TenantSettings.AsNoTracking()
+            .Select(s => new { s.CounterServiceEnabled, s.CounterUsesPager })
+            .FirstOrDefaultAsync(cancellationToken);
+        return (row?.CounterServiceEnabled == true, row?.CounterUsesPager == true);
+    }
+
+    private async Task EnsurePagerAvailableAsync(string pager, CancellationToken cancellationToken)
+    {
+        var taken = await _orders.Query()
+            .AnyAsync(
+                o => o.IsCounterPickup &&
+                     o.CounterUsesPager &&
+                     o.CounterPagerNumber == pager &&
+                     o.CounterHandedOverAtUtc == null &&
+                     o.CounterAbandonedAtUtc == null &&
+                     o.Status != SalesOrderStatus.Voided,
+                cancellationToken);
+        if (taken)
+            throw new InvalidOperationException($"El localizador {pager} ya está en un pedido abierto.");
+    }
+
+    private static string NormalizePagerNumber(string? raw)
+    {
+        var digits = CounterPhoneNumbers.Digits(raw).TrimStart('0');
+        if (digits.Length is < 1 or > 4)
+            throw new InvalidOperationException("Indique el número del localizador.");
+        return digits;
+    }
+
+    private static string NormalizeCounterPhone(string? phone)
+    {
+        var digits = CounterPhoneNumbers.Digits(phone);
+        if (digits.Length is < 7 or > 15)
+            throw new InvalidOperationException("Indique un celular válido para avisar cuando el pedido esté listo.");
+        return digits;
+    }
+
+    private async Task TryNotifyCounterReadyAsync(SalesOrder order, CancellationToken cancellationToken)
+    {
+        var tradeName = await _db.TenantSettings.AsNoTracking()
+            .Select(s => s.TradeName)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(tradeName))
+            tradeName = "el local";
+
+        CounterReadyNotificationResult result;
+        try
+        {
+            result = _counterNotifier is null
+                ? new CounterReadyNotificationResult(false, "WhatsApp no está configurado.")
+                : await _counterNotifier.NotifyReadyAsync(order, tradeName, cancellationToken);
+        }
+        catch (Exception)
+        {
+            result = new CounterReadyNotificationResult(false, "No se pudo enviar el aviso.");
+        }
+
+        if (result.Sent)
+        {
+            order.CounterNotifiedAtUtc = DateTime.UtcNow;
+            order.CounterNotificationError = null;
+            return;
+        }
+
+        var error = result.Error ?? "No se pudo enviar el aviso.";
+        order.CounterNotificationError = error.Length <= 300 ? error : error[..300];
     }
 
     private async Task EnsureSalonOperationsAllowedAsync(CancellationToken cancellationToken)

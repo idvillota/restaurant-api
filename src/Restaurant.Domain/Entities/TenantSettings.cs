@@ -106,5 +106,17 @@ public class TenantSettings : ITenantScoped
     /// </summary>
     public bool BarcodesEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Food-plaza counter. Off by default so table and delivery tenants are unchanged.
+    /// When on, this tenant takes named pickup orders, charges before the kitchen, and does not assign tables.
+    /// </summary>
+    public bool CounterServiceEnabled { get; set; }
+
+    /// <summary>
+    /// When counter service is on, call the guest with a numbered puck instead of WhatsApp.
+    /// Off keeps the WhatsApp notice. The choice is copied onto each new order.
+    /// </summary>
+    public bool CounterUsesPager { get; set; }
+
     public Tenant Tenant { get; set; } = null!;
 }

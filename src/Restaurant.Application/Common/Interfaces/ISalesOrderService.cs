@@ -15,6 +15,26 @@ public interface ISalesOrderService
 
     Task<SalesOrderDto> StartDeliveryOrderAsync(StartDeliveryCustomerDto dto, CancellationToken cancellationToken = default);
 
+    Task<SalesOrderDto> StartCounterOrderAsync(StartCounterOrderDto dto, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CounterOrderSummaryDto>> ListCounterOrdersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends paid counter orders to the kitchen. A ticket failure does not undo the sale;
+    /// those lines stay unsent so the cashier can retry.
+    /// </summary>
+    Task DispatchPaidCounterOrdersToKitchenAsync(
+        IReadOnlyList<Guid> orderIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Marks a paid, fully sent counter order ready and tries the pickup notice once.</summary>
+    Task<SalesOrderDto?> MarkCounterReadyAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    Task<SalesOrderDto?> HandOverCounterOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>Closes a paid counter order nobody collected. Does not void the sale.</summary>
+    Task<SalesOrderDto?> AbandonCounterOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
     Task<SalesOrderDto?> AddLineAsync(Guid orderId, AddSalesOrderLineDto dto, CancellationToken cancellationToken = default);
 
     Task<SalesOrderDto?> RemovePendingLineAsync(

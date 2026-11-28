@@ -22,6 +22,7 @@ public interface IProductService
     Task<ProductRecipeDto?> GetRecipeAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<ProductRecipeDto?> SetRecipeAsync(Guid productId, SetProductRecipeDto dto, CancellationToken cancellationToken = default);
     Task<ProductBundleDto?> GetBundleAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<ChoiceComboDto?> GetChoiceComboAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<ProductBundleDto?> SetBundleAsync(Guid productId, SetProductBundleDto dto, CancellationToken cancellationToken = default);
     Task<ProductListItemDto?> SetImageAsync(Guid productId, Stream content, string fileName, CancellationToken cancellationToken = default);
     Task<ProductListItemDto?> RemoveImageAsync(Guid productId, CancellationToken cancellationToken = default);

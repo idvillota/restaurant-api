@@ -81,6 +81,8 @@ public sealed class TenantSettingsService : ITenantSettingsService
 
         settings.TiqueterasEnabled = dto.TiqueterasEnabled;
         settings.BarcodesEnabled = dto.BarcodesEnabled;
+        settings.CounterServiceEnabled = dto.CounterServiceEnabled;
+        settings.CounterUsesPager = dto.CounterUsesPager;
         ApplyBreBKey(settings, dto);
 
         await SyncDianNextConsecutiveAsync(settings, cancellationToken);
@@ -226,6 +228,8 @@ public sealed class TenantSettingsService : ITenantSettingsService
             RequirePriorDayCloseBeforeNewShift = settings.RequirePriorDayCloseBeforeNewShift,
             TiqueterasEnabled = settings.TiqueterasEnabled,
             BarcodesEnabled = settings.BarcodesEnabled,
+            CounterServiceEnabled = settings.CounterServiceEnabled,
+            CounterUsesPager = settings.CounterUsesPager,
             BreBKey = settings.BreBKey,
             BreBKeyType = settings.BreBKeyType is { } keyType ? (int)keyType : null,
         };

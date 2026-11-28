@@ -29,6 +29,12 @@ public sealed class CustomersController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    [HttpGet("by-phone")]
+    public async Task<ActionResult<IReadOnlyList<CustomerDto>>> GetByPhone(
+        [FromQuery] string? phone,
+        CancellationToken cancellationToken = default) =>
+        Ok(await _service.FindByPhoneAsync(phone ?? string.Empty, cancellationToken));
+
     [HttpGet("by-tax-id")]
     public async Task<ActionResult<CustomerDto>> GetByTaxId(
         [FromQuery] string? taxId,
