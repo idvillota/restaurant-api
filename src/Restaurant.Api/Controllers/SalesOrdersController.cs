@@ -70,6 +70,78 @@ public sealed class SalesOrdersController : ControllerBase
         }
     }
 
+    [HttpGet("counter")]
+    public async Task<ActionResult<IReadOnlyList<CounterOrderSummaryDto>>> ListCounter(
+        CancellationToken cancellationToken = default) =>
+        Ok(await _service.ListCounterOrdersAsync(cancellationToken));
+
+    [HttpPost("counter")]
+    public async Task<ActionResult<SalesOrderDto>> StartCounter(
+        [FromBody] StartCounterOrderDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return ValidationProblem(ModelState);
+
+        try
+        {
+            var created = await _service.StartCounterOrderAsync(dto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:guid}/counter/ready")]
+    public async Task<ActionResult<SalesOrderDto>> MarkCounterReady(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await _service.MarkCounterReadyAsync(id, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:guid}/counter/handover")]
+    public async Task<ActionResult<SalesOrderDto>> HandOverCounter(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await _service.HandOverCounterOrderAsync(id, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:guid}/counter/abandon")]
+    public async Task<ActionResult<SalesOrderDto>> AbandonCounter(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await _service.AbandonCounterOrderAsync(id, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("table/{tableId:guid}")]
     public async Task<ActionResult<SalesOrderDto>> StartForTable(
         Guid tableId,
@@ -274,8 +346,9 @@ public sealed class SalesOrdersController : ControllerBase
                     StatusCodes.Status403Forbidden,
                     new
                     {
-                        message =
-                            "Solo un administrador puede liberar una mesa con pedido vacío.",
+                        message = existing.IsCounterPickup
+                            ? "Solo un administrador puede anular un pedido de mostrador vacío."
+                            : "Solo un administrador puede liberar una mesa con pedido vacío.",
                     });
             }
 

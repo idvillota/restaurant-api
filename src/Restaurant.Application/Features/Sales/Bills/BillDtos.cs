@@ -62,6 +62,12 @@ public sealed class TenantSettingsDto
     /// <summary>When true, barcode/QR capture and product labels are available.</summary>
     public bool BarcodesEnabled { get; set; } = true;
 
+    /// <summary>When true, this tenant sells at the counter: pay before kitchen, no tables.</summary>
+    public bool CounterServiceEnabled { get; set; }
+
+    /// <summary>When true, a counter tenant calls the guest with a puck instead of WhatsApp.</summary>
+    public bool CounterUsesPager { get; set; }
+
     /// <summary>
     /// Populated after settings update when barcodes were enabled and missing product codes were filled.
     /// </summary>
@@ -152,6 +158,10 @@ public sealed class UpdateTenantSettingsDto
 
     public bool BarcodesEnabled { get; set; } = true;
 
+    public bool CounterServiceEnabled { get; set; }
+
+    public bool CounterUsesPager { get; set; }
+
     [MaxLength(40)]
     public string? BreBKey { get; set; }
 
@@ -164,6 +174,7 @@ public sealed class PayableTableGroupDto
     public string TableCode { get; set; } = string.Empty;
     public string? Zone { get; set; }
     public bool IsDelivery { get; set; }
+    public bool IsCounterPickup { get; set; }
     public Guid? CustomerId { get; set; }
     public string? CustomerName { get; set; }
     public string? DeliveryAddress { get; set; }

@@ -19,6 +19,12 @@ public static class DependencyInjection
     {
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<PlatformOptions>(configuration.GetSection(PlatformOptions.SectionName));
+        services.Configure<CounterPickupOptions>(configuration.GetSection(CounterPickupOptions.SectionName));
+        services.AddHttpClient(WhatsAppCounterReadyNotifier.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        services.AddScoped<ICounterReadyNotifier, WhatsAppCounterReadyNotifier>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<ICurrentTenantContext, CurrentTenantContext>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();

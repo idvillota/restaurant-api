@@ -337,6 +337,12 @@ public sealed class ApplicationDbContext : DbContext
             e.Property(x => x.DeliveryPhone).HasMaxLength(40);
             e.Property(x => x.DeliveryAddress).HasMaxLength(300);
             e.Property(x => x.IsDelivery).HasDefaultValue(false);
+            e.Property(x => x.IsCounterPickup).HasDefaultValue(false);
+            e.Property(x => x.CounterCustomerName).HasMaxLength(200);
+            e.Property(x => x.CounterPhone).HasMaxLength(20);
+            e.Property(x => x.CounterUsesPager).HasDefaultValue(false);
+            e.Property(x => x.CounterPagerNumber).HasMaxLength(4);
+            e.Property(x => x.CounterNotificationError).HasMaxLength(300);
             e.HasIndex(x => new { x.TenantId, x.DiningTableId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.Status });
             e.HasIndex(x => new { x.TenantId, x.ClosedAtUtc });

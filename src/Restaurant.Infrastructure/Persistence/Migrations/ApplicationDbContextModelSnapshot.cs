@@ -1756,6 +1756,39 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ClosedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("CounterAbandonedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CounterCustomerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("CounterHandedOverAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CounterNotificationError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("CounterNotifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CounterPagerNumber")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
+                    b.Property<string>("CounterPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("CounterReadyAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("CounterUsesPager")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -1776,6 +1809,11 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid?>("DiningTableId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsCounterPickup")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("IsDelivery")
                         .ValueGeneratedOnAdd()
@@ -2090,6 +2128,12 @@ namespace Restaurant.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
+
+                    b.Property<bool>("CounterServiceEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CounterUsesPager")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Country")
                         .IsRequired()

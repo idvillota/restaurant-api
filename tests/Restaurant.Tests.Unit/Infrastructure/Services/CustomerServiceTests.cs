@@ -94,6 +94,26 @@ public sealed class CustomerServiceTests
     }
 
     [Fact]
+    public async Task FindByPhoneAsync_matches_a_colombian_mobile_and_skips_a_number_without_a_phone()
+    {
+        using var fx = new TenantDbFixture();
+        var sut = CreateSut(fx);
+        await sut.CreateAsync(new CreateCustomerDto { Name = "Ana", Phone = "3001234567", TaxId = "123" });
+        await sut.CreateAsync(new CreateCustomerDto { Name = "Corto", Phone = "12", TaxId = "999" });
+        await sut.CreateAsync(new CreateCustomerDto
+        {
+            Name = "Consumidor final",
+            Phone = "3001234567",
+            TaxId = CustomerTaxId.ConsumidorFinal,
+        });
+
+        var found = await sut.FindByPhoneAsync("57 300 123 4567");
+        var only = Assert.Single(found);
+        Assert.Equal("Ana", only.Name);
+        Assert.Empty(await sut.FindByPhoneAsync("12"));
+    }
+
+    [Fact]
     public async Task FindByTaxIdAsync_matches_normalized_digits()
     {
         using var fx = new TenantDbFixture();

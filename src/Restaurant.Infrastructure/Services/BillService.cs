@@ -29,6 +29,7 @@ public sealed class BillService : IBillService
     private readonly IMobileSalePublisher? _salePublisher;
     private readonly IPrintJobQueue? _printJobs;
     private readonly ILogger<BillService>? _logger;
+    private readonly ISalesOrderService? _salesOrders;
 
     public BillService(
         ApplicationDbContext db,
@@ -40,7 +41,8 @@ public sealed class BillService : IBillService
         ILunchTicketBookletService lunchTickets,
         IMobileSalePublisher? salePublisher = null,
         IPrintJobQueue? printJobs = null,
-        ILogger<BillService>? logger = null)
+        ILogger<BillService>? logger = null,
+        ISalesOrderService? salesOrders = null)
     {
         _db = db;
         _tenantContext = tenantContext;
@@ -52,6 +54,7 @@ public sealed class BillService : IBillService
         _salePublisher = salePublisher;
         _printJobs = printJobs;
         _logger = logger;
+        _salesOrders = salesOrders;
     }
 
     public async Task<IReadOnlyList<PayableTableGroupDto>> ListPayableByTableSearchAsync(
@@ -65,17 +68,23 @@ public sealed class BillService : IBillService
                 search.Length == 0 ||
                 (o.DiningTable != null && EF.Functions.ILike(o.DiningTable.Code, $"%{search}%")) ||
                 (o.DeliveryCustomerName != null && EF.Functions.ILike(o.DeliveryCustomerName, $"%{search}%")) ||
-                (o.DeliveryAddress != null && EF.Functions.ILike(o.DeliveryAddress, $"%{search}%")))
+                (o.DeliveryAddress != null && EF.Functions.ILike(o.DeliveryAddress, $"%{search}%")) ||
+                (o.CounterCustomerName != null && EF.Functions.ILike(o.CounterCustomerName, $"%{search}%")) ||
+                (o.CounterPhone != null && EF.Functions.ILike(o.CounterPhone, $"%{search}%")) ||
+                EF.Functions.ILike(o.Number, $"%{search}%"))
             .Select(o => new
             {
                 o.Id,
                 o.Number,
                 o.DiningTableId,
-                TableCode = o.IsDelivery ? "Domicilio" : (o.DiningTable != null ? o.DiningTable.Code : "—"),
+                TableCode = o.IsCounterPickup
+                    ? "Mostrador"
+                    : o.IsDelivery ? "Domicilio" : (o.DiningTable != null ? o.DiningTable.Code : "—"),
                 Zone = o.DiningTable != null ? o.DiningTable.Zone : null,
                 o.IsDelivery,
+                o.IsCounterPickup,
                 o.CustomerId,
-                CustomerName = o.DeliveryCustomerName,
+                CustomerName = o.IsCounterPickup ? o.CounterCustomerName : o.DeliveryCustomerName,
                 o.DeliveryAddress,
                 Lines = o.Lines.Where(l => l.Quantity > 0).Select(l => new
                 {
@@ -97,16 +106,17 @@ public sealed class BillService : IBillService
             .ToListAsync(cancellationToken);
 
         return orderRows
-            .GroupBy(o => o.DiningTableId)
+            .GroupBy(o => o.IsCounterPickup || o.DiningTableId is null ? o.Id : o.DiningTableId.Value)
             .Select(g =>
             {
                 var first = g.First();
                 return new PayableTableGroupDto
                 {
-                    TableId = first.DiningTableId ?? Guid.Empty,
+                    TableId = first.IsCounterPickup ? first.Id : first.DiningTableId ?? Guid.Empty,
                     TableCode = first.TableCode,
                     Zone = first.Zone,
                     IsDelivery = first.IsDelivery,
+                    IsCounterPickup = first.IsCounterPickup,
                     CustomerId = first.CustomerId,
                     CustomerName = first.CustomerName,
                     DeliveryAddress = first.DeliveryAddress,
@@ -345,6 +355,7 @@ public sealed class BillService : IBillService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await NotifyFreedTablesAsync(orders, cancellationToken);
+        await DispatchPaidCounterOrdersToKitchenAsync(orders, cancellationToken);
 
         // Checkout is already committed. Receipt PDF/XML must not roll back payment if generation fails.
         SalesReceiptModel? receiptModel = null;
@@ -675,6 +686,30 @@ public sealed class BillService : IBillService
         }
     }
 
+    private async Task DispatchPaidCounterOrdersToKitchenAsync(
+        IReadOnlyList<SalesOrder> orders,
+        CancellationToken cancellationToken)
+    {
+        if (_salesOrders is null)
+            return;
+
+        var counterOrderIds = orders
+            .Where(order => order.IsCounterPickup)
+            .Select(order => order.Id)
+            .ToList();
+        if (counterOrderIds.Count == 0)
+            return;
+
+        try
+        {
+            await _salesOrders.DispatchPaidCounterOrdersToKitchenAsync(counterOrderIds, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Counter orders stayed paid, but the kitchen send failed.");
+        }
+    }
+
     private async Task NotifyFreedTablesAsync(
         IReadOnlyList<SalesOrder> orders,
         CancellationToken cancellationToken)
@@ -801,7 +836,7 @@ public sealed class BillService : IBillService
         CancellationToken cancellationToken)
     {
         var fromNav = orders
-            .Select(o => o.IsDelivery ? "Domicilio" : o.DiningTable?.Code)
+            .Select(o => o.IsCounterPickup ? "Mostrador" : o.IsDelivery ? "Domicilio" : o.DiningTable?.Code)
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -837,7 +872,10 @@ public sealed class BillService : IBillService
             .Include(o => o.Lines)
             .ThenInclude(l => l.Product)
             .ThenInclude(p => p.ProductType)
-            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any(l => l.Quantity > 0));
+            .Where(o =>
+                o.Lines.Any(l => l.Quantity > 0) &&
+                (o.Status == SalesOrderStatus.Open ||
+                 (o.IsCounterPickup && o.Status == SalesOrderStatus.Draft)));
 
     private IQueryable<SalesOrder> LoadOpenOrdersQuery() =>
         _db.SalesOrders
@@ -848,7 +886,10 @@ public sealed class BillService : IBillService
             .ThenInclude(p => p.ProductType)
             .Include(o => o.Lines)
             .ThenInclude(l => l.ExcludedIngredients)
-            .Where(o => o.Status == SalesOrderStatus.Open && o.Lines.Any(l => l.Quantity > 0));
+            .Where(o =>
+                o.Lines.Any(l => l.Quantity > 0) &&
+                (o.Status == SalesOrderStatus.Open ||
+                 (o.IsCounterPickup && o.Status == SalesOrderStatus.Draft)));
 
     private static PayableOrderDto MapPayableOrder(SalesOrder order)
     {
@@ -863,7 +904,7 @@ public sealed class BillService : IBillService
                 LineId = l.Id,
                 OrderId = order.Id,
                 OrderNumber = order.Number,
-                TableCode = order.DiningTable?.Code,
+                TableCode = order.IsCounterPickup ? "Mostrador" : order.DiningTable?.Code,
                 ProductId = l.ProductId,
                 ProductName = l.Product.Name,
                 ProductTypeName = l.Product.ProductType?.Name ?? "Otros",
@@ -888,7 +929,7 @@ public sealed class BillService : IBillService
                 LineId = l.Id,
                 OrderId = order.Id,
                 OrderNumber = order.Number,
-                TableCode = order.DiningTable?.Code,
+                TableCode = order.IsCounterPickup ? "Mostrador" : order.DiningTable?.Code,
                 ProductId = l.ProductId,
                 ProductName = l.Product.Name,
                 ProductTypeName = l.Product.ProductType?.Name ?? "Otros",

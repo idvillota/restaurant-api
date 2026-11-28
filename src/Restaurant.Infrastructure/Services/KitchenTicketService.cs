@@ -132,8 +132,14 @@ public sealed class KitchenTicketService : IKitchenTicketService
 
         return new KitchenTicketModel
         {
-            TableCode = order.IsDelivery ? "DOMICILIO" : order.DiningTable?.Code ?? "—",
+            TableCode = order.IsCounterPickup
+                ? "MOSTRADOR"
+                : order.IsDelivery ? "DOMICILIO" : order.DiningTable?.Code ?? "—",
             IsDelivery = order.IsDelivery,
+            IsCounterPickup = order.IsCounterPickup,
+            CounterCustomerName = order.CounterCustomerName,
+            CounterPhone = order.CounterPhone,
+            CounterPagerNumber = order.CounterPagerNumber,
             DeliveryAddress = order.DeliveryAddress,
             DeliveryPhone = order.DeliveryPhone,
             OrderNumber = order.Number,

@@ -13,6 +13,10 @@ public sealed class KitchenTicketModel
 {
     public string TableCode { get; set; } = string.Empty;
     public bool IsDelivery { get; set; }
+    public bool IsCounterPickup { get; set; }
+    public string? CounterCustomerName { get; set; }
+    public string? CounterPhone { get; set; }
+    public string? CounterPagerNumber { get; set; }
 
     /// <summary>Address captured on the delivery dialog, including a one-time address.</summary>
     public string? DeliveryAddress { get; set; }

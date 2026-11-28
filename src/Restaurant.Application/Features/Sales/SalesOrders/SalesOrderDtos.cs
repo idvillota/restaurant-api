@@ -13,6 +13,16 @@ public sealed class SalesOrderDto
     public string? DeliveryCustomerName { get; set; }
     public string? DeliveryPhone { get; set; }
     public string? DeliveryAddress { get; set; }
+    public bool IsCounterPickup { get; set; }
+    public string? CounterCustomerName { get; set; }
+    public string? CounterPhone { get; set; }
+    public bool CounterUsesPager { get; set; }
+    public string? CounterPagerNumber { get; set; }
+    public DateTime? CounterReadyAtUtc { get; set; }
+    public DateTime? CounterNotifiedAtUtc { get; set; }
+    public string? CounterNotificationError { get; set; }
+    public DateTime? CounterHandedOverAtUtc { get; set; }
+    public DateTime? CounterAbandonedAtUtc { get; set; }
     public string Number { get; set; } = string.Empty;
     public SalesOrderStatus Status { get; set; }
     public DateTime OpenedAtUtc { get; set; }
@@ -229,4 +239,37 @@ public sealed class CancelSalesOrderResultDto
     public List<KitchenTicketFileDto> KitchenTickets { get; set; } = [];
     public bool OrderVoided { get; set; }
     public string? Message { get; set; }
+}
+
+public sealed class StartCounterOrderDto
+{
+    [Required]
+    [MaxLength(200)]
+    public string CustomerName { get; set; } = string.Empty;
+
+    [MaxLength(20)]
+    public string? Phone { get; set; }
+
+    /// <summary>Puck number. Required only when this tenant calls guests with a localizador.</summary>
+    [MaxLength(8)]
+    public string? PagerNumber { get; set; }
+}
+
+public sealed class CounterOrderSummaryDto
+{
+    public Guid Id { get; set; }
+    public string Number { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+    public bool UsesPager { get; set; }
+    public string? PagerNumber { get; set; }
+    public SalesOrderStatus Status { get; set; }
+    public decimal Total { get; set; }
+    public bool Paid { get; set; }
+    public bool SentToKitchen { get; set; }
+    /// <summary>When the whole order was sent to the kitchen. Empty until every line is sent.</summary>
+    public DateTime? SentToKitchenAtUtc { get; set; }
+    public DateTime? ReadyAtUtc { get; set; }
+    public DateTime? NotifiedAtUtc { get; set; }
+    public string? NotificationError { get; set; }
 }
